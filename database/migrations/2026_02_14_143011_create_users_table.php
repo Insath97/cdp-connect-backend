@@ -20,7 +20,16 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('profile_image')->nullable();
             $table->string('password');
-            $table->boolean('is_active')->default(true);
+            $table->enum('user_type', ['admin', 'hierarchy', 'customer']);
+
+            $table->boolean('is_active')->default(true); // Reporting structure
+
+            // Physical location (where they WORK)
+            $table->foreignId('branch_id')->nullable()->constrained('branches');
+            $table->foreignId('zone_id')->nullable()->constrained('zones');
+            $table->foreignId('region_id')->nullable()->constrained('regions');
+            $table->foreignId('province_id')->nullable()->constrained('provinces');
+
             $table->boolean('can_login')->default(true);
             $table->timestamp('last_login_at')->nullable();
             $table->string('last_login_ip')->nullable();

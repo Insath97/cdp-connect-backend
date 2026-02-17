@@ -214,7 +214,7 @@ class RoleController extends Controller
 
             $query = Role::query();
 
-            if (!$user->isSuperAdmin() && $user->hasRole('Super Admin')) {
+            if ($user->hasRole('Super Admin')) {
                 $query->where('name', '!=', 'Super Admin');
             }
 

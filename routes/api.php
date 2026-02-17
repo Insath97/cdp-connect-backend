@@ -9,9 +9,6 @@ Route::get('/health-check', function () {
     return response()->json(['message' => 'CDP Connect API is working!']);
 });
 
-/* admin routes */
-require __DIR__ . '/admin.php';
-
 /* version 1 routes */
 require __DIR__ . '/v1.php';
 

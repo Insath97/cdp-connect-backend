@@ -25,6 +25,13 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
         'username',
         'email',
         'password',
+        'user_type',
+        'level_id',
+        'parent_user_id',
+        'branch_id',
+        'zone_id',
+        'region_id',
+        'province_id',
         'is_active',
         'can_login',
         'profile_image',
@@ -70,12 +77,51 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
     public function getJWTCustomClaims()
     {
         return [
-            'id'        => $this->id,
-            'name'      => $this->name,
-            'username'  => $this->username,
-            'email'     => $this->email,
+            'id' => $this->id,
+            'name' => $this->name,
+            'username' => $this->username,
+            'email' => $this->email,
         ];
     }
+
+    /* Relationships */
+
+    public function level()
+    {
+        return $this->belongsTo(Level::class);
+    }
+
+    public function parent()
+    {
+        return $this->belongsTo(User::class, 'parent_user_id');
+    }
+
+    public function children()
+    {
+        return $this->hasMany(User::class, 'parent_user_id');
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function zone()
+    {
+        return $this->belongsTo(Zone::class);
+    }
+
+    public function region()
+    {
+        return $this->belongsTo(Region::class);
+    }
+
+    public function province()
+    {
+        return $this->belongsTo(Province::class);
+    }
+
+    /* Helper Methods */
 
     public function canLogin(): bool
     {
@@ -107,7 +153,7 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
 
     /**
      * Mark the user's email as verified
-    */
+     */
     public function markEmailAsVerifiedcheck(string $token)
     {
         $this->update([
@@ -119,7 +165,7 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
 
     /**
      * Mark the user's email as verified without a token
-    */
+     */
     public function markEmailAsVerified()
     {
         $this->update([
@@ -147,7 +193,7 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
 
     /**
      * Check if the user has verified their email
-    */
+     */
     public function hasVerifiedEmail(): bool
     {
         return !is_null($this->email_verified_at);

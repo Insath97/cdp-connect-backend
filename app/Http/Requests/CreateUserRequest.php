@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
 class CreateUserRequest extends FormRequest
 {
@@ -25,16 +26,25 @@ class CreateUserRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:255',
-            'username' => 'required|string|max:255|regex:/^[a-zA-Z0-9._-]+$/|not_regex:/\s/|unique:users,username',
-            'email' => 'required|string|email|max:255|unique:users,email',
-            'password' => 'required|string|min:8|confirmed',
-            'password_confirmation' => 'required|string|min:8',
+            'username' => 'required|string|max:255|unique:users,username',
+            'email' => 'required|email|max:255|unique:users,email',
+            'password' => 'required|string|min:8',
+            'user_type' => 'required|in:admin,hierarchy,customer',
             'role' => 'required|string|exists:roles,name',
+
+            // Hierarchy specific validation
+            'level_id' => 'required_if:user_type,hierarchy|nullable|exists:levels,id',
+            'parent_user_id' => 'nullable|exists:users,id',
+
+            // Location fields (required based on business logic, but nullable in DB)
             'branch_id' => 'nullable|exists:branches,id',
-            'organization_id' => 'required_with:branch_id|exists:organizations,id',
-            'profile_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'is_active' => 'nullable|boolean',
-            'can_login' => 'nullable|boolean',
+            'zone_id' => 'nullable|exists:zones,id',
+            'region_id' => 'nullable|exists:regions,id',
+            'province_id' => 'nullable|exists:provinces,id',
+
+            'profile_image' => 'nullable|string',
+            'is_active' => 'sometimes|boolean',
+            'can_login' => 'sometimes|boolean',
         ];
     }
 

@@ -7,6 +7,9 @@ use App\Http\Requests\CreateLevelRequest;
 use App\Http\Requests\UpdateLevelRequest;
 use App\Models\Level;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class LevelController extends Controller
 {
@@ -26,6 +29,12 @@ class LevelController extends Controller
 
             $levels = $query->paginate($perPage);
 
+            Log::info('Levels index accessed', [
+                'user_id' => Auth::id(),
+                'filters' => $request->only(['search', 'is_active', 'per_page']),
+                'count' => $levels->count()
+            ]);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Levels retrieved successfully',
@@ -44,7 +53,18 @@ class LevelController extends Controller
     {
         try {
             $data = $request->validated();
+
+            if (empty($data['slug'])) {
+                $data['slug'] = Str::slug($data['level_name']);
+            }
+
             $level = Level::create($data);
+
+            Log::info('Level created', [
+                'user_id' => Auth::id(),
+                'level_id' => $level->id,
+                'level_name' => $level->level_name
+            ]);
 
             return response()->json([
                 'status' => 'success',
@@ -71,6 +91,11 @@ class LevelController extends Controller
                     'message' => 'Level not found'
                 ], 404);
             }
+
+            Log::info('Level viewed', [
+                'user_id' => Auth::id(),
+                'level_id' => $level->id
+            ]);
 
             return response()->json([
                 'status' => 'success',
@@ -99,7 +124,18 @@ class LevelController extends Controller
             }
 
             $data = $request->validated();
+
+            if (isset($data['level_name']) && $data['level_name'] !== $level->level_name) {
+                $data['slug'] = Str::slug($data['level_name']);
+            }
+
             $level->update($data);
+
+            Log::info('Level updated', [
+                'user_id' => Auth::id(),
+                'level_id' => $level->id,
+                'updated_fields' => array_keys($data)
+            ]);
 
             return response()->json([
                 'status' => 'success',
@@ -127,7 +163,25 @@ class LevelController extends Controller
                 ], 404);
             }
 
+            // Check if user is Super Admin
+            if (!Auth::user()->hasRole('Super Admin')) {
+                Log::warning('Unauthorized level deletion attempt', [
+                    'user_id' => Auth::id(),
+                    'level_id' => $id
+                ]);
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only Super Admin can delete levels'
+                ], 403);
+            }
+
             $level->delete();
+
+            Log::info('Level deleted', [
+                'user_id' => Auth::id(),
+                'level_id' => $id,
+                'level_name' => $level->level_name
+            ]);
 
             return response()->json([
                 'status' => 'success',
@@ -142,4 +196,3 @@ class LevelController extends Controller
         }
     }
 }
-

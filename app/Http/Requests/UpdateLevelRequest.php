@@ -29,6 +29,7 @@ class UpdateLevelRequest extends FormRequest
             'slug' => 'sometimes|string|max:255|unique:levels,slug,' . $id,
             'code' => 'sometimes|string|max:50|unique:levels,code,' . $id,
             'tire_level' => 'sometimes|integer|min:1',
+            'category' => 'sometimes|in:executive,management,branch,agency',
             'isActive' => 'sometimes|boolean',
             'is_single_user' => 'sometimes|boolean',
         ];

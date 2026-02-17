@@ -5,9 +5,8 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Validation\Rule;
 
-class UpdateUserRequest extends FormRequest
+class UpdateBranchRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -24,26 +23,27 @@ class UpdateUserRequest extends FormRequest
      */
     public function rules(): array
     {
-        $id = $this->route('user');
+        $id = $this->route('branch');
         return [
             'name' => 'sometimes|string|max:255',
-            'username' => 'sometimes|string|max:255|unique:users,username,' . $id,
-            'email' => 'sometimes|email|max:255|unique:users,email,' . $id,
-            'password' => 'sometimes|string|min:8',
-            'user_type' => 'sometimes|in:admin,hierarchy,customer',
-            'role' => 'sometimes|string|exists:roles,name',
-
-            'level_id' => 'required_if:user_type,hierarchy|nullable|exists:levels,id',
-            'parent_user_id' => 'nullable|exists:users,id',
-
-            'branch_id' => 'nullable|exists:branches,id',
-            'zone_id' => 'nullable|exists:zones,id',
-            'region_id' => 'nullable|exists:regions,id',
-            'province_id' => 'nullable|exists:provinces,id',
-
-            'profile_image' => 'nullable|string',
+            'code' => 'sometimes|string|max:50|unique:branches,code,' . $id,
+            'address_line1' => 'sometimes|string|max:255',
+            'address_line2' => 'nullable|string|max:255',
+            'city' => 'sometimes|string|max:100',
+            'postal_code' => 'nullable|string|max:20',
+            'zone_id' => 'sometimes|exists:zones,id',
+            'region_id' => 'sometimes|exists:regions,id',
+            'province_id' => 'sometimes|exists:provinces,id',
+            'phone_primary' => 'sometimes|string|max:20',
+            'phone_secondary' => 'nullable|string|max:20',
+            'email' => 'nullable|email|max:255',
+            'fax' => 'nullable|string|max:20',
+            'opening_date' => 'sometimes|date',
+            'branch_type' => 'sometimes|in:main,city,satellite,mobile',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
             'is_active' => 'sometimes|boolean',
-            'can_login' => 'sometimes|boolean',
+            'is_head_office' => 'sometimes|boolean',
         ];
     }
 

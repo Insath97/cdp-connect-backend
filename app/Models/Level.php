@@ -12,7 +12,9 @@ class Level extends Model
     protected $fillable = [
         'level_name',
         'slug',
+        'code',
         'tire_level',
+        'category',
         'isActive',
         'is_single_user'
     ];

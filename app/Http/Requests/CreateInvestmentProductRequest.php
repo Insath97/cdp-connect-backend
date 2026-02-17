@@ -5,9 +5,8 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Validation\Rule;
 
-class UpdateUserRequest extends FormRequest
+class CreateInvestmentProductRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -24,46 +23,32 @@ class UpdateUserRequest extends FormRequest
      */
     public function rules(): array
     {
-        $id = $this->route('user');
         return [
-            'name' => 'sometimes|string|max:255',
-            'username' => 'sometimes|string|max:255|unique:users,username,' . $id,
-            'email' => 'sometimes|email|max:255|unique:users,email,' . $id,
-            'password' => 'sometimes|string|min:8',
-            'user_type' => 'sometimes|in:admin,hierarchy,customer',
-            'role' => 'sometimes|string|exists:roles,name',
-
-            'level_id' => 'required_if:user_type,hierarchy|nullable|exists:levels,id',
-            'parent_user_id' => 'nullable|exists:users,id',
-
-            'branch_id' => 'nullable|exists:branches,id',
-            'zone_id' => 'nullable|exists:zones,id',
-            'region_id' => 'nullable|exists:regions,id',
-            'province_id' => 'nullable|exists:provinces,id',
-
-            'profile_image' => 'nullable|string',
+            'name' => 'required|string|max:255',
+            'code' => 'required|string|unique:investment_products,code|max:50',
+            'duration_months' => 'required|integer|min:1',
+            'roi_percentage' => 'required|numeric|min:0|max:100',
+            'minimum_amount' => 'required|numeric|min:0',
+            'maximum_amount' => 'nullable|numeric|gte:minimum_amount',
             'is_active' => 'sometimes|boolean',
-            'can_login' => 'sometimes|boolean',
         ];
-    }
-
-    public function bodyParameters()
-    {
-        return [];
     }
 
     protected function failedValidation(Validator $validator)
     {
         $errorMessages = $validator->errors();
+
         $fieldErrors = collect($errorMessages->getMessages())->map(function ($messages, $field) {
             return [
                 'field' => $field,
                 'messages' => $messages,
             ];
         })->values();
+
         $message = $fieldErrors->count() > 1
             ? 'There are multiple validation errors. Please review the form and correct the issues.'
             : 'There is an issue with the input for ' . $fieldErrors->first()['field'] . '.';
+
         throw new HttpResponseException(response()->json([
             'message' => $message,
             'errors' => $fieldErrors,
