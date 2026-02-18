@@ -60,7 +60,6 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::patch('targets/{id}/achieved', [TargetController::class, 'markAchieved']);
     Route::patch('targets/{id}/expired', [TargetController::class, 'markExpired']);
 
-    // Customer Routes
     Route::apiResource('customers', CustomerController::class);
     Route::patch('customers/{id}/restore', [CustomerController::class, 'restore']);
     Route::delete('customers/{id}/force', [CustomerController::class, 'forceDelete']);

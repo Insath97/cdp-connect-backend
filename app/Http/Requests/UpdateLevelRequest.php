@@ -26,7 +26,7 @@ class UpdateLevelRequest extends FormRequest
         $id = $this->route('id') ?? $this->route('level');
         return [
             'level_name' => 'sometimes|string|max:255',
-            'slug' => 'sometimes|string|max:255|unique:levels,slug,' . $id,
+            'slug' => 'sometimes|string|unique:levels,slug,' . $id . '|max:255',
             'code' => 'sometimes|string|max:50|unique:levels,code,' . $id,
             'tire_level' => 'sometimes|integer|min:1',
             'category' => 'sometimes|in:executive,management,branch,agency',

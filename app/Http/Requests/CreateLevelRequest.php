@@ -25,7 +25,7 @@ class CreateLevelRequest extends FormRequest
     {
         return [
             'level_name' => 'required|string|max:255',
-            'slug' => 'required|string|unique:levels,slug|max:255',
+            'slug' => 'nullable|string|unique:levels,slug|max:255',
             'code' => 'required|string|unique:levels,code|max:50',
             'tire_level' => 'required|integer|min:1',
             'category' => 'required|in:executive,management,branch,agency',
