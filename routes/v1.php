@@ -11,8 +11,9 @@ use App\Http\Controllers\V1\BranchController;
 use App\Http\Controllers\V1\CustomerController;
 use App\Http\Controllers\V1\UserController;
 use App\Http\Controllers\V1\InvestmentProductController;
-use App\Http\Controllers\V1\TargetController;
 use App\Http\Controllers\V1\LevelController;
+use App\Http\Controllers\V1\TargetController;
+use App\Http\Controllers\V1\QuotationController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -64,4 +65,9 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::patch('customers/{id}/restore', [CustomerController::class, 'restore']);
     Route::delete('customers/{id}/force', [CustomerController::class, 'forceDelete']);
     Route::patch('customers/{id}/toggle-status', [CustomerController::class, 'toggleStatus']);
+
+    Route::apiResource('quotations', QuotationController::class);
+    Route::patch('quotations/{id}/restore', [QuotationController::class, 'restore']);
+    Route::delete('quotations/{id}/force', [QuotationController::class, 'forceDelete']);
+    Route::patch('quotations/{id}/toggle-status', [QuotationController::class, 'toggleStatus']);
 });

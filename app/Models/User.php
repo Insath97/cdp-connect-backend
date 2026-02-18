@@ -192,6 +192,22 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
     }
 
     /**
+     * Get all direct and indirect subordinate IDs (descendants).
+     */
+    public function getAllDescendantIds(): array
+    {
+        $descendants = [];
+        $children = User::where('parent_user_id', $this->id)->get();
+
+        foreach ($children as $child) {
+            $descendants[] = $child->id;
+            $descendants = array_merge($descendants, $child->getAllDescendantIds());
+        }
+
+        return $descendants;
+    }
+
+    /**
      * Check if the user has verified their email
      */
     public function hasVerifiedEmail(): bool
