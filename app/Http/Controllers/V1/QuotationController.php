@@ -23,7 +23,7 @@ class QuotationController extends Controller
             $query = Quotation::with(['customer', 'branch', 'investmentProduct', 'creator']);
 
             // Hierarchy Visibility Logic
-            if (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
+            if ($user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
                 // Hierarchical users (GM, AGM, etc.) see their own and descendants
                 $descendantIds = $user->getAllDescendantIds();
                 $accessibleUserIds = array_merge([$user->id], $descendantIds);
@@ -61,7 +61,7 @@ class QuotationController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Quotations retrieved successfully',
-                'data' => $quotations
+                'data' => $quotations->load(['customer:id,full_name,name_with_initials,id_type,id_number', 'branch:id,name,code', 'investmentProduct:id,name,code,duration_months,roi_percentage', 'creator:id,name,username,email'])
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
@@ -146,7 +146,7 @@ class QuotationController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Quotation created successfully',
-                'data' => $quotation
+                'data' => $quotation->load(['customer:id,full_name,name_with_initials', 'branch:id,name,code', 'investmentProduct:id,name,code,duration_months,roi_percentage', 'creator'])
             ], 201);
 
         } catch (\Throwable $th) {

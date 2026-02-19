@@ -28,7 +28,7 @@ class CreateInvestmentProductRequest extends FormRequest
             'code' => 'required|string|unique:investment_products,code|max:50',
             'duration_months' => 'required|integer|min:1',
             'roi_percentage' => 'required|numeric|min:0|max:100',
-            'minimum_amount' => 'required|numeric|min:0',
+            'minimum_amount' => 'nullable|numeric|min:0',
             'maximum_amount' => 'nullable|numeric|gte:minimum_amount',
             'is_active' => 'sometimes|boolean',
         ];

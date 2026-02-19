@@ -19,7 +19,6 @@ use App\Http\Controllers\V1\QuotationController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
-
 Route::prefix('v1')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
 });
