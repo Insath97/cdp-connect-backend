@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\V1\AuthController;
 use App\Http\Controllers\V1\CountryController;
+use App\Http\Controllers\V1\InvestmentController;
 use App\Http\Controllers\V1\PermissionController;
 use App\Http\Controllers\V1\ProvinceController;
 use App\Http\Controllers\V1\RegionController;
@@ -70,4 +71,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::patch('quotations/{id}/restore', [QuotationController::class, 'restore']);
     Route::delete('quotations/{id}/force', [QuotationController::class, 'forceDelete']);
     Route::patch('quotations/{id}/toggle-status', [QuotationController::class, 'toggleStatus']);
+
+    Route::apiResource('investments', InvestmentController::class);
+    Route::patch('investments/{id}/approve', [InvestmentController::class, 'approve']);
 });

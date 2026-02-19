@@ -27,6 +27,13 @@ class Target extends Model
         'achieved_at' => 'datetime',
     ];
 
+    protected $appends = ['remaining_amount'];
+
+    public function getRemainingAmountAttribute()
+    {
+        return max(0, $this->target_amount - $this->achieved_amount);
+    }
+
     /* Relationships */
 
     public function user()
@@ -49,5 +56,30 @@ class Target extends Model
     public function scopeForPeriod($query, $type, $key)
     {
         return $query->where('period_type', $type)->where('period_key', $key);
+    }
+
+    /**
+     * Recursively update achieved_amount for a user and their superiors.
+     */
+    public static function syncAchievement($userId, $periodKey, $amount)
+    {
+        $target = self::where('user_id', $userId)
+            ->where('period_key', $periodKey)
+            ->first();
+
+        if ($target) {
+            $target->increment('achieved_amount', $amount);
+
+            // Auto-achieve if amount reached? (Optional)
+            if ($target->achieved_amount >= $target->target_amount) {
+                $target->update(['status' => 'achieved', 'achieved_at' => now()]);
+            }
+        }
+
+        // Move up the hierarchy
+        $user = User::find($userId);
+        if ($user && $user->parent_user_id) {
+            self::syncAchievement($user->parent_user_id, $periodKey, $amount);
+        }
     }
 }
