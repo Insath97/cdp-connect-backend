@@ -61,11 +61,12 @@ class InvestmentController extends Controller
             }
 
             // Ordering: GM -> AGM -> Branch (Hierarchical Order)
-            $investments = $query->join('users', 'investments.created_by', '=', 'users.id')
-                ->join('levels', 'users.level_id', '=', 'levels.id')
-                ->join('branches', 'investments.branch_id', '=', 'branches.id')
+            // Use leftJoin to avoid filtering out records that might not have a level or branch (e.g., Super Admin entries)
+            $investments = $query->leftJoin('users', 'investments.created_by', '=', 'users.id')
+                ->leftJoin('levels', 'users.level_id', '=', 'levels.id')
+                ->leftJoin('branches', 'investments.branch_id', '=', 'branches.id')
                 ->select('investments.*')
-                ->orderBy('levels.tire_level', 'asc')
+                ->orderByRaw('COALESCE(levels.tire_level, 999) ASC')
                 ->orderBy('branches.name', 'asc')
                 ->orderBy('investments.created_at', 'desc')
                 ->paginate($perPage);

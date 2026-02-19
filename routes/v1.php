@@ -14,10 +14,12 @@ use App\Http\Controllers\V1\UserController;
 use App\Http\Controllers\V1\InvestmentProductController;
 use App\Http\Controllers\V1\LevelController;
 use App\Http\Controllers\V1\TargetController;
+use App\Http\Controllers\V1\TargetProgressController;
 use App\Http\Controllers\V1\QuotationController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
+
 Route::prefix('v1')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
 });
@@ -74,4 +76,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
 
     Route::apiResource('investments', InvestmentController::class);
     Route::patch('investments/{id}/approve', [InvestmentController::class, 'approve']);
+
+    Route::get('target-progress', [TargetProgressController::class, 'index']);
+    Route::get('target-progress/{period_key}', [TargetProgressController::class, 'show']);
 });

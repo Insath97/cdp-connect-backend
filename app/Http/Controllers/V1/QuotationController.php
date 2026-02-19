@@ -48,11 +48,12 @@ class QuotationController extends Controller
             }
 
             // Ordering: GM -> AGM -> Branch (Hierarchical Order)
-            $quotations = $query->join('users', 'quotations.created_by', '=', 'users.id')
-                ->join('levels', 'users.level_id', '=', 'levels.id')
-                ->join('branches', 'quotations.branch_id', '=', 'branches.id')
+            // Use leftJoin to avoid filtering out records that might not have a level or branch (e.g., Super Admin entries)
+            $quotations = $query->leftJoin('users', 'quotations.created_by', '=', 'users.id')
+                ->leftJoin('levels', 'users.level_id', '=', 'levels.id')
+                ->leftJoin('branches', 'quotations.branch_id', '=', 'branches.id')
                 ->select('quotations.*')
-                ->orderBy('levels.tire_level', 'asc')
+                ->orderByRaw('COALESCE(levels.tire_level, 999) ASC')
                 ->orderBy('branches.name', 'asc')
                 ->orderBy('quotations.created_at', 'desc')
                 ->paginate($perPage);
