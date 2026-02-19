@@ -16,6 +16,59 @@ class QuotationController extends Controller
 {
     public function index(Request $request)
     {
+        try {
+            $perPage = $request->get('per_page', 15);
+            $user = Auth::guard('api')->user();
+
+            $query = Quotation::with(['customer', 'branch', 'investmentProduct', 'creator']);
+
+            // Hierarchy Visibility Logic
+            if (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
+                // Hierarchical users (GM, AGM, etc.) see their own and descendants
+                $descendantIds = $user->getAllDescendantIds();
+                $accessibleUserIds = array_merge([$user->id], $descendantIds);
+
+                $query->whereIn('created_by', $accessibleUserIds);
+            }
+
+            // Branch Filter
+            if ($request->has('branch_id')) {
+                $query->where('branch_id', $request->branch_id);
+            }
+
+            // Search by Quotation Number or Customer Name
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('quotation_number', 'like', "%{$search}%")
+                        ->orWhereHas('customer', function ($cq) use ($search) {
+                            $cq->where('full_name', 'like', "%{$search}%");
+                        });
+                });
+            }
+
+            // Ordering: GM -> AGM -> Branch (Hierarchical Order)
+            $quotations = $query->join('users', 'quotations.created_by', '=', 'users.id')
+                ->join('levels', 'users.level_id', '=', 'levels.id')
+                ->join('branches', 'quotations.branch_id', '=', 'branches.id')
+                ->select('quotations.*')
+                ->orderBy('levels.tire_level', 'asc')
+                ->orderBy('branches.name', 'asc')
+                ->orderBy('quotations.created_at', 'desc')
+                ->paginate($perPage);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Quotations retrieved successfully',
+                'data' => $quotations
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve quotations',
+                'error' => $th->getMessage()
+            ], 500);
+        }
     }
 
     public function store(CreateQuotationRequest $request)
@@ -111,7 +164,28 @@ class QuotationController extends Controller
 
     public function show($id)
     {
+        try {
+            $quotation = Quotation::with(['customer', 'branch', 'investmentProduct', 'creator'])->find($id);
 
+            if (!$quotation) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Quotation not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Quotation details retrieved successfully',
+                'data' => $quotation
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve quotation details',
+                'error' => $th->getMessage()
+            ], 500);
+        }
     }
 
     public function update(Request $request, $id)
