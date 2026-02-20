@@ -11,19 +11,50 @@ use Carbon\Carbon;
 class TargetProgressController extends Controller
 {
     /**
-     * Display all targets for the logged-in user.
+     * Display targets for the logged-in user or their hierarchy.
      */
     public function index(Request $request)
     {
         try {
             $user = Auth::guard('api')->user();
-            $targets = Target::where('user_id', $user->id)
-                ->orderBy('period_key', 'desc')
-                ->get();
+            $query = Target::with(['user', 'assigner']);
+
+            // 1. Identify allowed user IDs for filtering
+            $allowedUserIds = [];
+            $isAdmin = $user->hasRole('Super Admin');
+
+            if (!$isAdmin) {
+                // If not admin, you can only see yourself and your descendants
+                $allowedUserIds = array_merge([$user->id], $user->getAllDescendantIds());
+                $query->whereIn('user_id', $allowedUserIds);
+            }
+
+            // 2. Allow filtering by target user_id within the allowed scope
+            if ($request->has('user_id')) {
+                $targetUserId = $request->user_id;
+                if (!$isAdmin && !in_array($targetUserId, $allowedUserIds)) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Unauthorized. You can only view targets within your own hierarchy.'
+                    ], 403);
+                }
+                $query->where('user_id', $targetUserId);
+            }
+
+            // 3. Filter by period_type and period_key if provided
+            if ($request->has('period_type')) {
+                $query->where('period_type', $request->period_type);
+            }
+
+            if ($request->has('period_key')) {
+                $query->where('period_key', $request->period_key);
+            }
+
+            $targets = $query->orderBy('period_key', 'desc')->get();
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Your targets retrieved successfully',
+                'message' => 'Targets retrieved successfully',
                 'data' => $targets
             ], 200);
         } catch (\Throwable $th) {
@@ -38,24 +69,37 @@ class TargetProgressController extends Controller
     /**
      * Display the specified target by period_key for the logged-in user.
      */
-    public function show(string $period_key)
+    public function show(string $period_key, Request $request)
     {
         try {
             $user = Auth::guard('api')->user();
+            $targetUserId = $request->get('user_id', $user->id);
 
-            // If the key is 'current', resolve it to the current month key
+            // Access control
+            if (!$user->hasRole('Super Admin')) {
+                $allowedUserIds = array_merge([$user->id], $user->getAllDescendantIds());
+                if (!in_array($targetUserId, $allowedUserIds)) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Unauthorized. You can only view progress within your own hierarchy.'
+                    ], 403);
+                }
+            }
+
+            // Resolve 'current' period
             if ($period_key === 'current') {
                 $period_key = Carbon::now()->format('Y-m');
             }
 
-            $target = Target::where('user_id', $user->id)
+            $target = Target::where('user_id', $targetUserId)
                 ->where('period_key', $period_key)
+                ->with(['user', 'assigner'])
                 ->first();
 
             if (!$target) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => "No target found for period: {$period_key}"
+                    'message' => "No target found for user ID {$targetUserId} in period: {$period_key}"
                 ], 404);
             }
 

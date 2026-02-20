@@ -29,7 +29,7 @@ class CreateInvestmentProductRequest extends FormRequest
             'duration_months' => 'required|integer|min:1',
             'roi_percentage' => 'required|numeric|min:0|max:100',
             'minimum_amount' => 'nullable|numeric|min:0',
-            'maximum_amount' => 'nullable|numeric|gte:minimum_amount',
+            'maximum_amount' => 'nullable|numeric|',//gte:minimum_amount
             'is_active' => 'sometimes|boolean',
         ];
     }

@@ -15,10 +15,10 @@ return new class extends Migration {
             $table->foreignId('user_id')->constrained('users');
             $table->foreignId('assigned_by')->constrained('users');
             $table->enum('period_type', ['month', 'quarter', 'year']);
-            $table->string('period_key')->unique(); // 2026-02, 2026-Q1, 2026
+            $table->string('period_key');// 2026-02, 2026-Q1, 2026
             $table->decimal('target_amount', 15, 2);
             $table->decimal('achieved_amount', 15, 2)->default(0);
-            $table->decimal('achievement_percentage', 5, 2)->virtualAs('(achieved_amount / target_amount) * 100');
+            $table->decimal('achievement_percentage', 5, 2)->default(0);
             $table->enum('status', ['active', 'achieved', 'expired'])->default('active');
             $table->timestamp('achieved_at')->nullable();
             $table->timestamps();

@@ -110,7 +110,21 @@ class InvestmentController extends Controller
 
             // 2. Resolve Target Period Key from Reservation Date
             $reservationDate = Carbon::parse($data['reservation_date']);
-            $data['target_period_key'] = $reservationDate->format('Y-m');
+            $targetPeriodKey = $reservationDate->format('Y-m');
+            $data['target_period_key'] = $targetPeriodKey;
+
+            // 2.1 Validate Target existence for the selected Unit Head
+            $unitHeadId = $data['unit_head_id'];
+            $targetExists = Target::where('user_id', $unitHeadId)
+                ->where('period_key', $targetPeriodKey)
+                ->exists();
+
+            if (!$targetExists) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "The selected Unit Head does not have a target assigned for the period {$targetPeriodKey}. Please assign a target first."
+                ], 422);
+            }
 
             // 3. Auto-generate Application Number: APP-{BranchCode}-{YYMM}{Sequence}
             $yymm = $reservationDate->format('ym');
@@ -274,7 +288,7 @@ class InvestmentController extends Controller
 
             // 3. Trigger Target Achievement Sync
             Target::syncAchievement(
-                $investment->created_by,
+                $investment->unit_head_id,
                 $investment->target_period_key,
                 $investment->investment_amount
             );

@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('code')->unique(); // INV-06M, INV-01Y
             $table->integer('duration_months'); // 6,12,24,36,48,60
             $table->decimal('roi_percentage', 5, 2); // 18,36,38,40,45,48
-            $table->decimal('minimum_amount', 15, 2)->default(10000);
+            $table->decimal('minimum_amount', 15, 2)->default(0);
             $table->decimal('maximum_amount', 15, 2)->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
