@@ -17,11 +17,34 @@ class TargetController extends Controller
     {
         try {
             $perPage = $request->get('per_page', 15);
+            $user = Auth::user();
             $query = Target::with(['user', 'assigner']);
+
+            // Hierarchy visibility logic
+            if (!$user->hasRole('Super Admin')) {
+                $descendantIds = $user->getAllDescendantIds();
+                $accessibleUserIds = array_merge([$user->id], $descendantIds);
+
+                $query->where(function ($q) use ($user, $accessibleUserIds) {
+                    $q->whereIn('user_id', $accessibleUserIds)
+                        ->orWhere('assigned_by', $user->id);
+                });
+            }
 
             // Filter logic
             if ($request->has('user_id')) {
-                $query->where('user_id', $request->user_id);
+                $targetUserId = $request->user_id;
+                // If not admin, ensure requested user_id is in allowed scope
+                if (!$user->hasRole('Super Admin')) {
+                    $allowedIds = array_merge([$user->id], $user->getAllDescendantIds());
+                    if (!in_array($targetUserId, $allowedIds)) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => 'Unauthorized access to target history.'
+                        ], 403);
+                    }
+                }
+                $query->where('user_id', $targetUserId);
             }
 
             if ($request->has('period_type')) {
@@ -36,10 +59,7 @@ class TargetController extends Controller
                 $query->where('status', $request->status);
             }
 
-            // Hierarchy visibility logic can be added here (e.g., see own and children's)
-            // For now, allowing broad view or scoped by user_id filter.
-
-            $targets = $query->paginate($perPage);
+            $targets = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
             Log::info('Targets index accessed', [
                 'user_id' => Auth::id(),
@@ -72,10 +92,26 @@ class TargetController extends Controller
             // For now, we assume 'assigned_by' tracks who set it.
 
             $data['assigned_by'] = $currentUser->id;
+            $targetUser = User::with('level')->findOrFail($data['user_id']);
 
-            // Optional: Logic to check if parent has enough unallocated target
-            if ($currentUser->user_type === 'hierarchy' && !$currentUser->hasRole('Super Admin')) {
-                // Find parent's target for SAME period
+            // 1. Admin Restriction: Only assign to Level 1 (GM)
+            if ($currentUser->hasRole('Super Admin')) {
+                if ($targetUser->level->tire_level !== 1) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Admins can only assign targets to top-level users (GM). Sub-targets must be assigned by their respective managers.'
+                    ], 422);
+                }
+            } else {
+                // 2. Hierarchy Restriction: Only assign to direct children
+                if ($targetUser->parent_user_id !== $currentUser->id) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'You can only assign sub-targets to your direct subordinates.'
+                    ], 422);
+                }
+
+                // 3. Unallocated Target Check
                 $parentTarget = Target::where('user_id', $currentUser->id)
                     ->where('period_type', $data['period_type'])
                     ->where('period_key', $data['period_key'])
@@ -84,26 +120,24 @@ class TargetController extends Controller
                 if (!$parentTarget) {
                     return response()->json([
                         'status' => 'error',
-                        'message' => 'You do not have a target set for this period yet, so you cannot assign sub-targets.'
+                        'message' => 'You do not have a target set for this period, so you cannot assign sub-targets.'
                     ], 422);
                 }
 
-                // Sum of existing children targets
-                // Logic: Find all targets assigned by ME for this period
-                $assignedSum = Target::where('assigned_by', $currentUser->id)
+                $alreadyAssigned = Target::where('assigned_by', $currentUser->id)
                     ->where('period_type', $data['period_type'])
                     ->where('period_key', $data['period_key'])
                     ->sum('target_amount');
 
-                if (($assignedSum + $data['target_amount']) > $parentTarget->target_amount) {
+                if (($alreadyAssigned + $data['target_amount']) > $parentTarget->target_amount) {
                     return response()->json([
                         'status' => 'error',
-                        'message' => 'Insufficient target amount. You cannot assign more than your own target.',
+                        'message' => 'Insufficient target amount. You cannot assign more than your own target limit.',
                         'data' => [
-                            'your_target' => $parentTarget->target_amount,
-                            'already_assigned' => $assignedSum,
-                            'attempted_assign' => $data['target_amount'],
-                            'remaining' => $parentTarget->target_amount - $assignedSum
+                            'your_limit' => $parentTarget->target_amount,
+                            'already_assigned' => $alreadyAssigned,
+                            'attempted' => $data['target_amount'],
+                            'remaining' => $parentTarget->target_amount - $alreadyAssigned
                         ]
                     ], 422);
                 }
@@ -170,12 +204,41 @@ class TargetController extends Controller
             }
 
             $data = $request->validated();
+            $currentUser = Auth::user();
 
-            // Updating logic - preventing over-allocation logic on update as well
-            if (isset($data['target_amount']) && Auth::guard('api')->user()->user_type === 'hierarchy' && !Auth::guard('api')->user()->hasRole('Super Admin')) {
-                // Similar logic to store... omitted for brevity but strictly should be here.
-                // Assuming admin or careful usage for now for update.
+            // Permission Check: Only assigner or Super Admin
+            if ($currentUser->id !== $target->assigned_by && !$currentUser->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized. You can only update targets you assigned.'
+                ], 403);
+            }
 
+            // Unallocated Target Check on Amount Increase
+            if (isset($data['target_amount']) && !$currentUser->hasRole('Super Admin')) {
+                $parentTarget = Target::where('user_id', $currentUser->id)
+                    ->where('period_type', $target->period_type)
+                    ->where('period_key', $target->period_key)
+                    ->first();
+
+                $otherAssignedSum = Target::where('assigned_by', $currentUser->id)
+                    ->where('period_type', $target->period_type)
+                    ->where('period_key', $target->period_key)
+                    ->where('id', '!=', $target->id)
+                    ->sum('target_amount');
+
+                if (($otherAssignedSum + $data['target_amount']) > $parentTarget->target_amount) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Insufficient target amount limit.',
+                        'data' => [
+                            'your_limit' => $parentTarget->target_amount,
+                            'other_assignments' => $otherAssignedSum,
+                            'requested' => $data['target_amount'],
+                            'max_allowed' => $parentTarget->target_amount - $otherAssignedSum
+                        ]
+                    ], 422);
+                }
             }
 
             $target->update($data);
