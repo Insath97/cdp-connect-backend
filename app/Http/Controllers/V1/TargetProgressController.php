@@ -52,10 +52,29 @@ class TargetProgressController extends Controller
 
             $targets = $query->orderBy('period_key', 'desc')->get();
 
+            // 4. Fetch Commissions for these same users/scope
+            $commissionQuery = \App\Models\Commission::with('investment');
+            if (!$isAdmin) {
+                $commissionQuery->whereIn('user_id', $allowedUserIds);
+            }
+
+            if ($request->has('user_id')) {
+                $commissionQuery->where('user_id', $request->user_id);
+            }
+            if ($request->has('period_key')) {
+                $commissionQuery->where('period_key', $request->period_key);
+            }
+
+            $commissions = $commissionQuery->orderBy('created_at', 'desc')->get();
+
             return response()->json([
                 'status' => 'success',
-                'message' => 'Targets retrieved successfully',
-                'data' => $targets
+                'message' => 'Targets and Commissions retrieved successfully',
+                'data' => [
+                    'targets' => $targets,
+                    'commissions' => $commissions,
+                    'total_commission' => $commissions->sum('commission_amount')
+                ]
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
@@ -103,10 +122,21 @@ class TargetProgressController extends Controller
                 ], 404);
             }
 
+            // 3. Fetch Commissions for this user and period
+            $commissions = \App\Models\Commission::where('user_id', $targetUserId)
+                ->where('period_key', $period_key)
+                ->with('investment')
+                ->orderBy('created_at', 'desc')
+                ->get();
+
             return response()->json([
                 'status' => 'success',
-                'message' => 'Target progress retrieved successfully',
-                'data' => $target
+                'message' => 'Target progress and commissions retrieved successfully',
+                'data' => [
+                    'target' => $target,
+                    'commissions' => $commissions,
+                    'total_commission' => $commissions->sum('commission_amount')
+                ]
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([

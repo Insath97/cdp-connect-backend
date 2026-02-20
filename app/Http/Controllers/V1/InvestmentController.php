@@ -9,6 +9,8 @@ use App\Models\Branch;
 use App\Models\Target;
 use App\Models\Beneficiary;
 use App\Models\CustomerBankDetail;
+use App\Models\Commission;
+use App\Models\CommissionSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -257,7 +259,7 @@ class InvestmentController extends Controller
         DB::beginTransaction();
         try {
             $user = Auth::guard('api')->user();
-            $investment = Investment::with('branch')->findOrFail($id);
+            $investment = Investment::with(['branch', 'unitHead'])->findOrFail($id);
 
             if ($investment->status !== 'pending') {
                 return response()->json([
@@ -269,7 +271,7 @@ class InvestmentController extends Controller
             // 1. Generate Policy Number: {BranchCode}-{YYMM}{Sequence}
             $branch = $investment->branch;
             $yymm = date('ym');
-            $prefix = 'CDP'.$branch->code . '-';
+            $prefix = 'CDP' . $branch->code . '-';
 
             $lastPolicy = Investment::where('policy_number', 'like', $prefix . '%')
                 ->orderBy('policy_number', 'desc')
@@ -292,6 +294,9 @@ class InvestmentController extends Controller
                 $investment->target_period_key,
                 $investment->investment_amount
             );
+
+            // 4. Calculate and Store Commissions
+            $this->processCommissions($investment);
 
             DB::commit();
 
@@ -319,6 +324,47 @@ class InvestmentController extends Controller
                 'message' => 'Failed to approve investment',
                 'error' => $th->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Calculate and store commissions for a newly approved investment.
+     */
+    protected function processCommissions(Investment $investment)
+    {
+        // 1. Fetch percentages from settings
+        $unitHeadPct = CommissionSetting::where('key', 'unit_head_commission_pct')->value('value') ?? 10.00;
+        $parentPct = CommissionSetting::where('key', 'parent_commission_pct')->value('value') ?? 1.00;
+
+        $amount = $investment->investment_amount;
+
+        // 2. Unit Head Commission
+        if ($investment->unit_head_id) {
+            Commission::create([
+                'investment_id' => $investment->id,
+                'user_id' => $investment->unit_head_id,
+                'investment_amount' => $amount,
+                'commission_amount' => ($amount * $unitHeadPct) / 100,
+                'commission_percentage' => $unitHeadPct,
+                'tier' => 'unit_head',
+                'period_key' => $investment->target_period_key,
+                'status' => 'pending',
+            ]);
+
+            // 3. Parent Commission
+            $unitHead = $investment->unitHead;
+            if ($unitHead && $unitHead->parent_user_id) {
+                Commission::create([
+                    'investment_id' => $investment->id,
+                    'user_id' => $unitHead->parent_user_id,
+                    'investment_amount' => $amount,
+                    'commission_amount' => ($amount * $parentPct) / 100,
+                    'commission_percentage' => $parentPct,
+                    'tier' => 'parent',
+                    'period_key' => $investment->target_period_key,
+                    'status' => 'pending',
+                ]);
+            }
         }
     }
 
