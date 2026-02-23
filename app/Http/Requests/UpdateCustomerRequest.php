@@ -29,7 +29,7 @@ class UpdateCustomerRequest extends FormRequest
             'customer_id' => 'nullable|exists:users,id',
             'full_name' => 'sometimes|required|string|max:255',
             'name_with_initials' => 'sometimes|required|string|max:255',
-            'customer_code' => 'sometimes|required|string|max:255|unique:customers,customer_code,' . $id,
+            'customer_code' => 'sometimes|nullable|string|max:255|unique:customers,customer_code,' . $id,
             'id_type' => 'sometimes|required|in:nic,passport,driving_license,other',
             'id_number' => 'sometimes|required|string|max:255|unique:customers,id_number,' . $id,
             'address_line_1' => 'nullable|string|max:255',

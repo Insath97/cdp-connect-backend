@@ -70,6 +70,14 @@ class CustomerController extends Controller
                 $data['customer_id'] = $currentUser->id;
             }
 
+            // Generate Customer Code if not provided
+            if (empty($data['customer_code'])) {
+                $lastCustomer = Customer::orderBy('id', 'desc')->first();
+                $lastId = $lastCustomer ? $lastCustomer->id : 0;
+                $nextId = $lastId + 1;
+                $data['customer_code'] = 'CUS-' . str_pad($nextId, 5, '0', STR_PAD_LEFT);
+            }
+
             $customer = Customer::create($data);
 
             Log::info('Customer created', [

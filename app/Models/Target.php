@@ -86,7 +86,7 @@ class Target extends Model
             $originalTargetForThisUser = $target->current_amount + $target->achieved_amount;
 
             // 1. Reduce remaining target level for this person
-            $target->current_amount = max(0, $target->target_amount - $amount);
+            $target->current_amount = max(0, $target->current_amount - $amount);
 
             // 2. Increment total achieved amount for this person
             $target->achieved_amount += $amount;
