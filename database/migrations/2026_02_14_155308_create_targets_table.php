@@ -17,6 +17,7 @@ return new class extends Migration {
             $table->enum('period_type', ['month', 'quarter', 'year']);
             $table->string('period_key');// 2026-02, 2026-Q1, 2026
             $table->decimal('target_amount', 15, 2);
+            $table->decimal('current_amount', 15, 2)->default(0);
             $table->decimal('achieved_amount', 15, 2)->default(0);
             $table->decimal('achievement_percentage', 5, 2)->default(0);
             $table->enum('status', ['active', 'achieved', 'expired'])->default('active');

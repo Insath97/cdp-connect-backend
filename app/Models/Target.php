@@ -16,6 +16,7 @@ class Target extends Model
         'period_type',
         'period_key',
         'target_amount',
+        'current_amount',
         'achieved_amount',
         'achievement_percentage',
         'status',
@@ -24,6 +25,7 @@ class Target extends Model
 
     protected $casts = [
         'target_amount' => 'decimal:2',
+        'current_amount' => 'decimal:2',
         'achieved_amount' => 'decimal:2',
         'achievement_percentage' => 'decimal:2',
         'achieved_at' => 'datetime',
@@ -81,10 +83,10 @@ class Target extends Model
 
         if ($target) {
             // The "initial target" for THIS user is the sum of what's left and what's already met
-            $originalTargetForThisUser = $target->target_amount + $target->achieved_amount;
+            $originalTargetForThisUser = $target->current_amount + $target->achieved_amount;
 
             // 1. Reduce remaining target level for this person
-            $target->target_amount = max(0, $target->target_amount - $amount);
+            $target->current_amount = max(0, $target->target_amount - $amount);
 
             // 2. Increment total achieved amount for this person
             $target->achieved_amount += $amount;
@@ -104,12 +106,13 @@ class Target extends Model
                 'user_id' => $target->user_id,
                 'new_target_amount' => $target->target_amount,
                 'new_achieved_amount' => $target->achieved_amount,
+                'new_current_amount' => $target->current_amount,
                 'new_percentage' => $target->achievement_percentage,
                 'is_deep' => $isDeep
             ]);
 
             // Check if achieved
-            if ($target->target_amount <= 0 || $target->achieved_amount >= $originalTargetForThisUser) {
+            if ($target->current_amount <= 0 || $target->achieved_amount >= $originalTargetForThisUser) {
                 $target->update(['status' => 'achieved', 'achieved_at' => now()]);
             }
         } else {
