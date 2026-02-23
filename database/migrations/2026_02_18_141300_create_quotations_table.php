@@ -13,7 +13,18 @@ return new class extends Migration {
         Schema::create('quotations', function (Blueprint $table) {
             $table->id();
             $table->string('quotation_number')->unique();
-            $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
+            $table->foreignId('customer_id')->nullable()->constrained('customers')->onDelete('cascade');
+
+            $table->string('f_name')->nullable();
+            $table->string('l_name')->nullable();
+            $table->string('full_name');
+            $table->string('name_with_initials')->nullable();
+            $table->enum('id_type', ['nic', 'passport', 'driving_license', 'other'])->default('nic');
+            $table->string('id_number');
+            $table->string('phone_primary');
+            $table->string('email')->nullable();
+            $table->string('address')->nullable();
+
             $table->foreignId('branch_id')->constrained('branches')->onDelete('cascade');
             $table->foreignId('investment_product_id')->constrained('investment_products')->onDelete('cascade');
 

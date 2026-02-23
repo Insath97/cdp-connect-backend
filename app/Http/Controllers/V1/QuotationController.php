@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateQuotationRequest;
 use App\Models\Quotation;
 use App\Models\Branch;
+use App\Models\Customer;
 use App\Models\InvestmentProduct;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -78,19 +79,42 @@ class QuotationController extends Controller
             $user = Auth::guard('api')->user();
             $data = $request->validated();
 
-            // 1. 14-Day Restriction
-            $lastQuotation = Quotation::where('customer_id', $data['customer_id'])
+            // 1. 14-Day Restriction (Based on id_number/NIC)
+            $lastQuotation = Quotation::where('id_number', $data['id_number'])
                 ->where('created_at', '>=', Carbon::now()->subDays(14))
                 ->first();
 
             if ($lastQuotation) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'A quotation was already created for this customer within the last 14 days.'
+                    'message' => 'A quotation was already created for this ID number within the last 14 days.'
                 ], 422);
             }
 
-            // 2. Intelligent Branch Selection
+            // 2. Intelligent Customer Selection/Lookup
+            $customer = null;
+            if (!empty($data['customer_id'])) {
+                $customer = Customer::find($data['customer_id']);
+            } else {
+                // Try to find customer by id_number if customer_id not provided
+                $customer = Customer::where('id_number', $data['id_number'])->first();
+                if ($customer) {
+                    $data['customer_id'] = $customer->id;
+                }
+            }
+
+            // 3. Snapshotting Customer Info
+            if ($customer) {
+                $data['full_name'] = $customer->full_name;
+                $data['name_with_initials'] = $customer->name_with_initials;
+                $data['id_type'] = $customer->id_type;
+                $data['id_number'] = $customer->id_number;
+                $data['phone_primary'] = $customer->phone_primary;
+                $data['email'] = $customer->email;
+                $data['address'] = $customer->address;
+            }
+
+            // 4. Intelligent Branch Selection
             $branchId = $data['branch_id'] ?? $user->branch_id;
 
             if (!$branchId) {
@@ -102,16 +126,15 @@ class QuotationController extends Controller
 
             $branch = Branch::findOrFail($branchId);
 
-            // 3. Investment Calculation (Monthly Interest)
+            // 5. Investment Calculation
             $product = InvestmentProduct::findOrFail($data['investment_product_id']);
             $roi = $product->roi_percentage;
             $duration = $product->duration_months;
             $amount = $data['investment_amount'];
 
-            // Monthly Interest = (Amount * (ROI/100)) / 12
             $monthlyInterest = ($amount * ($roi / 100)) / 12;
 
-            // 4. Generate Quotation Number
+            // 6. Generate Quotation Number
             $yearStr = date('y');
             $prefix = $branch->code . '-' . $yearStr;
             $lastNum = Quotation::where('quotation_number', 'like', $prefix . '%')
@@ -121,7 +144,7 @@ class QuotationController extends Controller
             $sequence = $lastNum ? (int) substr($lastNum->quotation_number, -4) + 1 : 1;
             $quotationNumber = $prefix . str_pad($sequence, 4, '0', STR_PAD_LEFT);
 
-            // 5. Prepare Quotation Data
+            // 7. Prepare and Create Quotation
             $quotationData = array_merge($data, [
                 'branch_id' => $branchId,
                 'quotation_number' => $quotationNumber,
@@ -152,6 +175,7 @@ class QuotationController extends Controller
         } catch (\Throwable $th) {
             Log::error('Quotation creation failed', [
                 'error' => $th->getMessage(),
+                'line' => $th->getLine(),
                 'user_id' => Auth::guard('api')->id()
             ]);
 
