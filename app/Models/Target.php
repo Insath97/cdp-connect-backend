@@ -82,18 +82,16 @@ class Target extends Model
             ->first();
 
         if ($target) {
-            // The "initial target" for THIS user is the sum of what's left and what's already met
-            $originalTargetForThisUser = $target->current_amount + $target->achieved_amount;
-
-            // 1. Reduce remaining target level for this person
-            $target->current_amount = max(0, $target->current_amount - $amount);
-
-            // 2. Increment total achieved amount for this person
+            // 1. Increment total achieved amount for this person
             $target->achieved_amount += $amount;
 
+            // 2. Reduce remaining target level for this person (Robust calculation)
+            // Use target_amount - achieved_amount to ensure it's always in sync with progress
+            $target->current_amount = max(0, $target->target_amount - $target->achieved_amount);
+
             // 3. Calculate achievement percentage relative to THEIR own target
-            if ($originalTargetForThisUser > 0) {
-                $percentage = ($target->achieved_amount / $originalTargetForThisUser) * 100;
+            if ($target->target_amount > 0) {
+                $percentage = ($target->achieved_amount / $target->target_amount) * 100;
                 $target->achievement_percentage = min($percentage, 999.99);
             } else {
                 $target->achievement_percentage = $target->achieved_amount > 0 ? 100.00 : 0;
@@ -104,19 +102,23 @@ class Target extends Model
             Log::info("Target updated in hierarchy", [
                 'target_id' => $target->id,
                 'user_id' => $target->user_id,
-                'new_target_amount' => $target->target_amount,
-                'new_achieved_amount' => $target->achieved_amount,
-                'new_current_amount' => $target->current_amount,
-                'new_percentage' => $target->achievement_percentage,
+                'target_amount' => $target->target_amount,
+                'achieved_amount' => $target->achieved_amount,
+                'current_amount' => $target->current_amount,
+                'percentage' => $target->achievement_percentage,
                 'is_deep' => $isDeep
             ]);
 
             // Check if achieved
-            if ($target->current_amount <= 0 || $target->achieved_amount >= $originalTargetForThisUser) {
+            if ($target->current_amount <= 0 || $target->achieved_amount >= $target->target_amount) {
                 $target->update(['status' => 'achieved', 'achieved_at' => now()]);
             }
         } else {
-            Log::warning("Target not found for sync", ['user_id' => $userId, 'period_key' => $periodKey]);
+            Log::warning("Target NOT FOUND for sync. This user's amounts will NOT be updated, but moving up the hierarchy.", [
+                'user_id' => $userId,
+                'period_key' => $periodKey,
+                'is_deep' => $isDeep
+            ]);
         }
 
         // Move up the hierarchy

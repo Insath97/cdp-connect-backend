@@ -277,7 +277,7 @@ class InvestmentController extends Controller
                 ->orderBy('policy_number', 'desc')
                 ->first();
 
-            $sequence = $lastPolicy ? (int) substr($lastPolicy->policy_number, -8) + 1 : 1;
+            $sequence = $lastPolicy ? (int) substr($lastPolicy->policy_number, -4) + 1 : 1;
             $policyNumber = $prefix . str_pad($sequence, 8, '0', STR_PAD_LEFT);
 
             // 2. Update Investment Status
