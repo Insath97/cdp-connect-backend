@@ -53,6 +53,7 @@ class CreateInvestmentRequest extends FormRequest
             'bank' => 'required|in:HNB,Sampath,Commercial Bank,People\'s Bank,NSB,Other',
             'payment_type' => 'required|in:full_payment,monthly',
             'payment_description' => 'nullable|string',
+            'payment_proof' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240', // Max 1MB
             'initial_payment' => 'required|numeric|min:0',
             'initial_payment_date' => 'nullable|date',
             'monthly_payment_amount' => 'nullable|numeric|min:0',
