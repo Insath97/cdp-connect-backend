@@ -34,6 +34,7 @@ return new class extends Migration {
             $table->date('initial_payment_date')->nullable();
             $table->decimal('monthly_payment_amount', 15, 2)->nullable();
             $table->date('monthly_payment_date')->nullable();
+            $table->string('payment_proof');
 
             $table->enum('status', ['pending', 'approved', 'cancelled'])->default('pending');
 

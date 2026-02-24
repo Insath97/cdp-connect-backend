@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::create('customer_bank_details', function (Blueprint $table) {
             $table->id();
             $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
-            $table->string('bank_name');
-            $table->string('branch_name');
-            $table->string('account_number')->unique();
+            $table->string('bank_name')->nullable();
+            $table->string('branch_name')->nullable();
+            $table->string('account_number')->unique()->nullable();
             $table->enum('payment_method', ['bank_transfer', 'cheque', 'cash'])->default('bank_transfer');
             $table->timestamps();
         });

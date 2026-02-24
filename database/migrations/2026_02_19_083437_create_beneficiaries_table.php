@@ -13,13 +13,13 @@ return new class extends Migration
     {
         Schema::create('beneficiaries', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
-            $table->string('full_name');
+            $table->foreignId('customer_id')->nullable()->constrained('customers')->onDelete('cascade');
+            $table->string('full_name')->nullable();
             $table->enum('id_type', ['nic', 'passport', 'driving_license', 'other'])->default('nic');
-            $table->string('id_number')->unique();
-            $table->string('phone_primary');
-            $table->string('relationship');
-            $table->decimal('share_percentage', 5, 2);
+            $table->string('id_number')->unique()->nullable();
+            $table->string('phone_primary')->nullable();
+            $table->string('relationship')->nullable();
+            $table->decimal('share_percentage', 5, 2)->nullable();
             $table->timestamps();
         });
     }

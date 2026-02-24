@@ -11,6 +11,7 @@ use App\Models\Beneficiary;
 use App\Models\CustomerBankDetail;
 use App\Models\Commission;
 use App\Models\CommissionSetting;
+use App\Traits\FileUploadTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -19,6 +20,7 @@ use Carbon\Carbon;
 
 class InvestmentController extends Controller
 {
+    use FileUploadTrait;
     /**
      * Display a listing of the resource.
      */
@@ -166,6 +168,12 @@ class InvestmentController extends Controller
 
             // 5. Set Defaults
             $data['created_by'] = $currentUser->id;
+
+            $imagePath = $this->handleFileUpload($request, 'payment_proof', null, 'investments/payment', $data['application_number'] ?? '');
+            if ($imagePath) {
+                $data['payment_proof'] = $imagePath ?? null;
+            }
+
             $data['status'] = 'pending';
 
             $investment = Investment::create($data);
@@ -183,7 +191,6 @@ class InvestmentController extends Controller
                 'message' => 'Investment created successfully',
                 'data' => $investment->load(['customer', 'branch', 'investmentProduct', 'beneficiary', 'bankDetail'])
             ], 201);
-
         } catch (\Throwable $th) {
             DB::rollBack();
             Log::error('Investment creation failed', [
@@ -246,10 +253,7 @@ class InvestmentController extends Controller
         //
     }
 
-    public function update(Request $request, string $id)
-    {
-
-    }
+    public function update(Request $request, string $id) {}
 
     /**
      * Approve the specified investment.
@@ -311,7 +315,6 @@ class InvestmentController extends Controller
                 'message' => 'Investment approved and policy generated successfully',
                 'data' => $investment
             ], 200);
-
         } catch (\Throwable $th) {
             DB::rollBack();
             Log::error('Investment approval failed', [
