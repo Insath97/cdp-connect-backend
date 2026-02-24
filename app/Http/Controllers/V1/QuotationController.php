@@ -156,12 +156,12 @@ class QuotationController extends Controller
                 'monthly_return' => $monthlyReturn,
                 'annual_return' => $annualReturn,
                 'maturity_amount' => $maturityAmount,
-                'month_6_breakdown' => ($duration >= 6) ? $monthlyReturn * $duration : 0,
-                'year_1_breakdown' => ($duration >= 12) ? $monthlyReturn * $duration : 0,
-                'year_2_breakdown' => ($duration >= 24) ? $monthlyReturn * $duration : 0,
-                'year_3_breakdown' => ($duration >= 36) ? $monthlyReturn * $duration : 0,
-                'year_4_breakdown' => ($duration >= 48) ? $monthlyReturn * $duration : 0,
-                'year_5_breakdown' => ($duration >= 60) ? $monthlyReturn * $duration : 0,
+                'month_6_breakdown' => ($duration >= 6) ? $monthlyReturn * 6 : 0,
+                'year_1_breakdown' => ($duration >= 12) ? $monthlyReturn * 12 : 0,
+                'year_2_breakdown' => ($duration >= 24) ? $monthlyReturn * 24 : 0,
+                'year_3_breakdown' => ($duration >= 36) ? $monthlyReturn * 36 : 0,
+                'year_4_breakdown' => ($duration >= 48) ? $monthlyReturn * 48 : 0,
+                'year_5_breakdown' => ($duration >= 60) ? $monthlyReturn * 60 : 0,
             ]);
 
             $quotation = Quotation::create($quotationData);
