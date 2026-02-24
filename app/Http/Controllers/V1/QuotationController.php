@@ -132,7 +132,10 @@ class QuotationController extends Controller
             $duration = $product->duration_months;
             $amount = $data['investment_amount'];
 
-            $monthlyInterest = ($amount * ($roi / 100)) / 12;
+            $monthlyReturn = ($amount * ($roi / 100)) / 12;
+            $annualReturn = $amount * ($roi / 100);
+            $totalInterest = $monthlyReturn * $duration;
+            $maturityAmount = $amount + $totalInterest;
 
             // 6. Generate Quotation Number
             $yearStr = date('y');
@@ -150,12 +153,15 @@ class QuotationController extends Controller
                 'quotation_number' => $quotationNumber,
                 'created_by' => $user->id,
                 'status' => 'draft',
-                'month_6_breakdown' => ($duration >= 6) ? $monthlyInterest : 0,
-                'year_1_breakdown' => ($duration >= 12) ? $monthlyInterest : 0,
-                'year_2_breakdown' => ($duration >= 24) ? $monthlyInterest : 0,
-                'year_3_breakdown' => ($duration >= 36) ? $monthlyInterest : 0,
-                'year_4_breakdown' => ($duration >= 48) ? $monthlyInterest : 0,
-                'year_5_breakdown' => ($duration >= 60) ? $monthlyInterest : 0,
+                'monthly_return' => $monthlyReturn,
+                'annual_return' => $annualReturn,
+                'maturity_amount' => $maturityAmount,
+                'month_6_breakdown' => ($duration >= 6) ? $monthlyReturn : 0,
+                'year_1_breakdown' => ($duration >= 12) ? $monthlyReturn : 0,
+                'year_2_breakdown' => ($duration >= 24) ? $monthlyReturn : 0,
+                'year_3_breakdown' => ($duration >= 36) ? $monthlyReturn : 0,
+                'year_4_breakdown' => ($duration >= 48) ? $monthlyReturn : 0,
+                'year_5_breakdown' => ($duration >= 60) ? $monthlyReturn : 0,
             ]);
 
             $quotation = Quotation::create($quotationData);

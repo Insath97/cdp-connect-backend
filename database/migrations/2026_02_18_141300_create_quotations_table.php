@@ -29,6 +29,10 @@ return new class extends Migration {
             $table->foreignId('investment_product_id')->constrained('investment_products')->onDelete('cascade');
 
             $table->decimal('investment_amount', 15, 2);
+            $table->decimal('monthly_return', 15, 2)->default(0);
+            $table->decimal('annual_return', 15, 2)->default(0);
+            $table->decimal('maturity_amount', 15, 2)->default(0);
+
             $table->decimal('month_6_breakdown', 15, 2)->nullable();
             $table->decimal('year_1_breakdown', 15, 2)->nullable();
             $table->decimal('year_2_breakdown', 15, 2)->nullable();

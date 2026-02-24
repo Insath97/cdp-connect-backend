@@ -25,6 +25,9 @@ class Quotation extends Model
         'branch_id',
         'investment_product_id',
         'investment_amount',
+        'monthly_return',
+        'annual_return',
+        'maturity_amount',
         'month_6_breakdown',
         'year_1_breakdown',
         'year_2_breakdown',
@@ -40,6 +43,9 @@ class Quotation extends Model
 
     protected $casts = [
         'investment_amount' => 'decimal:2',
+        'monthly_return' => 'decimal:2',
+        'annual_return' => 'decimal:2',
+        'maturity_amount' => 'decimal:2',
         'month_6_breakdown' => 'decimal:2',
         'year_1_breakdown' => 'decimal:2',
         'year_2_breakdown' => 'decimal:2',
