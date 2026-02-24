@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateInvestmentRequest;
+use App\Mail\InvestmentSentMail;
 use App\Models\Investment;
 use App\Models\Branch;
 use App\Models\Target;
@@ -11,12 +12,14 @@ use App\Models\Beneficiary;
 use App\Models\CustomerBankDetail;
 use App\Models\Commission;
 use App\Models\CommissionSetting;
+use App\Models\SystemSetting;
 use App\Traits\FileUploadTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Mail;
 
 class InvestmentController extends Controller
 {
@@ -177,6 +180,23 @@ class InvestmentController extends Controller
             $data['status'] = 'pending';
 
             $investment = Investment::create($data);
+
+            try {
+                $recipientEmail = SystemSetting::getSetting('investment_admin_notification_email', 'admin@cdpconnect.com');
+
+                $emailData = [
+                    'investment' => $investment->load(['customer', 'branch', 'investmentProduct']),
+                    'application_number' => $investment->application_number,
+                    'customer_name' => $investment->customer->full_name,
+                    'branch_name' => $investment->branch->name,
+                    'investment_amount' => $investment->investment_amount,
+                    'payment_proof' => $investment->payment_proof,
+                ];
+
+                Mail::to($recipientEmail)->send(new InvestmentSentMail($emailData));
+            } catch (\Throwable $th) {
+                Log::error('Failed to send investment creation email: ' . $th->getMessage());
+            }
 
             DB::commit();
 
