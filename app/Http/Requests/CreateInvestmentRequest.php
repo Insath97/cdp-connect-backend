@@ -50,7 +50,7 @@ class CreateInvestmentRequest extends FormRequest
             'bank_detail.payment_method' => 'required_with:bank_detail|in:bank_transfer,cheque,cash',
 
             'investment_amount' => 'required|numeric|min:0',
-            'bank' => 'required|in:HNB,Sampath,Commercial Bank,People\'s Bank,NSB,Other',
+            'bank' => 'required|in:HNB,Sampath,Commercial Bank,Peoples Bank,NSB,Other',
             'payment_type' => 'required|in:full_payment,monthly',
             'payment_description' => 'nullable|string',
             'payment_proof' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240', // Max 1MB
