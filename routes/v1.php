@@ -16,6 +16,7 @@ use App\Http\Controllers\V1\LevelController;
 use App\Http\Controllers\V1\TargetController;
 use App\Http\Controllers\V1\TargetProgressController;
 use App\Http\Controllers\V1\QuotationController;
+use App\Http\Controllers\V1\ReceiptController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -75,7 +76,11 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
 
     Route::apiResource('investments', InvestmentController::class);
     Route::patch('investments/{id}/approve', [InvestmentController::class, 'approve']);
+    Route::get('investments/{id}/certificate', [InvestmentController::class, 'printCertificate']);
 
     Route::get('target-progress', [TargetProgressController::class, 'index']);
     Route::get('target-progress/{period_key}', [TargetProgressController::class, 'show']);
+
+    Route::apiResource('receipts', ReceiptController::class)->only(['store', 'show']);
+    Route::get('investments/{investmentId}/receipts', [ReceiptController::class, 'indexByInvestment']);
 });

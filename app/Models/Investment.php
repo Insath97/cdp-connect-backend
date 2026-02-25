@@ -95,4 +95,9 @@ class Investment extends Model
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
+
+    public function receipts()
+    {
+        return $this->hasMany(Receipt::class);
+    }
 }

@@ -14,6 +14,7 @@ use App\Models\Commission;
 use App\Models\CommissionSetting;
 use App\Models\SystemSetting;
 use App\Traits\FileUploadTrait;
+use App\Utilities\NumberToWords;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -251,6 +252,14 @@ class InvestmentController extends Controller
                 ], 404);
             }
 
+            $investment->amount_in_words = NumberToWords::convert($investment->investment_amount);
+
+            $investment->makeHidden(['created_at', 'updated_at', 'deleted_at', 'created_by', 'unit_head_id', 'checked_by', 'checked_at']);
+            if ($investment->customer)
+                $investment->customer->makeHidden(['created_at', 'updated_at', 'deleted_at']);
+            if ($investment->approver)
+                $investment->approver->makeHidden(['created_at', 'updated_at', 'email_verified_at']);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Investment details retrieved successfully',
@@ -266,6 +275,49 @@ class InvestmentController extends Controller
     }
 
     /**
+     * Get data for investment certificate.
+     */
+    public function printCertificate(string $id)
+    {
+        try {
+            $investment = Investment::with([
+                'customer:id,full_name,name_with_initials,customer_code,id_number,address_line_1,city',
+                'branch:id,name,code',
+                'investmentProduct:id,name,code,duration_months,roi_percentage','unitHead',
+                'approver:id,name'
+            ])->findOrFail($id);
+
+            if ($investment->status !== 'approved') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Certificates can only be generated for approved investments.'
+                ], 422);
+            }
+
+            $investment->amount_in_words = NumberToWords::convert($investment->investment_amount);
+
+            $investment->makeHidden(['created_at', 'updated_at', 'deleted_at', 'created_by']);
+            if ($investment->customer)
+                $investment->customer->makeHidden(['created_at', 'updated_at', 'deleted_at']);
+            if ($investment->approver)
+                $investment->approver->makeHidden(['created_at', 'updated_at', 'email_verified_at']);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Certificate data retrieved successfully',
+                'data' => $investment
+            ], 200);
+
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve certificate data',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Show the form for editing the specified resource.
      */
     public function edit(string $id)
@@ -273,7 +325,9 @@ class InvestmentController extends Controller
         //
     }
 
-    public function update(Request $request, string $id) {}
+    public function update(Request $request, string $id)
+    {
+    }
 
     /**
      * Approve the specified investment.
