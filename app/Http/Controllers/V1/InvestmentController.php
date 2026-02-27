@@ -22,8 +22,23 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Mail;
 
-class InvestmentController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class InvestmentController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Investment Index', only: ['index', 'show']),
+            new Middleware('permission:Investment Create', only: ['store']),
+            new Middleware('permission:Investment Update', only: ['update']),
+            new Middleware('permission:Investment Delete', only: ['destroy']),
+            new Middleware('permission:Investment Approve', only: ['approve']),
+            new Middleware('permission:Investment Certificate', only: ['printCertificate']),
+        ];
+    }
+
     use FileUploadTrait;
     /**
      * Display a listing of the resource.
@@ -283,7 +298,8 @@ class InvestmentController extends Controller
             $investment = Investment::with([
                 'customer:id,full_name,name_with_initials,customer_code,id_number,address_line_1,city',
                 'branch:id,name,code',
-                'investmentProduct:id,name,code,duration_months,roi_percentage','unitHead',
+                'investmentProduct:id,name,code,duration_months,roi_percentage',
+                'unitHead',
                 'approver:id,name'
             ])->findOrFail($id);
 

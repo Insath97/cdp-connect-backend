@@ -10,8 +10,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
-class RegionController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class RegionController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Region Index', only: ['index', 'show']),
+            new Middleware('permission:Region Create', only: ['store']),
+            new Middleware('permission:Region Update', only: ['update']),
+            new Middleware('permission:Region Delete', only: ['destroy']),
+            new Middleware('permission:Region Toggle Status', only: ['toggleStatus']),
+        ];
+    }
+
     public function index(Request $request)
     {
         try {

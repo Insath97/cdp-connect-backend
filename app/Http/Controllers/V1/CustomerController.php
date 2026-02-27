@@ -11,8 +11,24 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
-class CustomerController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class CustomerController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Customer Index', only: ['index', 'show']),
+            new Middleware('permission:Customer Create', only: ['store']),
+            new Middleware('permission:Customer Update', only: ['update']),
+            new Middleware('permission:Customer Delete', only: ['destroy']),
+            new Middleware('permission:Customer Restore', only: ['restore']),
+            new Middleware('permission:Customer Force Delete', only: ['forceDelete']),
+            new Middleware('permission:Customer Toggle Status', only: ['toggleStatus']),
+        ];
+    }
+
     public function index(Request $request)
     {
         try {

@@ -26,6 +26,7 @@ class UserSeeder extends Seeder
             'email' => 'dev@localhost.com',
             'password' => bcrypt('password'),
             'username' => 'devadmin',
+            'user_type' => 'admin',
             'is_active' => true,
             'can_login' => true,
         ]);

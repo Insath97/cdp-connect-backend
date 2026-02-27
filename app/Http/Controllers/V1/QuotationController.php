@@ -13,8 +13,24 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
-class QuotationController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class QuotationController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Quotation Index', only: ['index', 'show']),
+            new Middleware('permission:Quotation Create', only: ['store']),
+            new Middleware('permission:Quotation Update', only: ['update']),
+            new Middleware('permission:Quotation Delete', only: ['destroy']),
+            new Middleware('permission:Quotation Restore', only: ['restore']),
+            new Middleware('permission:Quotation Force Delete', only: ['forceDelete']),
+            new Middleware('permission:Quotation Toggle Status', only: ['toggleStatus']),
+        ];
+    }
+
     public function index(Request $request)
     {
         try {

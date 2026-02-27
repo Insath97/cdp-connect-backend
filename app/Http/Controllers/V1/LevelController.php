@@ -10,9 +10,21 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class LevelController extends Controller
+class LevelController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Level Index', only: ['index', 'show']),
+            new Middleware('permission:Level Create', only: ['store']),
+            new Middleware('permission:Level Update', only: ['update']),
+            new Middleware('permission:Level Delete', only: ['destroy']),
+        ];
+    }
+
     public function index(Request $request)
     {
         try {

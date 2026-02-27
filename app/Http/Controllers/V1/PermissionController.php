@@ -6,10 +6,22 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CreatePermissionRequest;
 use App\Http\Requests\UpdatePermissionRequest;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Spatie\Permission\Models\Permission;
 
-class PermissionController extends Controller
+class PermissionController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Permission Index', only: ['index', 'show']),
+            new Middleware('permission:Permission Create', only: ['store']),
+            new Middleware('permission:Permission Update', only: ['update']),
+            new Middleware('permission:Permission Delete', only: ['destroy']),
+        ];
+    }
+
     public function index(Request $request)
     {
         try {
@@ -63,7 +75,9 @@ class PermissionController extends Controller
         }
     }
 
-    public function create() {}
+    public function create()
+    {
+    }
 
     public function store(CreatePermissionRequest $request)
     {
@@ -115,7 +129,9 @@ class PermissionController extends Controller
         }
     }
 
-    public function edit(string $id) {}
+    public function edit(string $id)
+    {
+    }
 
     public function update(UpdatePermissionRequest $request, string $id)
     {

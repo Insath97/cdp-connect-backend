@@ -11,8 +11,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
-class TargetController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class TargetController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Target Index', only: ['index', 'show']),
+            new Middleware('permission:Target Create', only: ['store']),
+            new Middleware('permission:Target Update', only: ['update']),
+            new Middleware('permission:Target Delete', only: ['destroy']),
+            new Middleware('permission:My Targets', only: ['myTargets']),
+        ];
+    }
+
     public function index(Request $request)
     {
         try {

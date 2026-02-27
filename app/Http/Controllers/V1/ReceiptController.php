@@ -11,8 +11,18 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
-class ReceiptController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class ReceiptController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Receipt Index', only: ['show', 'indexByInvestment']),
+            new Middleware('permission:Receipt Create', only: ['store']),
+        ];
+    }
     /**
      * Store a newly created receipt in storage.
      */

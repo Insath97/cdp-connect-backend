@@ -6,11 +6,23 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateRoleRequest;
 use App\Http\Requests\UpdateRoleRequest;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
-class RoleController extends Controller
+class RoleController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Role Index', only: ['index', 'show', 'getAvailableRoles']),
+            new Middleware('permission:Role Create', only: ['store']),
+            new Middleware('permission:Role Update', only: ['update']),
+            new Middleware('permission:Role Delete', only: ['destroy']),
+        ];
+    }
+
     public function index(Request $request)
     {
         try {
@@ -53,7 +65,9 @@ class RoleController extends Controller
         }
     }
 
-    public function create() {}
+    public function create()
+    {
+    }
 
     public function store(CreateRoleRequest $request)
     {
@@ -112,7 +126,9 @@ class RoleController extends Controller
         }
     }
 
-    public function edit(string $id) {}
+    public function edit(string $id)
+    {
+    }
 
     public function update(UpdateRoleRequest $request, string $id)
     {

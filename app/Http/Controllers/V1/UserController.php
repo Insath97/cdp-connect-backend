@@ -14,11 +14,24 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Spatie\Permission\Models\Role;
 
-class UserController extends Controller
+class UserController extends Controller implements HasMiddleware
 {
     use FileUploadTrait;
+
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:User Index', only: ['index', 'show']),
+            new Middleware('permission:User Create', only: ['store']),
+            new Middleware('permission:User Update', only: ['update']),
+            new Middleware('permission:User Delete', only: ['destroy']),
+            new Middleware('permission:User Toggle Status', only: ['toggleStatus']),
+        ];
+    }
 
     public function index(Request $request)
     {

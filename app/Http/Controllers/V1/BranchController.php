@@ -10,8 +10,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
-class BranchController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class BranchController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Branch Index', only: ['index', 'show']),
+            new Middleware('permission:Branch Create', only: ['store']),
+            new Middleware('permission:Branch Update', only: ['update']),
+            new Middleware('permission:Branch Delete', only: ['destroy']),
+            new Middleware('permission:Branch Toggle Status', only: ['toggleStatus']),
+        ];
+    }
+
     public function index(Request $request)
     {
         try {

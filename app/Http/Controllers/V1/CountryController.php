@@ -10,8 +10,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
-class CountryController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class CountryController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Country Index', only: ['index', 'show']),
+            new Middleware('permission:Country Create', only: ['store']),
+            new Middleware('permission:Country Update', only: ['update']),
+            new Middleware('permission:Country Delete', only: ['destroy']),
+            new Middleware('permission:Country Toggle Status', only: ['toggleStatus']),
+        ];
+    }
+
     public function index(Request $request)
     {
         try {
@@ -47,7 +61,6 @@ class CountryController extends Controller
             ], 500);
         }
     }
-
     public function store(CreateCountryRequest $request)
     {
         try {
@@ -104,7 +117,6 @@ class CountryController extends Controller
             ], 500);
         }
     }
-
     public function update(UpdateCountryRequest $request, string $id)
     {
         try {
@@ -139,7 +151,6 @@ class CountryController extends Controller
             ], 500);
         }
     }
-
     public function destroy(string $id)
     {
         try {
@@ -184,7 +195,6 @@ class CountryController extends Controller
             ], 500);
         }
     }
-
     public function toggleStatus(string $id)
     {
         try {

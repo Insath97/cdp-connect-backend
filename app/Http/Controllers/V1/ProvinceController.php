@@ -10,8 +10,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
-class ProvinceController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class ProvinceController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Province Index', only: ['index', 'show']),
+            new Middleware('permission:Province Create', only: ['store']),
+            new Middleware('permission:Province Update', only: ['update']),
+            new Middleware('permission:Province Delete', only: ['destroy']),
+            new Middleware('permission:Province Toggle Status', only: ['toggleStatus']),
+        ];
+    }
+
     public function index(Request $request)
     {
         try {
