@@ -365,7 +365,7 @@ class InvestmentController extends Controller implements HasMiddleware
             // 1. Generate Policy Number: {BranchCode}-{YYMM}{Sequence}
             $branch = $investment->branch;
             $yymm = date('ym');
-            $prefix = 'CDP - ' . $branch->code . '-';
+            $prefix = 'CDP-' . $branch->code . '-';
 
             $lastPolicy = Investment::where('policy_number', 'like', $prefix . '%')
                 ->orderBy('policy_number', 'desc')
