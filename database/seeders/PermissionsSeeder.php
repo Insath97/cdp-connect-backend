@@ -119,6 +119,9 @@ class PermissionsSeeder extends Seeder
             /* Receipt Management */
             ['name' => 'Receipt Index', 'group_name' => 'Receipt Management Permissions'],
             ['name' => 'Receipt Create', 'group_name' => 'Receipt Management Permissions'],
+
+            /* Dashboard Management */
+            ['name' => 'Dashboard View', 'group_name' => 'Dashboard Management Permissions'],
         ];
 
         foreach ($permissions as $permission) {

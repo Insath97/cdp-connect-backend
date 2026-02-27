@@ -20,16 +20,17 @@ class UserSeeder extends Seeder
         $allPermissions = Permission::all();
         $role->syncPermissions($allPermissions);
 
-        $user = User::create([
-            'name' => 'Development Admin',
-            'profile_image' => '/image',
-            'email' => 'dev@localhost.com',
-            'password' => bcrypt('password'),
-            'username' => 'devadmin',
-            'user_type' => 'admin',
-            'is_active' => true,
-            'can_login' => true,
-        ]);
+        $user = User::updateOrCreate(
+            ['email' => 'dev@localhost.com', 'username' => 'devadmin'],
+            [
+                'name' => 'Development Admin',
+                'profile_image' => '/image',
+                'password' => bcrypt('password'),
+                'user_type' => 'admin',
+                'is_active' => true,
+                'can_login' => true,
+            ]
+        );
 
         $user->assignRole('Super Admin');
 
