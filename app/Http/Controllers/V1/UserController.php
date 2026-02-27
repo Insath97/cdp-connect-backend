@@ -138,18 +138,60 @@ class UserController extends Controller implements HasMiddleware
             }
 
             // Send Email
-           /*  try {
+            try {
+                // Load relationships for enriched email data
+                $user->load(['parent', 'level', 'branch', 'zone', 'region', 'province']);
+
+                // Prepare email data - ONLY include existing data, no N/A
                 $emailData = [
-                    'user' => $user,
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'username' => $user->username,
+                        'email' => $user->email,
+                        'user_type' => $user->user_type,
+                        'email_verified_at' => $user->email_verified_at,
+                    ],
                     'password' => $rawPassword,
-                    'role' => $data['role'],
+                    'role' => $data['role'] ?? null,
                     'created_by' => $currentUser ? $currentUser->name : 'System',
+                    'login_url' => config('app.frontend_url') ?? config('app.url'),
                 ];
 
+                // Only add relationships if they exist
+                if ($user->parent) {
+                    $emailData['parent_name'] = $user->parent->name;
+                }
+
+                if ($user->level) {
+                    $emailData['level_name'] = $user->level->name;
+                }
+
+                if ($user->branch) {
+                    $emailData['branch_name'] = $user->branch->name;
+                }
+
+                if ($user->zone) {
+                    $emailData['zone_name'] = $user->zone->name;
+                }
+
+                if ($user->region) {
+                    $emailData['region_name'] = $user->region->name;
+                }
+
+                if ($user->province) {
+                    $emailData['province_name'] = $user->province->name;
+                }
+
                 Mail::to($user->email)->send(new UserCreateMail($emailData));
+
+                Log::info('User creation email sent', [
+                    'user_id' => $user->id,
+                    'user_type' => $user->user_type
+                ]);
             } catch (\Throwable $th) {
                 Log::error('Failed to send user creation email: ' . $th->getMessage());
-            } */
+            }
 
             $user->load([
                 'roles' => function ($q) {
