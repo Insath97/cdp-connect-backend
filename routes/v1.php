@@ -18,6 +18,7 @@ use App\Http\Controllers\V1\TargetProgressController;
 use App\Http\Controllers\V1\QuotationController;
 use App\Http\Controllers\V1\ReceiptController;
 use App\Http\Controllers\V1\DashboardController;
+use App\Http\Controllers\V1\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -30,6 +31,13 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
 
     Route::post('logout', [AuthController::class, 'logout']);
     Route::get('me', [AuthController::class, 'me']);
+
+    // Profile Routes
+    Route::get('profile', [ProfileController::class, 'show']);
+    Route::patch('profile', [ProfileController::class, 'update']);
+    // Alias for PUT if preferred
+    Route::put('profile', [ProfileController::class, 'update']);
+    Route::patch('profile/change-password', [ProfileController::class, 'changePassword']);
 
     Route::get('dashboard', [DashboardController::class, 'index']);
 
