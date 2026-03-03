@@ -14,6 +14,7 @@ class InvestmentProduct extends Model
         'code',
         'duration_months',
         'roi_percentage',
+        'is_variable_roi',
         'minimum_amount',
         'maximum_amount',
         'is_active',
@@ -21,11 +22,17 @@ class InvestmentProduct extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_variable_roi' => 'boolean',
         'duration_months' => 'integer',
         'roi_percentage' => 'decimal:2',
         'minimum_amount' => 'decimal:2',
         'maximum_amount' => 'decimal:2',
     ];
+
+    public function annualRates()
+    {
+        return $this->hasMany(InvestmentProductRate::class);
+    }
 
     public function scopeActive($query)
     {

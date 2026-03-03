@@ -29,9 +29,15 @@ class UpdateInvestmentProductRequest extends FormRequest
             'code' => 'sometimes|string|max:50|unique:investment_products,code,' . $id,
             'duration_months' => 'sometimes|integer|min:1',
             'roi_percentage' => 'sometimes|numeric|min:0|max:100',
+            'is_variable_roi' => 'sometimes|boolean',
             'minimum_amount' => 'sometimes|numeric|min:0',
             'maximum_amount' => 'nullable|numeric|gte:minimum_amount',
             'is_active' => 'sometimes|boolean',
+
+            // Rates validation
+            'rates' => 'sometimes|nullable|array',
+            'rates.*.year' => 'required_with:rates|integer|min:1',
+            'rates.*.roi_percentage' => 'required_with:rates|numeric|min:0|max:100',
         ];
     }
 

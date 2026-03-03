@@ -9,6 +9,7 @@ use App\Models\InvestmentProduct;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -30,7 +31,7 @@ class InvestmentProductController extends Controller implements HasMiddleware
     {
         try {
             $perPage = $request->get('per_page', 15);
-            $query = InvestmentProduct::query();
+            $query = InvestmentProduct::with('annualRates');
 
             if ($request->has('search')) {
                 $query->search($request->search);
@@ -70,7 +71,18 @@ class InvestmentProductController extends Controller implements HasMiddleware
     {
         try {
             $data = $request->validated();
-            $investmentProduct = InvestmentProduct::create($data);
+
+            $investmentProduct = DB::transaction(function () use ($data) {
+                $product = InvestmentProduct::create($data);
+
+                if (isset($data['is_variable_roi']) && $data['is_variable_roi'] && isset($data['rates'])) {
+                    foreach ($data['rates'] as $rate) {
+                        $product->annualRates()->create($rate);
+                    }
+                }
+
+                return $product->load('annualRates');
+            });
 
             Log::info('Investment product created', [
                 'user_id' => Auth::id(),
@@ -95,7 +107,7 @@ class InvestmentProductController extends Controller implements HasMiddleware
     public function show(string $id)
     {
         try {
-            $investmentProduct = InvestmentProduct::find($id);
+            $investmentProduct = InvestmentProduct::with('annualRates')->find($id);
 
             if (!$investmentProduct) {
                 return response()->json([
@@ -136,7 +148,25 @@ class InvestmentProductController extends Controller implements HasMiddleware
             }
 
             $data = $request->validated();
-            $investmentProduct->update($data);
+
+            $investmentProduct = DB::transaction(function () use ($investmentProduct, $data) {
+                $investmentProduct->update($data);
+
+                if (isset($data['is_variable_roi'])) {
+                    if ($data['is_variable_roi'] && isset($data['rates'])) {
+                        // Delete old rates and create new ones
+                        $investmentProduct->annualRates()->delete();
+                        foreach ($data['rates'] as $rate) {
+                            $investmentProduct->annualRates()->create($rate);
+                        }
+                    } elseif (!$data['is_variable_roi']) {
+                        // Clear rates if variable ROI is disabled
+                        $investmentProduct->annualRates()->delete();
+                    }
+                }
+
+                return $investmentProduct->load('annualRates');
+            });
 
             Log::info('Investment product updated', [
                 'user_id' => Auth::id(),
