@@ -44,6 +44,10 @@ class UpdateUserRequest extends FormRequest
             'profile_image' => 'nullable|string',
             'is_active' => 'sometimes|boolean',
             'can_login' => 'sometimes|boolean',
+
+            // Identification based on user type (Staff vs Customer)
+            'id_type' => 'required_if:user_type,admin,hierarchy|nullable|in:nic,passport,driving_license,other',
+            'id_number' => 'required_if:user_type,admin,hierarchy|nullable|string|max:255|unique:users,id_number,' . $id,
         ];
     }
 
