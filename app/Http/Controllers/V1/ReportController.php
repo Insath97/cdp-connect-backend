@@ -37,7 +37,8 @@ class ReportController extends Controller implements HasMiddleware
             $isAdmin = $user->hasRole('Super Admin') || ($user->user_type === 'admin');
 
             $query = User::with(['level', 'branch'])
-                ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id');
+                ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id', 'users.user_type')
+                ->where('users.user_type', 'hierarchy');
 
             if (!$isAdmin) {
                 $descendantIds = $user->getAllDescendantIds();
@@ -129,8 +130,9 @@ class ReportController extends Controller implements HasMiddleware
 
             // 2. Fetch specific user data
             $userReport = User::with(['level', 'branch'])
-                ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id')
+                ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id', 'users.user_type')
                 ->where('users.id', $id)
+                ->where('users.user_type', 'hierarchy')
                 ->leftJoinSub(
                     Target::where('period_key', $periodKey),
                     't',
