@@ -20,6 +20,10 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('profile_image')->nullable();
             $table->string('password');
+            
+            $table->enum('id_type', ['nic', 'passport', 'driving_license', 'other'])->default('nic')->nullable();
+            $table->string('id_number')->unique()->nullable();
+
             $table->enum('user_type', ['admin', 'hierarchy', 'customer']);
 
             $table->boolean('is_active')->default(true); // Reporting structure
