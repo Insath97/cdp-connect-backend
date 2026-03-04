@@ -120,6 +120,9 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Receipt Index', 'group_name' => 'Receipt Management Permissions'],
             ['name' => 'Receipt Create', 'group_name' => 'Receipt Management Permissions'],
 
+            /* Report Management */
+            ['name' => 'Report Index', 'group_name' => 'Report Management Permissions'],
+
             /* Dashboard Management */
             ['name' => 'Dashboard View', 'group_name' => 'Dashboard Management Permissions'],
         ];
