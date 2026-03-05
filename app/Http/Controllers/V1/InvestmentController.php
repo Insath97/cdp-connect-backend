@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Mail;
 
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use App\Traits\InvestmentCalculationTrait;
 
 class InvestmentController extends Controller implements HasMiddleware
 {
@@ -39,7 +40,7 @@ class InvestmentController extends Controller implements HasMiddleware
         ];
     }
 
-    use FileUploadTrait;
+    use FileUploadTrait, InvestmentCalculationTrait;
     /**
      * Display a listing of the resource.
      */
@@ -298,7 +299,10 @@ class InvestmentController extends Controller implements HasMiddleware
             $investment = Investment::with([
                 'customer:id,full_name,name_with_initials,customer_code,id_number,address_line_1,city',
                 'branch:id,name,code',
-                'investmentProduct:id,name,code,duration_months,roi_percentage',
+                'investmentProduct' => function ($query) {
+                    $query->select('id', 'name', 'code', 'duration_months', 'roi_percentage', 'is_variable_roi')
+                        ->with('annualRates');
+                },
                 'unitHead',
                 'approver:id,name'
             ])->findOrFail($id);
@@ -308,6 +312,19 @@ class InvestmentController extends Controller implements HasMiddleware
                     'status' => 'error',
                     'message' => 'Certificates can only be generated for approved investments.'
                 ], 422);
+            }
+
+            // Calculate ROI and Breakdowns
+            if ($investment->investmentProduct) {
+                $calculations = $this->calculateInvestmentROI(
+                    (float) $investment->investment_amount,
+                    $investment->investmentProduct
+                );
+
+                // Append calculations to the investment object
+                foreach ($calculations as $key => $value) {
+                    $investment->{$key} = $value;
+                }
             }
 
             $investment->amount_in_words = NumberToWords::convert($investment->investment_amount);
