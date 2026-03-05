@@ -8,9 +8,12 @@ use App\Models\Quotation;
 use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\InvestmentProduct;
+use App\Http\Requests\UpdateQuotationRequest;
+use App\Traits\InvestmentCalculationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -30,6 +33,8 @@ class QuotationController extends Controller implements HasMiddleware
             new Middleware('permission:Quotation Toggle Status', only: ['toggleStatus']),
         ];
     }
+
+    use InvestmentCalculationTrait;
 
     public function index(Request $request)
     {
@@ -144,65 +149,20 @@ class QuotationController extends Controller implements HasMiddleware
 
             // 5. Investment Calculation
             $product = InvestmentProduct::with('annualRates')->findOrFail($data['investment_product_id']);
-            $duration = $product->duration_months;
-            $amount = $data['investment_amount'];
+            $calculations = $this->calculateInvestmentROI((float) $data['investment_amount'], $product);
 
-            $monthlyReturn = 0;
-            $annualReturn = 0;
-            $maturityAmount = 0;
-            $totalInterest = 0;
+            $monthlyReturn = $calculations['monthly_return'];
+            $annualReturn = $calculations['annual_return'];
+            $maturityAmount = $calculations['maturity_amount'];
 
             $breakdowns = [
-                'year_1_breakdown' => 0,
-                'year_2_breakdown' => 0,
-                'year_3_breakdown' => 0,
-                'year_4_breakdown' => 0,
-                'year_5_breakdown' => 0,
-                'month_6_breakdown' => 0,
+                'month_6_breakdown' => $calculations['month_6_breakdown'],
+                'year_1_breakdown' => $calculations['year_1_breakdown'],
+                'year_2_breakdown' => $calculations['year_2_breakdown'],
+                'year_3_breakdown' => $calculations['year_3_breakdown'],
+                'year_4_breakdown' => $calculations['year_4_breakdown'],
+                'year_5_breakdown' => $calculations['year_5_breakdown'],
             ];
-
-            if ($product->is_variable_roi) {
-                $rates = $product->annualRates->pluck('roi_percentage', 'year');
-
-                for ($year = 1; $year <= 5; $year++) {
-                    if ($duration >= ($year * 12)) {
-                        $rate = $rates->get($year) ?? $product->roi_percentage;
-                        $yearlyReturn = $amount * ($rate / 100);
-                        $totalInterest += $yearlyReturn;
-                        $breakdowns["year_{$year}_breakdown"] = $yearlyReturn;
-
-                        if ($year === 1) {
-                            $annualReturn = $yearlyReturn;
-                            $monthlyReturn = $yearlyReturn / 12;
-                            $breakdowns['month_6_breakdown'] = $monthlyReturn * 6;
-                        }
-                    }
-                }
-
-                // Handle 6 months edge case if duration is exactly 6 and variable ROI is somehow enabled
-                if ($duration == 6) {
-                    $monthlyReturn = ($amount * ($product->roi_percentage / 100)) / 12;
-                    $totalInterest = $monthlyReturn * 6;
-                    $breakdowns['month_6_breakdown'] = $totalInterest;
-                    $annualReturn = $monthlyReturn * 12;
-                }
-
-            } else {
-                // Standard Fixed ROI Calculation
-                $roi = $product->roi_percentage;
-                $monthlyReturn = ($amount * ($roi / 100)) / 12;
-                $annualReturn = $amount * ($roi / 100);
-                $totalInterest = $monthlyReturn * $duration;
-
-                $breakdowns['month_6_breakdown'] = ($duration >= 6) ? $monthlyReturn * 6 : 0;
-                $breakdowns['year_1_breakdown'] = ($duration >= 12) ? $monthlyReturn * 12 : 0;
-                $breakdowns['year_2_breakdown'] = ($duration >= 24) ? $monthlyReturn * 24 : 0;
-                $breakdowns['year_3_breakdown'] = ($duration >= 36) ? $monthlyReturn * 36 : 0;
-                $breakdowns['year_4_breakdown'] = ($duration >= 48) ? $monthlyReturn * 48 : 0;
-                $breakdowns['year_5_breakdown'] = ($duration >= 60) ? $monthlyReturn * 60 : 0;
-            }
-
-            $maturityAmount = $amount + $totalInterest;
 
             // 6. Generate Quotation Number
             $yearStr = date('y');
@@ -286,28 +246,137 @@ class QuotationController extends Controller implements HasMiddleware
         }
     }
 
-    public function update(Request $request, $id)
+    public function update(UpdateQuotationRequest $request, $id)
     {
+        try {
+            $user = Auth::guard('api')->user();
+            $data = $request->validated();
+            $quotation = Quotation::findOrFail($id);
 
+            // 1. Recalculate If Amount or Product Changed
+            if ($request->has('investment_amount') || $request->has('investment_product_id')) {
+                $productId = $data['investment_product_id'] ?? $quotation->investment_product_id;
+                $amount = $data['investment_amount'] ?? $quotation->investment_amount;
+
+                $product = InvestmentProduct::with('annualRates')->findOrFail($productId);
+                $calculations = $this->calculateInvestmentROI((float) $amount, $product);
+
+                $data = array_merge($data, [
+                    'monthly_return' => $calculations['monthly_return'],
+                    'annual_return' => $calculations['annual_return'],
+                    'maturity_amount' => $calculations['maturity_amount'],
+                    'month_6_breakdown' => $calculations['month_6_breakdown'],
+                    'year_1_breakdown' => $calculations['year_1_breakdown'],
+                    'year_2_breakdown' => $calculations['year_2_breakdown'],
+                    'year_3_breakdown' => $calculations['year_3_breakdown'],
+                    'year_4_breakdown' => $calculations['year_4_breakdown'],
+                    'year_5_breakdown' => $calculations['year_5_breakdown'],
+                ]);
+            }
+
+            $quotation->update($data);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Quotation updated successfully',
+                'data' => $quotation->load(['customer', 'branch', 'investmentProduct', 'creator'])
+            ], 200);
+
+        } catch (\Throwable $th) {
+            Log::error('Quotation update failed', [
+                'error' => $th->getMessage(),
+                'line' => $th->getLine(),
+                'user_id' => Auth::guard('api')->id(),
+                'quotation_id' => $id
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to update quotation',
+                'error' => $th->getMessage()
+            ], 500);
+        }
     }
 
     public function destroy($id)
     {
+        try {
+            $quotation = Quotation::findOrFail($id);
+            $quotation->delete();
 
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Quotation soft deleted successfully'
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to delete quotation',
+                'error' => $th->getMessage()
+            ], 500);
+        }
     }
 
     public function restore($id)
     {
+        try {
+            $quotation = Quotation::withTrashed()->findOrFail($id);
+            $quotation->restore();
 
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Quotation restored successfully',
+                'data' => $quotation
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to restore quotation',
+                'error' => $th->getMessage()
+            ], 500);
+        }
     }
 
     public function forceDelete($id)
     {
+        try {
+            $quotation = Quotation::withTrashed()->findOrFail($id);
+            $quotation->forceDelete();
 
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Quotation permanently deleted'
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to permanently delete quotation',
+                'error' => $th->getMessage()
+            ], 500);
+        }
     }
 
     public function toggleStatus($id)
     {
+        try {
+            $quotation = Quotation::findOrFail($id);
+            $quotation->is_active = !$quotation->is_active;
+            $quotation->save();
 
+            $status = $quotation->is_active ? 'activated' : 'deactivated';
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "Quotation {$status} successfully",
+                'data' => ['is_active' => $quotation->is_active]
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to toggle quotation status',
+                'error' => $th->getMessage()
+            ], 500);
+        }
     }
+
 }
