@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -15,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->string('name'); // Colombo, Gampaha, Kandy
             $table->string('code')->unique(); // CMB, GPH, KDY
-            $table->foreignId('province_id')->constrained('provinces')->cascadeOnDelete();
+            $table->foreignId('zone_id')->constrained('zones')->cascadeOnDelete();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });

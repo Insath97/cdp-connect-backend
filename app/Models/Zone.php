@@ -12,7 +12,7 @@ class Zone extends Model
     protected $fillable = [
         'name',
         'code',
-        'region_id',
+        'province_id',
         'is_active'
     ];
 
@@ -20,14 +20,19 @@ class Zone extends Model
         'is_active' => 'boolean'
     ];
 
-    public function region()
-    {
-        return $this->belongsTo(Region::class);
-    }
-
     public function province()
     {
-        return $this->hasOneThrough(Province::class, Region::class, 'id', 'id', 'region_id', 'province_id');
+        return $this->belongsTo(Province::class);
+    }
+
+    public function country()
+    {
+        return $this->hasOneThrough(Country::class, Province::class, 'id', 'id', 'province_id', 'country_id');
+    }
+
+    public function regions()
+    {
+        return $this->hasMany(Region::class);
     }
 
     public function branches()

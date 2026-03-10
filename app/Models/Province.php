@@ -27,9 +27,14 @@ class Province extends Model
         return $this->belongsTo(Country::class);
     }
 
+    public function zones()
+    {
+        return $this->hasMany(Zone::class);
+    }
+
     public function regions()
     {
-        return $this->hasMany(Region::class);
+        return $this->hasManyThrough(Region::class, Zone::class);
     }
 
     public function scopeActive($query)

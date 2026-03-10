@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('name'); // Colombo Central, Colombo North
             $table->string('code')->unique(); // CMB-C, CMB-N
-            $table->foreignId('region_id')->constrained('regions')->cascadeOnDelete();
+            $table->foreignId('province_id')->constrained('provinces')->cascadeOnDelete();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });

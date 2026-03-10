@@ -27,7 +27,7 @@ class UpdateZoneRequest extends FormRequest
         return [
             'name' => 'sometimes|string|max:255',
             'code' => 'sometimes|string|max:10|unique:zones,code,' . $id,
-            'region_id' => 'sometimes|exists:regions,id',
+            'province_id' => 'sometimes|exists:provinces,id',
             'is_active' => 'sometimes|boolean',
         ];
     }

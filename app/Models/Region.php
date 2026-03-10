@@ -12,7 +12,7 @@ class Region extends Model
     protected $fillable = [
         'name',
         'code',
-        'province_id',
+        'zone_id',
         'is_active'
     ];
 
@@ -20,19 +20,21 @@ class Region extends Model
         'is_active' => 'boolean'
     ];
 
+    public function zone()
+    {
+        return $this->belongsTo(Zone::class);
+    }
+
     public function province()
     {
-        return $this->belongsTo(Province::class);
+        return $this->hasOneThrough(Province::class, Zone::class, 'id', 'id', 'zone_id', 'province_id');
     }
 
     public function country()
     {
-        return $this->hasOneThrough(Country::class, Province::class, 'id', 'id', 'province_id', 'country_id');
-    }
-
-    public function zones()
-    {
-        return $this->hasMany(Zone::class);
+        // This is a bit complex for a standard hasOneThrough without a deep relation package.
+        // We'll go through Province which goes through Zone.
+        return $this->province ? $this->province->country() : null;
     }
 
     public function scopeActive($query)

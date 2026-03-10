@@ -26,7 +26,7 @@ class CreateZoneRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'code' => 'required|string|unique:zones,code|max:10',
-            'region_id' => 'required|exists:regions,id',
+            'province_id' => 'required|exists:provinces,id',
             'is_active' => 'sometimes|boolean',
         ];
     }

@@ -30,7 +30,7 @@ class RegionController extends Controller implements HasMiddleware
     {
         try {
             $perPage = $request->get('per_page', 15);
-            $query = Region::with('province.country');
+            $query = Region::with('zone.province.country');
 
             if ($request->has('search')) {
                 $query->search($request->search);
@@ -40,15 +40,15 @@ class RegionController extends Controller implements HasMiddleware
                 $request->boolean('is_active') ? $query->active() : $query->where('is_active', false);
             }
 
-            if ($request->has('province_id')) {
-                $query->where('province_id', $request->province_id);
+            if ($request->has('zone_id')) {
+                $query->where('zone_id', $request->zone_id);
             }
 
             $regions = $query->paginate($perPage);
 
             Log::info('Regions index accessed', [
                 'user_id' => Auth::id(),
-                'filters' => $request->only(['search', 'is_active', 'per_page', 'province_id']),
+                'filters' => $request->only(['search', 'is_active', 'per_page', 'zone_id']),
                 'count' => $regions->count()
             ]);
 
@@ -95,7 +95,7 @@ class RegionController extends Controller implements HasMiddleware
     public function show(string $id)
     {
         try {
-            $region = Region::with('province.country')->find($id);
+            $region = Region::with('zone.province.country')->find($id);
 
             if (!$region) {
                 return response()->json([
