@@ -202,7 +202,9 @@ class QuotationController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'success',
                 'message' => 'Quotation created successfully',
-                'data' => $quotation->load(['customer:id,full_name,name_with_initials', 'branch:id,name,code', 'investmentProduct:id,name,code,duration_months,roi_percentage', 'creator'])
+                'data' => array_merge($quotation->load(['customer:id,full_name,name_with_initials', 'branch:id,name,code', 'investmentProduct:id,name,code,duration_months', 'creator'])->toArray(), [
+                    'monthly_breakdown' => $calculations['monthly_breakdown']
+                ])
             ], 201);
 
         } catch (\Throwable $th) {
@@ -230,6 +232,15 @@ class QuotationController extends Controller implements HasMiddleware
                     'status' => 'error',
                     'message' => 'Quotation not found'
                 ], 404);
+            }
+
+            if ($quotation->investmentProduct) {
+                $product = $quotation->investmentProduct;
+                $product->load('annualRates');
+                $calculations = $this->calculateInvestmentROI((float) $quotation->investment_amount, $product);
+                
+                $quotation->monthly_breakdown = $calculations['monthly_breakdown'];
+                $quotation->total_interest = $calculations['total_interest'];
             }
 
             return response()->json([
