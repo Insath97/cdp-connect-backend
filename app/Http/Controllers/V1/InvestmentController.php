@@ -270,6 +270,13 @@ class InvestmentController extends Controller implements HasMiddleware
 
             $investment->amount_in_words = NumberToWords::convert($investment->investment_amount);
 
+            if ($investment->investmentProduct) {
+                $product = $investment->investmentProduct;
+                $product->load('annualRates');
+                $calculations = $this->calculateInvestmentROI((float)$investment->investment_amount, $product);
+                $investment->yearly_breakdown = $calculations['yearly_breakdown'];
+            }
+
             $investment->makeHidden(['created_at', 'updated_at', 'deleted_at', 'created_by', 'unit_head_id', 'checked_by', 'checked_at']);
             if ($investment->customer)
                 $investment->customer->makeHidden(['created_at', 'updated_at', 'deleted_at']);

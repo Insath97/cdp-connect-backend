@@ -30,7 +30,7 @@ trait InvestmentCalculationTrait
             'month_6_breakdown' => 0,
         ];
 
-        $rates_per_year = [];
+        $yearlyBreakdown = [];
 
         if ($product->is_variable_roi) {
             $rates = $product->annualRates->pluck('roi_percentage', 'year');
@@ -38,11 +38,17 @@ trait InvestmentCalculationTrait
             for ($year = 1; $year <= 5; $year++) {
                 if ($duration >= ($year * 12)) {
                     $rate = $rates->get($year) ?? $product->roi_percentage;
-                    $rates_per_year[$year] = $rate;
-
                     $yearlyReturn = $amount * ($rate / 100);
                     $totalInterest += $yearlyReturn;
                     $breakdowns["year_{$year}_breakdown"] = $yearlyReturn;
+
+                    $yearlyBreakdown[] = [
+                        'year' => $year,
+                        'roi_percentage' => (float)$rate,
+                        'monthly_payout' => round($yearlyReturn / 12, 2),
+                        'yearly_total' => round($yearlyReturn, 2),
+                        'duration_months' => 12
+                    ];
 
                     if ($year === 1) {
                         $annualReturn = $yearlyReturn;
@@ -58,6 +64,14 @@ trait InvestmentCalculationTrait
                 $totalInterest = $monthlyReturn * 6;
                 $breakdowns['month_6_breakdown'] = $totalInterest;
                 $annualReturn = $monthlyReturn * 12;
+
+                $yearlyBreakdown = [[
+                    'year' => 1,
+                    'roi_percentage' => (float)$product->roi_percentage,
+                    'monthly_payout' => round($monthlyReturn, 2),
+                    'yearly_total' => round($totalInterest, 2),
+                    'duration_months' => 6
+                ]];
             }
 
         } else {
@@ -74,9 +88,18 @@ trait InvestmentCalculationTrait
             $breakdowns['year_4_breakdown'] = ($duration >= 48) ? $monthlyReturn * 48 : 0;
             $breakdowns['year_5_breakdown'] = ($duration >= 60) ? $monthlyReturn * 60 : 0;
 
-            // For fixed ROI, all years have the same rate
+            // Generate yearly breakdown for fixed ROI
+            $remainingMonths = $duration;
             for ($yr = 1; $yr <= ceil($duration / 12); $yr++) {
-                $rates_per_year[$yr] = $roi;
+                $monthsInThisYear = min(12, $remainingMonths);
+                $yearlyBreakdown[] = [
+                    'year' => $yr,
+                    'roi_percentage' => $roi,
+                    'monthly_payout' => round($monthlyReturn, 2),
+                    'yearly_total' => round($monthlyReturn * $monthsInThisYear, 2),
+                    'duration_months' => $monthsInThisYear
+                ];
+                $remainingMonths -= $monthsInThisYear;
             }
         }
 
@@ -87,40 +110,7 @@ trait InvestmentCalculationTrait
             'annual_return' => $annualReturn,
             'maturity_amount' => $maturityAmount,
             'total_interest' => $totalInterest,
-            'monthly_breakdown' => $this->buildMonthlyBreakdown($amount, $duration, $rates_per_year),
+            'yearly_breakdown' => $yearlyBreakdown
         ]);
-    }
-
-    /**
-     * Build a month-by-month breakdown of the investment.
-     *
-     * @param float $amount
-     * @param int $duration
-     * @param array $rates_per_year
-     * @return array
-     */
-    private function buildMonthlyBreakdown(float $amount, int $duration, array $rates_per_year): array
-    {
-        $monthlyBreakdown = [];
-        $cumulativeInterest = 0;
-
-        for ($month = 1; $month <= $duration; $month++) {
-            $year = (int) ceil($month / 12);
-            $rate = $rates_per_year[$year] ?? $rates_per_year[max(array_keys($rates_per_year))];
-            
-            $monthlyReturn = ($amount * ($rate / 100)) / 12;
-            $cumulativeInterest += $monthlyReturn;
-
-            $monthlyBreakdown[] = [
-                'month' => $month,
-                'year' => $year,
-                'roi_percentage' => (float) $rate,
-                'monthly_return' => round($monthlyReturn, 2),
-                'cumulative_interest' => round($cumulativeInterest, 2),
-                'balance' => round($amount + $cumulativeInterest, 2),
-            ];
-        }
-
-        return $monthlyBreakdown;
     }
 }
