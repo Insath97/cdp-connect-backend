@@ -105,12 +105,12 @@ class QuotationController extends Controller implements HasMiddleware
                 ->where('created_at', '>=', Carbon::now()->subDays(14))
                 ->first();
 
-            if ($lastQuotation) {
+           /*  if ($lastQuotation) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'A quotation was already created for this ID number within the last 14 days.'
                 ], 422);
-            }
+            } */
 
             // 2. Intelligent Customer Selection/Lookup
             $customer = null;
