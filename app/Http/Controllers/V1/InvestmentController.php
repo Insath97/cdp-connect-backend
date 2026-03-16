@@ -11,6 +11,8 @@ use App\Models\Target;
 use App\Models\Beneficiary;
 use App\Models\CustomerBankDetail;
 use App\Models\Commission;
+use App\Mail\InvestmentApprovedMail;
+use App\Services\SmsService;
 use App\Models\CommissionSetting;
 use App\Models\SystemSetting;
 use App\Traits\FileUploadTrait;
@@ -372,7 +374,7 @@ class InvestmentController extends Controller implements HasMiddleware
     /**
      * Approve the specified investment.
      */
-    public function approve(Request $request, string $id)
+    public function approve(Request $request, SmsService $smsService, string $id)
     {
         DB::beginTransaction();
         try {
@@ -420,9 +422,44 @@ class InvestmentController extends Controller implements HasMiddleware
 
             Log::info('Investment approved', [
                 'investment_id' => $investment->id,
-                'policy_number' => $policyNumber,
+                'policy_number' => $investment->policy_number,
                 'approved_by' => $user->id
             ]);
+
+            $investment->load(['customer.user', 'investmentProduct']);
+
+            // 5. Send Welcome Notifications (Email & SMS)
+            try {
+                $customer = $investment->customer;
+                $recipientEmail = $customer->user->email ?? null;
+                $recipientPhone = $customer->phone_primary ?? null;
+
+                $data = [
+                    'customer_name' => $customer->full_name,
+                    'policy_number' => $investment->policy_number,
+                    'investment_amount' => $investment->investment_amount,
+                    'product_name' => $investment->investmentProduct->name,
+                    'duration_months' => $investment->investmentProduct->duration_months,
+                    'monthly_payout_day' => Carbon::parse($investment->monthly_payment_date)->day,
+                ];
+
+                // Send Email
+                if ($recipientEmail) {
+                    Mail::to($recipientEmail)->send(new InvestmentApprovedMail($data));
+                }
+
+                // Send SMS
+                if ($recipientPhone) {
+                    $welcomeSms = "Congratulations {$customer->full_name}! Your investment application is approved. Policy No: {$investment->policy_number}. Welcome to the CDP family!";
+                    $smsService->sendSms($recipientPhone, $welcomeSms);
+                }
+
+            } catch (\Throwable $notificationError) {
+                Log::error('Failed to send investment approval notifications', [
+                    'investment_id' => $investment->id,
+                    'error' => $notificationError->getMessage()
+                ]);
+            }
 
             return response()->json([
                 'status' => 'success',
