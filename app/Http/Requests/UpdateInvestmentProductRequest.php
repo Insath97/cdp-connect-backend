@@ -30,8 +30,8 @@ class UpdateInvestmentProductRequest extends FormRequest
             'duration_months' => 'sometimes|integer|min:1',
             'roi_percentage' => 'sometimes|numeric|min:0|max:100',
             'is_variable_roi' => 'sometimes|boolean',
-            'minimum_amount' => 'sometimes|numeric|min:0',
-            'maximum_amount' => 'nullable|numeric|gte:minimum_amount',
+            'unit_head_commission_pct' => 'sometimes|numeric|min:0|max:100',
+            'parent_commission_pct' => 'sometimes|numeric|min:0|max:100',
             'is_active' => 'sometimes|boolean',
 
             // Rates validation

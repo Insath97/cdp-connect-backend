@@ -15,8 +15,8 @@ class InvestmentProduct extends Model
         'duration_months',
         'roi_percentage',
         'is_variable_roi',
-        'minimum_amount',
-        'maximum_amount',
+        'unit_head_commission_pct',
+        'parent_commission_pct',
         'is_active',
     ];
 
@@ -25,8 +25,8 @@ class InvestmentProduct extends Model
         'is_variable_roi' => 'boolean',
         'duration_months' => 'integer',
         'roi_percentage' => 'decimal:2',
-        'minimum_amount' => 'decimal:2',
-        'maximum_amount' => 'decimal:2',
+        'unit_head_commission_pct' => 'decimal:2',
+        'parent_commission_pct' => 'decimal:2',
     ];
 
     public function annualRates()

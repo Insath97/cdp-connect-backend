@@ -449,9 +449,18 @@ class InvestmentController extends Controller implements HasMiddleware
      */
     protected function processCommissions(Investment $investment)
     {
-        // 1. Fetch percentages from settings
-        $unitHeadPct = CommissionSetting::where('key', 'unit_head_commission_pct')->value('value') ?? 10.00;
-        $parentPct = CommissionSetting::where('key', 'parent_commission_pct')->value('value') ?? 1.00;
+        // 1. Fetch percentages from the linked InvestmentProduct
+        $product = $investment->investmentProduct;
+        
+        if (!$product) {
+            Log::warning('Commission processing skipped: Investment product not found', [
+                'investment_id' => $investment->id
+            ]);
+            return;
+        }
+
+        $unitHeadPct = $product->unit_head_commission_pct ?? 0;
+        $parentPct = $product->parent_commission_pct ?? 0;
 
         $amount = $investment->investment_amount;
 

@@ -29,8 +29,8 @@ class CreateInvestmentProductRequest extends FormRequest
             'duration_months' => 'required|integer|min:1',
             'roi_percentage' => 'required|numeric|min:0|max:100',
             'is_variable_roi' => 'sometimes|boolean',
-            'minimum_amount' => 'nullable|numeric|min:0',
-            'maximum_amount' => 'nullable|numeric|',//gte:minimum_amount
+            'unit_head_commission_pct' => 'required|numeric|min:0|max:100',
+            'parent_commission_pct' => 'required|numeric|min:0|max:100',
             'is_active' => 'sometimes|boolean',
 
             // Rates validation
