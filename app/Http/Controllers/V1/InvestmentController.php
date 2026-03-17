@@ -431,7 +431,7 @@ class InvestmentController extends Controller implements HasMiddleware
             // 5. Send Welcome Notifications (Email & SMS)
             try {
                 $customer = $investment->customer;
-                $recipientEmail = $customer->user->email ?? null;
+                $recipientEmail = $customer->email ?? null;
                 $recipientPhone = $customer->phone_primary ?? null;
 
                 $data = [

@@ -22,7 +22,7 @@ class SmsService
 
     /**
      * Send SMS via Dialog Gateway
-     * 
+     *
      * @param string $number (Format: 947XXXXXXXX)
      * @param string $message
      * @return bool
@@ -31,7 +31,7 @@ class SmsService
     {
         try {
             // Ensure number is in correct format (94 prefix)
-            $number = $this->formatNumber($number);
+             $number = $this->formatNumber($number); 
 
             $response = Http::post($this->url, [
                 'username' => $this->username,
@@ -42,16 +42,20 @@ class SmsService
             ]);
 
             if ($response->successful()) {
-                Log::info('SMS sent successfully', ['number' => $number]);
+                Log::info('SMS Gateway Success Response', [
+                    'number' => $number,
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
                 return true;
             }
 
-            Log::error('SMS sending failed', [
+            Log::error('SMS Gateway Error Response', [
                 'status' => $response->status(),
                 'body' => $response->body(),
                 'number' => $number
             ]);
-            
+
             return false;
 
         } catch (\Throwable $th) {
@@ -66,7 +70,7 @@ class SmsService
     protected function formatNumber(string $number): string
     {
         $number = preg_replace('/[^0-9]/', '', $number);
-        
+
         if (str_starts_with($number, '0')) {
             $number = '94' . substr($number, 1);
         } elseif (!str_starts_with($number, '94')) {
