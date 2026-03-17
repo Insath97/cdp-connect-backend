@@ -41,6 +41,7 @@ class CustomerController extends Controller implements HasMiddleware
                     $q->where('full_name', 'like', "%{$search}%")
                         ->orWhere('customer_code', 'like', "%{$search}%")
                         ->orWhere('id_number', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('phone_primary', 'like', "%{$search}%");
                 });
             }

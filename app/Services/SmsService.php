@@ -14,7 +14,7 @@ class SmsService
 
     public function __construct()
     {
-        $this->url = env('DIALOG_SMS_URL', 'https://esms.dialog.lk/api/v1/send');
+        $this->url = env('DIALOG_SMS_URL', 'https://esms.dialog.lk/');
         $this->username = env('DIALOG_SMS_USERNAME');
         $this->password = env('DIALOG_SMS_PASSWORD');
         $this->mask = env('DIALOG_SMS_MASK', 'CDP EMPIRE');

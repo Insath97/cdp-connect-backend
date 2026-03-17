@@ -27,6 +27,7 @@ class Customer extends Model
         'date_of_birth',
         'phone_primary',
         'phone_secondary',
+        'email',
         'have_whatsapp',
         'whatsapp_number',
         'preferred_language',

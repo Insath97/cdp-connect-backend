@@ -20,6 +20,7 @@ use App\Http\Controllers\V1\ReceiptController;
 use App\Http\Controllers\V1\DashboardController;
 use App\Http\Controllers\V1\ProfileController;
 use App\Http\Controllers\V1\ReportController;
+use App\Http\Controllers\V1\ImportController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -96,7 +97,8 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::apiResource('receipts', ReceiptController::class)->only(['store', 'show']);
     Route::get('investments/{investmentId}/receipts', [ReceiptController::class, 'indexByInvestment']);
 
-    // Report Routes
     Route::get('reports/hierarchy', [ReportController::class, 'index']);
     Route::get('reports/hierarchy/{id}', [ReportController::class, 'show']);
+
+    Route::post('imports/{table}', [ImportController::class, 'import']);
 });

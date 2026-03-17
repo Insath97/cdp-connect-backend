@@ -42,6 +42,7 @@ class UpdateCustomerRequest extends FormRequest
             'date_of_birth' => 'sometimes|required|date',
             'phone_primary' => 'sometimes|required|string|max:20',
             'phone_secondary' => 'nullable|string|max:20',
+            'email' => 'sometimes|nullable|email|max:255|unique:customers,email,' . $id,
             'have_whatsapp' => 'boolean',
             'whatsapp_number' => 'nullable|string|max:20',
             'preferred_language' => 'sometimes|required|in:english,sinhala,tamil',

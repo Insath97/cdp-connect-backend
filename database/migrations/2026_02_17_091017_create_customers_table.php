@@ -22,6 +22,8 @@ return new class extends Migration {
             $table->enum('id_type', ['nic', 'passport', 'driving_license', 'other'])->default('nic');
             $table->string('id_number')->unique();
 
+            $table->string('email')->nullable()->unique();
+
             $table->string('address_line_1')->nullable();
             $table->string('address_line_2')->nullable();
             $table->string('landmark')->nullable();

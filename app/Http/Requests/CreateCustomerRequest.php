@@ -40,6 +40,7 @@ class CreateCustomerRequest extends FormRequest
             'date_of_birth' => 'required|date',
             'phone_primary' => 'required|string|max:20',
             'phone_secondary' => 'nullable|string|max:20',
+            'email' => 'nullable|email|max:255|unique:customers,email',
             'have_whatsapp' => 'boolean',
             'whatsapp_number' => 'nullable|required_if:have_whatsapp,true|string|max:20',
             'preferred_language' => 'required|in:english,sinhala,tamil',
