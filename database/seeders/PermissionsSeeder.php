@@ -112,6 +112,11 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Investment Delete', 'group_name' => 'Investment Management Permissions'],
             ['name' => 'Investment Approve', 'group_name' => 'Investment Management Permissions'],
             ['name' => 'Investment Certificate', 'group_name' => 'Investment Management Permissions'],
+            ['name' => 'Investment Maturity', 'group_name' => 'Investment Management Permissions'],
+
+            /* Import Management */
+            ['name' => 'Import Index', 'group_name' => 'Import Management Permissions'],
+            ['name' => 'Bulk Import', 'group_name' => 'Import Management Permissions'],
 
             /* Target Progress */
             ['name' => 'Target Progress Index', 'group_name' => 'Target Progress Permissions'],
@@ -122,6 +127,8 @@ class PermissionsSeeder extends Seeder
 
             /* Report Management */
             ['name' => 'Report Index', 'group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Agent Performance', 'group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Investor Maturity', 'group_name' => 'Report Management Permissions'],
 
             /* Dashboard Management */
             ['name' => 'Dashboard View', 'group_name' => 'Dashboard Management Permissions'],

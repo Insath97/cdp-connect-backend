@@ -25,6 +25,8 @@ class ReportController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('permission:Report Index', only: ['index', 'show']),
+            new Middleware('permission:Report Agent Performance', only: ['agentPerformance']),
+            new Middleware('permission:Report Investor Maturity', only: ['investorMaturity']),
         ];
     }
 

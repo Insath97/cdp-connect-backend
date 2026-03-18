@@ -39,6 +39,7 @@ class InvestmentController extends Controller implements HasMiddleware
             new Middleware('permission:Investment Delete', only: ['destroy']),
             new Middleware('permission:Investment Approve', only: ['approve']),
             new Middleware('permission:Investment Certificate', only: ['printCertificate']),
+            new Middleware('permission:Investment Maturity', only: ['investorMaturity']),
         ];
     }
 
@@ -450,7 +451,9 @@ class InvestmentController extends Controller implements HasMiddleware
 
                 // Send SMS
                 if ($recipientPhone) {
-                    $welcomeSms = "Congratulations {$customer->full_name}! Your investment application is approved. Policy No: {$investment->policy_number}. Welcome to the CDP family!";
+                    $amount = number_format($investment->investment_amount, 0);
+                    $duration = $investment->investmentProduct->duration_months ?? 0;
+                    $welcomeSms = "Welcome to CDP Empire.\n\nYour Investment has been created.\n\nAmount : LKR {$amount}/-\n\nDuration : {$duration} Months\n\nPolicy No : {$investment->policy_number}\n\nThanks for choosing CDP Empire (Pvt) Ltd.";
                     $smsService->sendSms($recipientPhone, $welcomeSms);
                 }
 

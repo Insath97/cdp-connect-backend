@@ -9,8 +9,19 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
-class ImportController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class ImportController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Import Index', only: ['index', 'listTables']),
+            new Middleware('permission:Bulk Import', only: ['import']),
+        ];
+    }
+
     protected $importService;
 
     public function __construct(BulkImportService $importService)
