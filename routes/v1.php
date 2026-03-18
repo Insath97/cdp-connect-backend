@@ -87,6 +87,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::delete('quotations/{id}/force', [QuotationController::class, 'forceDelete']);
     Route::patch('quotations/{id}/toggle-status', [QuotationController::class, 'toggleStatus']);
 
+    Route::get('investments/maturity-report', [InvestmentController::class, 'investorMaturity']);
     Route::apiResource('investments', InvestmentController::class);
     Route::patch('investments/{id}/approve', [InvestmentController::class, 'approve']);
     Route::get('investments/{id}/certificate', [InvestmentController::class, 'printCertificate']);
@@ -98,6 +99,8 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::get('investments/{investmentId}/receipts', [ReceiptController::class, 'indexByInvestment']);
 
     Route::get('reports/hierarchy', [ReportController::class, 'index']);
+    Route::get('reports/agent-performance', [ReportController::class, 'agentPerformance']);
+    Route::get('reports/investor-maturity', [ReportController::class, 'investorMaturity']);
     Route::get('reports/hierarchy/{id}', [ReportController::class, 'show']);
 
     Route::get('imports/tables/list', [ImportController::class, 'listTables']);

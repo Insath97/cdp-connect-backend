@@ -532,6 +532,124 @@ class InvestmentController extends Controller implements HasMiddleware
     }
 
     /**
+     * Get a paginated list of all investments with their detailed maturity schedules (Year and Month labels).
+     */
+    public function investorMaturity(Request $request)
+    {
+        try {
+            $perPage = $request->get('per_page', 15);
+            $user = Auth::guard('api')->user();
+
+            $query = Investment::with(['customer', 'investmentProduct.annualRates', 'branch', 'creator']);
+
+            // 1. Hierarchy Visibility Logic
+            if (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
+                // Hierarchical users see their own and descendants' investments
+                $descendantIds = $user->getAllDescendantIds();
+                $accessibleUserIds = array_merge([$user->id], $descendantIds);
+                $query->whereIn('created_by', $accessibleUserIds);
+            }
+
+            // 2. Filters
+            if ($request->has('investment_product_id')) {
+                $query->where('investment_product_id', $request->investment_product_id);
+            }
+
+            if ($request->has('period_key')) {
+                $query->where('target_period_key', $request->period_key);
+            }
+
+            if ($request->has('branch_id')) {
+                $query->where('branch_id', $request->branch_id);
+            }
+
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->whereHas('customer', function ($cq) use ($search) {
+                        $cq->where('full_name', 'like', "%{$search}%")
+                            ->orWhere('id_number', 'like', "%{$search}%")
+                            ->orWhere('customer_code', 'like', "%{$search}%");
+                    })->orWhere('policy_number', 'like', "%{$search}%")
+                      ->orWhere('application_number', 'like', "%{$search}%")
+                      ->orWhere('sales_code', 'like', "%{$search}%");
+                });
+            }
+
+            // 3. Status Filter (Default to approved for maturity analysis)
+            $status = $request->get('status', 'approved');
+            $query->where('status', $status);
+
+            // 4. Execution & Pagination
+            $investments = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+            // 5. Transform data to include detailed maturity schedules
+            $investments->getCollection()->transform(function ($inv) {
+                $calculations = [];
+                if ($inv->investmentProduct) {
+                    $calculations = $this->calculateInvestmentROI((float)$inv->investment_amount, $inv->investmentProduct);
+                }
+
+                $startDate = $inv->reservation_date ?? $inv->created_at;
+                $monthlySchedule = [];
+                // Use a copy of the start date for calculation, ensure it's Carbon
+                $payoutDate = Carbon::parse($startDate);
+
+                foreach ($calculations['yearly_breakdown'] ?? [] as $yearData) {
+                    $monthlyPayout = $yearData['monthly_payout'];
+                    $monthsInYear = $yearData['duration_months'];
+                    
+                    for ($i = 0; $i < $monthsInYear; $i++) {
+                        $payoutDate->addMonth(); // Payout usually starts 1 month after reservation
+                        $monthlySchedule[] = [
+                            'date' => $payoutDate->format('Y-m-d'),
+                            'year' => $payoutDate->year,
+                            'month' => $payoutDate->format('F'),
+                            'payout_amount' => round($monthlyPayout, 2)
+                        ];
+                    }
+                }
+
+                return [
+                    'id' => $inv->id,
+                    'policy_number' => $inv->policy_number,
+                    'customer_name' => $inv->customer->full_name ?? 'N/A',
+                    'id_number' => $inv->customer->id_number ?? 'N/A',
+                    'plan' => $inv->investmentProduct->name ?? 'N/A',
+                    'invest_date' => $inv->reservation_date ? $inv->reservation_date->format('Y-m-d') : 'N/A',
+                    'investment_amount' => (float)$inv->investment_amount,
+                    'duration_months' => $inv->investmentProduct->duration_months ?? 0,
+                    'monthly_maturity' => round($calculations['monthly_return'] ?? 0, 2),
+                    'total_maturity' => round($calculations['maturity_amount'] ?? 0, 2),
+                    'total_interest' => round($calculations['total_interest'] ?? 0, 2),
+                    'detailed_payout_schedule' => $monthlySchedule,
+                    'creator' => $inv->creator->name ?? 'N/A',
+                    'branch' => $inv->branch->name ?? 'N/A',
+                    'status' => $inv->status
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Investment maturity data retrieved successfully',
+                'data' => $investments
+            ], 200);
+
+        } catch (\Throwable $th) {
+            Log::error('Investment maturity report failed in InvestmentController', [
+                'error' => $th->getMessage(),
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve investment maturity report',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Remove the specified resource from storage.
      */
     public function destroy(string $id)
