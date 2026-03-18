@@ -79,14 +79,6 @@ class CustomerController extends Controller implements HasMiddleware
             $currentUser = Auth::guard('api')->user();
             $data = $request->validated();
 
-            // Setup default values or logic if needed
-            // If customer_id is not provided, maybe assign current user?
-            // The migration allows nullable, but usually we track who created it.
-            // If customer_id represents the "Agent", we can set it.
-            if (!isset($data['customer_id'])) {
-                $data['customer_id'] = $currentUser->id;
-            }
-
             // Generate Customer Code if not provided
             if (empty($data['customer_code'])) {
                 $lastCustomer = Customer::orderBy('id', 'desc')->first();
@@ -99,7 +91,6 @@ class CustomerController extends Controller implements HasMiddleware
 
             Log::info('Customer created', [
                 'creator_id' => $currentUser->id,
-                'customer_id' => $customer->id,
                 'customer_code' => $customer->customer_code
             ]);
 

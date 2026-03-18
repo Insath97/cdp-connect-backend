@@ -135,15 +135,24 @@
 
 <body>
     <div class="email-wrapper">
-        <div class="header">
-            <h1 style="color: white; margin-bottom: 5px;">Investment Approved</h1>
+        {{--  <div class="header">
+            <h1 style="margin-bottom: 5px;">Investment Approved</h1>
             <div class="welcome-badge">Welcome to the CDP Family!</div>
+        </div> --}}
+
+        <div class="header"
+            style="background: linear-gradient(135deg, #e1f8f3 0%, #d0f0e8 100%); padding: 40px 30px; text-align: center;">
+            <h1 style="margin-bottom: 5px; color: #1e594f; font-size: 26px; font-weight: 800;">Investment Approved</h1>
+            <div class="welcome-badge"
+                style="display: inline-block; margin-top: 12px; background: #298c77; padding: 6px 16px; border-radius: 30px; font-size: 14px; font-weight: 600; letter-spacing: 0.05em; color: #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                Welcome to the CDP Family!</div>
         </div>
 
         <div class="content">
             <div class="congrats-card">
                 <h2>Congratulations, {{ $data['customer_name'] }}!</h2>
-                <p style="margin: 5px 0 0 0;">Your investment application has been officially approved and your and your policy is now active.</p>
+                <p style="margin: 5px 0 0 0;">Your investment application has been officially approved and your and your
+                    policy is now active.</p>
             </div>
 
             <div class="section">
@@ -168,9 +177,11 @@
                 </table>
             </div>
 
-            <p>Your monthly returns will be processed on the {{ $data['monthly_payout_day'] }}th of every month. You will receive a notification via Email and SMS once each payout is processed.</p>
-            
-            <p style="margin-top: 25px;">Thank you for trusting CDP Connect with your investments. We look forward to a successful partnership.</p>
+            <p>Your monthly returns will be processed on the {{ $data['monthly_payout_day'] }}th of every month. You
+                will receive a notification via Email and SMS once each payout is processed.</p>
+
+            <p style="margin-top: 25px;">Thank you for trusting CDP Empire with your investments. We look forward to a
+                successful partnership.</p>
         </div>
 
         <div class="footer">
