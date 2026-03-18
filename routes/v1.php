@@ -100,5 +100,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::get('reports/hierarchy', [ReportController::class, 'index']);
     Route::get('reports/hierarchy/{id}', [ReportController::class, 'show']);
 
+    Route::get('imports/tables/list', [ImportController::class, 'listTables']);
+    Route::get('imports', [ImportController::class, 'index']);
     Route::post('imports/{table}', [ImportController::class, 'import']);
 });

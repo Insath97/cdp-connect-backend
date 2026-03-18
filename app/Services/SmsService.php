@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 class SmsService
 {
     protected $baseUrl;
+    protected $sendSmsUrl;
     protected $username;
     protected $password;
     protected $mask;
@@ -16,6 +17,8 @@ class SmsService
     public function __construct()
     {
         $this->baseUrl = env('DIALOG_SMS_URL', 'https://esms.dialog.lk');
+        // Note: Send SMS endpoint specifically uses e-sms.dialog.lk as per documentation
+        $this->sendSmsUrl = 'https://e-sms.dialog.lk/api/v2/sms';
         $this->username = env('DIALOG_SMS_USERNAME');
         $this->password = env('DIALOG_SMS_PASSWORD');
         $this->mask = env('DIALOG_SMS_MASK', 'CDP EMPIRE');
@@ -110,7 +113,7 @@ class SmsService
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $token,
                 'Content-Type' => 'application/json'
-            ])->post($this->baseUrl . '/api/v2/sms', $payload);
+            ])->post($this->sendSmsUrl, $payload);
 
             if ($response->successful()) {
                 $data = $response->json();
@@ -130,6 +133,7 @@ class SmsService
             Log::error('SMS API Error Response', [
                 'status' => $response->status(),
                 'body' => $response->body(),
+                'errCode' => $response->json('errCode') ?? 'Unknown',
                 'transaction_id' => $transactionId
             ]);
 
@@ -201,27 +205,27 @@ class SmsService
     }
 
     /**
-     * Format phone number to required format (947XXXXXXXX)
+     * Format phone number to required format (7XXXXXXXX - 9 digits)
      */
     protected function formatNumber(string $number): string
     {
         // Remove all non-numeric characters
         $number = preg_replace('/[^0-9]/', '', $number);
 
-        // Check if it starts with 94
-        if (!str_starts_with($number, '94')) {
-            // If starts with 0, replace with 94
-            if (str_starts_with($number, '0')) {
-                $number = '94' . substr($number, 1);
-            } else {
-                // If neither, add 94 prefix
-                $number = '94' . $number;
-            }
+        // If starts with 94, remove it
+        if (str_starts_with($number, '94')) {
+            $number = substr($number, 2);
         }
 
-        // Ensure it's exactly 11 digits (94 + 9 digits)
-        if (strlen($number) > 11) {
-            $number = substr($number, 0, 11);
+        // If starts with 0, remove it
+        if (str_starts_with($number, '0')) {
+            $number = substr($number, 1);
+        }
+
+        // Ensure it's exactly 9 digits as per API docs
+        if (strlen($number) > 9) {
+            // Keep last 9 digits if longer (might happen if someone enters 07XXXXXXXX)
+            $number = substr($number, -9);
         }
 
         return $number;

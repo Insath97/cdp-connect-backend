@@ -99,7 +99,7 @@ class BranchController extends Controller implements HasMiddleware
     public function show(string $id)
     {
         try {
-            $branch = Branch::with(['zone.region.province.country'])->find($id);
+            $branch = Branch::with(['region.zone.province.country'])->find($id);
 
             if (!$branch) {
                 return response()->json([

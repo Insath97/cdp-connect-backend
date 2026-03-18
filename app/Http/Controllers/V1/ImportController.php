@@ -19,6 +19,58 @@ class ImportController extends Controller
     }
 
     /**
+     * List only the table names for a frontend select box.
+     */
+    public function listTables(): JsonResponse
+    {
+        try {
+            $configs = $this->importService->getImportableConfig();
+            $tables = array_map(function ($table) {
+                return [
+                    'id' => $table,
+                    'name' => ucwords(str_replace('_', ' ', $table))
+                ];
+            }, array_keys($configs));
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $tables
+            ], 200);
+
+        } catch (\Throwable $th) {
+            Log::error("Bulk import table list failure: " . $th->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve table list.',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * List all importable tables and their required headers.
+     */
+    public function index(): JsonResponse
+    {
+        try {
+            $tables = $this->importService->getImportableTables();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $tables
+            ], 200);
+
+        } catch (\Throwable $th) {
+            Log::error("Bulk import table list failure: " . $th->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve importable tables.',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Handle bulk import for various system tables.
      */
     public function import(BulkImportRequest $request, string $table): JsonResponse
