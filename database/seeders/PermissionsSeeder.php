@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class PermissionsSeeder extends Seeder
 {
@@ -141,5 +142,10 @@ class PermissionsSeeder extends Seeder
                 'guard_name' => 'api',
             ]);
         }
+
+        $role = Role::firstOrCreate(['guard_name' => 'api', 'name' => 'Super Admin']);
+
+        $allPermissions = Permission::all();
+        $role->syncPermissions($allPermissions);
     }
 }
