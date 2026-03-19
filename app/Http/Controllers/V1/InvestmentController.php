@@ -350,7 +350,6 @@ class InvestmentController extends Controller implements HasMiddleware
                 'message' => 'Certificate data retrieved successfully',
                 'data' => $investment
             ], 200);
-
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => 'error',
@@ -368,9 +367,7 @@ class InvestmentController extends Controller implements HasMiddleware
         //
     }
 
-    public function update(Request $request, string $id)
-    {
-    }
+    public function update(Request $request, string $id) {}
 
     /**
      * Approve the specified investment.
@@ -453,10 +450,22 @@ class InvestmentController extends Controller implements HasMiddleware
                 if ($recipientPhone) {
                     $amount = number_format($investment->investment_amount, 0);
                     $duration = $investment->investmentProduct->duration_months ?? 0;
-                    $welcomeSms = "Welcome to CDP Empire.\n\nYour Investment has been created.\n\nAmount : LKR {$amount}/-\n\nDuration : {$duration} Months\n\nPolicy No : {$investment->policy_number}\n\nThanks for choosing CDP Empire (Pvt) Ltd.";
+                    $welcomeSms = "Dear {$investment->customer->full_name},\n\n" .
+                        "Welcome to CDP Empire!\n\n" .
+                        "Your Investment has been successfully created.\n\n" .
+                        "━━━━━━━━━━━━━━━━━━━\n" .
+                        "INVESTMENT DETAILS:\n" .
+                        "━━━━━━━━━━━━━━━━━━━\n" .
+                        "Amount: LKR {$amount}/-\n" .
+                        "Duration: {$duration} Months\n" .
+                        "Policy No: {$investment->policy_number}\n\n" .
+                        "Thank you for choosing CDP Empire (Pvt) Ltd.\n\n" .
+                        "For any inquiries:\n" .
+                        "Hotline: +94 114 007 007\n" .
+                        "Website: https://cdp.lk/";
+
                     $smsService->sendSms($recipientPhone, $welcomeSms);
                 }
-
             } catch (\Throwable $notificationError) {
                 Log::error('Failed to send investment approval notifications', [
                     'investment_id' => $investment->id,
@@ -491,7 +500,7 @@ class InvestmentController extends Controller implements HasMiddleware
     {
         // 1. Fetch percentages from the linked InvestmentProduct
         $product = $investment->investmentProduct;
-        
+
         if (!$product) {
             Log::warning('Commission processing skipped: Investment product not found', [
                 'investment_id' => $investment->id
@@ -574,8 +583,8 @@ class InvestmentController extends Controller implements HasMiddleware
                             ->orWhere('id_number', 'like', "%{$search}%")
                             ->orWhere('customer_code', 'like', "%{$search}%");
                     })->orWhere('policy_number', 'like', "%{$search}%")
-                      ->orWhere('application_number', 'like', "%{$search}%")
-                      ->orWhere('sales_code', 'like', "%{$search}%");
+                        ->orWhere('application_number', 'like', "%{$search}%")
+                        ->orWhere('sales_code', 'like', "%{$search}%");
                 });
             }
 
@@ -601,7 +610,7 @@ class InvestmentController extends Controller implements HasMiddleware
                 foreach ($calculations['yearly_breakdown'] ?? [] as $yearData) {
                     $monthlyPayout = $yearData['monthly_payout'];
                     $monthsInYear = $yearData['duration_months'];
-                    
+
                     for ($i = 0; $i < $monthsInYear; $i++) {
                         $payoutDate->addMonth(); // Payout usually starts 1 month after reservation
                         $monthlySchedule[] = [
@@ -637,7 +646,6 @@ class InvestmentController extends Controller implements HasMiddleware
                 'message' => 'Investment maturity data retrieved successfully',
                 'data' => $investments
             ], 200);
-
         } catch (\Throwable $th) {
             Log::error('Investment maturity report failed in InvestmentController', [
                 'error' => $th->getMessage(),
