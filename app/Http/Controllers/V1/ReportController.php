@@ -16,6 +16,7 @@ use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 
 use App\Traits\InvestmentCalculationTrait;
+use Illuminate\Http\JsonResponse;
 
 class ReportController extends Controller implements HasMiddleware
 {
@@ -198,7 +199,7 @@ class ReportController extends Controller implements HasMiddleware
     /**
      * Search for a hierarchy user and get their performance summary and customer details.
      */
-    public function agentPerformance(Request $request)
+    public function agentPerformance(Request $request): JsonResponse
     {
         try {
             $currentUser = Auth::guard('api')->user();
@@ -250,7 +251,8 @@ class ReportController extends Controller implements HasMiddleware
             // 4. Customer Details (Investments)
             // Retrieve important datas as requested: Customer Name, Plan, Period, Amount, Maturity details
             $investments = Investment::with(['customer', 'investmentProduct.annualRates'])
-                ->where('created_by', $agent->id)
+                ->where('unit_head_id', $agent->id)
+                ->where('target_period_key', $periodKey)
                 ->get()
                 ->map(function ($inv) {
                     $calculations = [];
