@@ -138,6 +138,10 @@
                     <span class="label">Investment Amount</span>
                     <span class="value">LKR {{ number_format($data['investment_amount'], 2) }}</span>
                 </div>
+                <div class="info-row">
+                    <span class="label">Duration Progress</span>
+                    <span class="value">Month {{ $data['completed_months'] }} of {{ $data['total_months'] }}</span>
+                </div>
             </div>
 
             <p style="margin-top: 25px; font-size: 14px;">The amount will be credited to your registered bank account within 2-3 working days. Thank you for choosing CDP Connect.</p>

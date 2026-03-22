@@ -45,7 +45,7 @@ class ReportController extends Controller implements HasMiddleware
             $isAdmin = $user->hasRole('Super Admin') || ($user->user_type === 'admin');
 
             $query = User::with(['level', 'branch'])
-                ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id', 'users.user_type')
+                ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id', 'users.user_type','users.id_type','users.id_number')
                 ->where('users.user_type', 'hierarchy');
 
             if (!$isAdmin) {
@@ -262,6 +262,7 @@ class ReportController extends Controller implements HasMiddleware
 
                     return [
                         'customer_name' => $inv->customer->full_name ?? 'N/A',
+                        'policy_number' => $inv->policy_number,
                         'invest_date' => $inv->reservation_date ? $inv->reservation_date->format('Y-m-d') : 'N/A',
                         'plan' => $inv->investmentProduct->name ?? 'N/A',
                         'period' => ($inv->investmentProduct->duration_months ?? 0) . ' Months',

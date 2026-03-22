@@ -37,10 +37,18 @@ class SendMonthlyPayoutNotifications extends Command
         $today = now();
         $this->info("Scanning for payouts for today: " . $today->format('Y-m-d'));
 
-        // 1. Fetch approved investments that have a monthly payment date today
+        // 1. Fetch approved investments that are due for payout
+        // Logic: Payout day matches today AND it is at least 1 month after reservation
         $investments = Investment::with(['customer.user', 'investmentProduct'])
             ->where('status', 'approved')
-            ->whereDay('monthly_payment_date', $today->day)
+            ->where(function ($query) use ($today) {
+                $query->whereDay('monthly_payment_date', $today->day)
+                    ->orWhere(function ($q) use ($today) {
+                        $q->whereNull('monthly_payment_date')
+                            ->whereDay('reservation_date', $today->day);
+                    });
+            })
+            ->where('reservation_date', '<=', $today->copy()->subMonth()->toDateString())
             ->get();
 
         if ($investments->isEmpty()) {
@@ -59,6 +67,11 @@ class SendMonthlyPayoutNotifications extends Command
                 $payoutAmount = $calculations['monthly_return'];
                 $monthYear = $today->format('F Y');
 
+                // Calculate Duration Progress
+                $startDate = Carbon::parse($investment->reservation_date);
+                $totalMonths = $investment->investmentProduct->duration_months ?? 0;
+                $completedMonths = (int) $startDate->diffInMonths($today);
+
                 $customer = $investment->customer;
                 $recipientEmail = $customer->user->email ?? null;
                 $recipientPhone = $customer->phone_primary ?? null;
@@ -70,6 +83,8 @@ class SendMonthlyPayoutNotifications extends Command
                     'policy_number' => $investment->policy_number,
                     'product_name' => $investment->investmentProduct->name,
                     'investment_amount' => $investment->investment_amount,
+                    'total_months' => $totalMonths,
+                    'completed_months' => $completedMonths,
                 ];
 
                 // 3. Send Email
@@ -82,7 +97,15 @@ class SendMonthlyPayoutNotifications extends Command
 
                 // 4. Send SMS
                 if ($recipientPhone) {
-                    $smsMessage = "Dear {$customer->full_name}, your monthly return of LKR " . number_format($payoutAmount, 2) . " for {$monthYear} has been processed. CDP Connect.";
+                    $smsMessage = "Dear {$customer->full_name},\n\n" .
+                        "Month: {$monthYear}\n" .
+                        "Plan: {$investment->investmentProduct->name}\n" .
+                        "Policy No: {$investment->policy_number}\n" .
+                        "Duration: {$completedMonths}/{$totalMonths} Months\n\n" .
+                        "Your monthly return of LKR " . number_format($payoutAmount, 2) . " has been processed.\n\n" .
+                        "Thank you for choosing CDP Empire (Pvt) Ltd.\n" .
+                        "Hotline: +94 114 007 007";
+
                     $smsService->sendSms($recipientPhone, $smsMessage);
                     $this->info("SMS sent to: {$recipientPhone}");
                 } else {
