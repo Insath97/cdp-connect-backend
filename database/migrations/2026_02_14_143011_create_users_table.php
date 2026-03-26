@@ -18,9 +18,10 @@ return new class extends Migration
             $table->string('name');
             $table->string('username')->unique();
             $table->string('email')->unique();
+            $table->string('employee_code')->nullable()->unique();
             $table->string('profile_image')->nullable();
             $table->string('password');
-            
+
             $table->enum('id_type', ['nic', 'passport', 'driving_license', 'other'])->default('nic')->nullable();
             $table->string('id_number')->unique()->nullable();
 

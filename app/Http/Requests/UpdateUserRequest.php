@@ -33,6 +33,9 @@ class UpdateUserRequest extends FormRequest
             'user_type' => 'sometimes|in:admin,hierarchy,customer',
             'role' => 'sometimes|string|exists:roles,name',
 
+            // Employee Code (Required for hierarchy users)
+            'employee_code' => 'sometimes|required_if:user_type,hierarchy|nullable|string|max:255|unique:users,employee_code,' . $id,
+
             'level_id' => 'required_if:user_type,hierarchy|nullable|exists:levels,id',
             'parent_user_id' => 'nullable|exists:users,id',
 

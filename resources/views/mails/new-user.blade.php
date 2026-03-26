@@ -222,6 +222,14 @@
                             <div class="credential-value">{{ $parent_name }}</div>
                         </div>
                     @endif
+
+                    {{-- Employee Code --}}
+                    @if (isset($user['employee_code']) && !empty($user['employee_code']))
+                        <div class="credential-item">
+                            <div class="credential-label">Employee ID</div>
+                            <div class="credential-value">{{ $user['employee_code'] }}</div>
+                        </div>
+                    @endif
                 </div>
             @endif
 

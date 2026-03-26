@@ -32,6 +32,9 @@ class CreateUserRequest extends FormRequest
             'user_type' => 'required|in:admin,hierarchy,customer',
             'role' => 'required|string|exists:roles,name',
 
+            // Employee Code (Required for hierarchy users)
+            'employee_code' => 'required_if:user_type,hierarchy|nullable|string|max:255|unique:users,employee_code',
+
             // Hierarchy specific validation
             'level_id' => 'required_if:user_type,hierarchy|nullable|exists:levels,id',
             'parent_user_id' => 'nullable|exists:users,id',

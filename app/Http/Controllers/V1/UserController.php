@@ -44,7 +44,8 @@ class UserController extends Controller implements HasMiddleware
                 $query->where(function (Builder $builder) use ($search) {
                     $builder->where('name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('username', 'like', "%{$search}%");
+                        ->orWhere('username', 'like', "%{$search}%")
+                        ->orWhere('employee_code', 'like', "%{$search}%");
                 });
             }
 
@@ -118,6 +119,7 @@ class UserController extends Controller implements HasMiddleware
             if ($data['user_type'] === 'admin') {
                 $data['level_id'] = null;
                 $data['parent_user_id'] = null;
+                $data['employee_code'] = null;
                 $data['branch_id'] = null;
                 $data['zone_id'] = null;
                 $data['region_id'] = null;
@@ -149,6 +151,7 @@ class UserController extends Controller implements HasMiddleware
                         'name' => $user->name,
                         'username' => $user->username,
                         'email' => $user->email,
+                        'employee_code' => $user->employee_code,
                         'user_type' => $user->user_type,
                         'email_verified_at' => $user->email_verified_at,
                     ],
@@ -292,6 +295,7 @@ class UserController extends Controller implements HasMiddleware
             if (isset($data['user_type']) && $data['user_type'] === 'admin') {
                 $data['level_id'] = null;
                 $data['parent_user_id'] = null;
+                $data['employee_code'] = null;
                 $data['branch_id'] = null;
                 $data['zone_id'] = null;
                 $data['region_id'] = null;
