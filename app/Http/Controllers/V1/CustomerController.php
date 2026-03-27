@@ -302,4 +302,46 @@ class CustomerController extends Controller implements HasMiddleware
             ], 500);
         }
     }
+    
+    public function getPublicDetails($customer_code = null)
+    {
+        try {
+            if ($customer_code) {
+                $customer = Customer::with(['bankDetails', 'beneficiaries'])
+                    ->where('customer_code', $customer_code)
+                    ->first();
+
+                if (!$customer) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Customer not found'
+                    ], 404);
+                }
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Customer details retrieved successfully',
+                    'data' => $customer
+                ], 200);
+            }
+
+            // If no customer_code, return all
+            $perPage = request()->get('per_page', 15);
+            $customers = Customer::with(['bankDetails', 'beneficiaries'])
+                ->orderBy('created_at', 'desc')
+                ->paginate($perPage);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'All customer details retrieved successfully',
+                'data' => $customers
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve customer details',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -68,4 +68,14 @@ class Customer extends Model
     {
         return $this->belongsTo(User::class, 'customer_id');
     }
+    
+    public function beneficiaries()
+    {
+        return $this->hasMany(Beneficiary::class);
+    }
+    
+    public function bankDetails()
+    {
+        return $this->hasMany(CustomerBankDetail::class);
+    }
 }
