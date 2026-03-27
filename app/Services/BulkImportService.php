@@ -508,9 +508,19 @@ class BulkImportService
             return;
         }
 
-        // Remove any fields that aren't fillable
-        $fillable = $config['fillable'];
-        $filteredData = array_intersect_key($data, array_flip($fillable));
+        // Prepare allowed fields: fillable + dependencies + unique key
+        $allowedFields = $config['fillable'];
+        if (isset($config['dependencies'])) {
+            foreach ($config['dependencies'] as $dep) {
+                $allowedFields[] = $dep['foreign_key'];
+            }
+        }
+        if (!in_array($uniqueKeyField, $allowedFields)) {
+            $allowedFields[] = $uniqueKeyField;
+        }
+
+        // Remove any fields that aren't in the allowed list
+        $filteredData = array_intersect_key($data, array_flip($allowedFields));
 
         // Default updateOrCreate
         $modelClass::updateOrCreate(
