@@ -13,13 +13,12 @@ use App\Models\Region;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Models\Zone;
-use App\Models\Beneficiary;
-use App\Models\Receipt;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Models\Role;
+use Carbon\Carbon;
 
 class BulkImportService
 {
@@ -101,7 +100,7 @@ class BulkImportService
                 'model' => Customer::class,
                 'unique_key' => 'customer_code',
                 'dependencies' => [
-                    'agent_username' => ['model' => User::class, 'field' => 'username', 'foreign_key' => 'customer_id'] // agent is stored in customer_id
+                    'agent_username' => ['model' => User::class, 'field' => 'username', 'foreign_key' => 'customer_id']
                 ],
                 'fillable' => ['full_name', 'name_with_initials', 'customer_code', 'id_type', 'id_number', 'address_line_1', 'address_line_2', 'landmark', 'city', 'state', 'country', 'postal_code', 'date_of_birth', 'phone_primary', 'phone_secondary', 'email', 'have_whatsapp', 'whatsapp_number', 'preferred_language', 'employment_status', 'occupation', 'employer_name', 'employer_address_line1', 'employer_address_line2', 'employer_city', 'employer_state', 'employer_country', 'employer_postal_code', 'employer_phone', 'employer_email', 'business_name', 'business_registration_number', 'business_nature', 'business_address_line1', 'business_address_line2', 'business_city', 'business_state', 'business_country', 'business_postal_code', 'business_phone', 'business_email', 'is_active'],
             ],
@@ -138,18 +137,25 @@ class BulkImportService
         }
 
         $handle = fopen($file->getRealPath(), 'r');
-        $headers = fgetcsv($handle);
 
+        // Read and clean headers
+        $headers = fgetcsv($handle);
         if (!$headers) {
             fclose($handle);
             return array_merge($results, ['errors' => ['Empty or invalid CSV file.']]);
         }
 
+        // Clean headers (remove BOM, trim whitespace)
+        $headers = array_map(function($header) {
+            return trim($header, "\xEF\xBB\xBF");
+        }, $headers);
+        $headers = array_map('trim', $headers);
+
         $rowNumber = 1;
         while (($rowData = fgetcsv($handle)) !== false) {
             $rowNumber++;
             $results['total']++;
-            
+
             // Handle mismatched column counts
             if (count($headers) !== count($rowData)) {
                 $results['failed']++;
@@ -161,7 +167,30 @@ class BulkImportService
             }
 
             $data = array_combine($headers, $rowData);
-            
+
+            // Clean all data (remove empty strings, trim)
+            $data = $this->cleanData($data);
+
+            // Special preprocessing for customers table
+            if ($table === 'customers') {
+                $data = $this->preprocessCustomerData($data);
+
+                // Skip if date_of_birth is invalid
+                if (isset($data['date_of_birth']) && $data['date_of_birth'] === null) {
+                    $results['failed']++;
+                    $results['errors'][] = [
+                        'row' => $rowNumber,
+                        'error' => "Invalid date format in date_of_birth. Expected dd/mm/yyyy"
+                    ];
+                    continue;
+                }
+            }
+
+            // Special preprocessing for investments table
+            if ($table === 'investments') {
+                $data = $this->preprocessInvestmentData($data);
+            }
+
             DB::beginTransaction();
             try {
                 $this->processGenericRow($config, $data);
@@ -183,13 +212,196 @@ class BulkImportService
     }
 
     /**
+     * Clean and sanitize data
+     */
+    protected function cleanData(array $data): array
+    {
+        $cleaned = [];
+        foreach ($data as $key => $value) {
+            if ($value === null || $value === '') {
+                $cleaned[$key] = null;
+            } else {
+                $cleaned[$key] = trim($value);
+            }
+        }
+        return $cleaned;
+    }
+
+    /**
+     * Preprocess customer data (date format, boolean fields, etc.)
+     */
+    protected function preprocessCustomerData(array $data): array
+    {
+        // 1. Handle date_of_birth conversion (dd/mm/yyyy -> Y-m-d)
+        if (!empty($data['date_of_birth'])) {
+            $parsedDate = $this->parseDate($data['date_of_birth']);
+            if ($parsedDate) {
+                $data['date_of_birth'] = $parsedDate;
+            } else {
+                $data['date_of_birth'] = null; // Will be caught by validation
+            }
+        }
+
+        // 2. Handle have_whatsapp boolean field
+        if (isset($data['have_whatsapp'])) {
+            $value = strtolower(trim($data['have_whatsapp']));
+            if (in_array($value, ['1', 'true', 'yes', 'y', 'on'])) {
+                $data['have_whatsapp'] = true;
+            } elseif (in_array($value, ['0', 'false', 'no', 'n', 'off', ''])) {
+                $data['have_whatsapp'] = false;
+            } else {
+                $data['have_whatsapp'] = false; // Default to false
+            }
+        } else {
+            $data['have_whatsapp'] = false;
+        }
+
+        // 3. Handle phone numbers - clean formatting
+        if (!empty($data['phone_primary'])) {
+            $data['phone_primary'] = $this->cleanPhoneNumber($data['phone_primary']);
+        }
+
+        if (!empty($data['phone_secondary'])) {
+            $data['phone_secondary'] = $this->cleanPhoneNumber($data['phone_secondary']);
+        }
+
+        if (!empty($data['whatsapp_number'])) {
+            $data['whatsapp_number'] = $this->cleanPhoneNumber($data['whatsapp_number']);
+        }
+
+        // 4. Handle id_number - remove spaces
+        if (!empty($data['id_number'])) {
+            $data['id_number'] = str_replace(' ', '', trim($data['id_number']));
+        }
+
+        // 5. Set default values for required fields if missing
+        if (empty($data['country'])) {
+            $data['country'] = 'Sri Lanka';
+        }
+
+        if (empty($data['preferred_language'])) {
+            $data['preferred_language'] = 'english';
+        }
+
+        if (empty($data['employment_status'])) {
+            $data['employment_status'] = 'unemployed';
+        }
+
+        if (!isset($data['is_active']) || $data['is_active'] === null) {
+            $data['is_active'] = true;
+        }
+
+        return $data;
+    }
+
+    /**
+     * Preprocess investment data
+     */
+    protected function preprocessInvestmentData(array $data): array
+    {
+        // Parse dates
+        $dateFields = ['reservation_date', 'initial_payment_date', 'monthly_payment_date'];
+        foreach ($dateFields as $field) {
+            if (!empty($data[$field])) {
+                $parsedDate = $this->parseDate($data[$field]);
+                if ($parsedDate) {
+                    $data[$field] = $parsedDate;
+                } else {
+                    $data[$field] = null;
+                }
+            }
+        }
+
+        // Handle numeric fields
+        $numericFields = ['investment_amount', 'initial_payment', 'monthly_payment_amount'];
+        foreach ($numericFields as $field) {
+            if (!empty($data[$field])) {
+                $data[$field] = floatval(str_replace(',', '', $data[$field]));
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Parse date from dd/mm/yyyy to Y-m-d
+     */
+    protected function parseDate($date): ?string
+    {
+        if (empty($date)) return null;
+
+        $date = trim($date);
+
+        // Handle dd/mm/YYYY format
+        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $date, $matches)) {
+            $day = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
+            $month = str_pad($matches[2], 2, '0', STR_PAD_LEFT);
+            $year = $matches[3];
+
+            if (checkdate($month, $day, $year)) {
+                return "{$year}-{$month}-{$day}";
+            }
+        }
+
+        // Handle dd-mm-YYYY format
+        if (preg_match('/^(\d{1,2})-(\d{1,2})-(\d{4})$/', $date, $matches)) {
+            $day = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
+            $month = str_pad($matches[2], 2, '0', STR_PAD_LEFT);
+            $year = $matches[3];
+
+            if (checkdate($month, $day, $year)) {
+                return "{$year}-{$month}-{$day}";
+            }
+        }
+
+        // Handle YYYY-mm-dd format (already correct)
+        if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $date, $matches)) {
+            $year = $matches[1];
+            $month = str_pad($matches[2], 2, '0', STR_PAD_LEFT);
+            $day = str_pad($matches[3], 2, '0', STR_PAD_LEFT);
+
+            if (checkdate($month, $day, $year)) {
+                return "{$year}-{$month}-{$day}";
+            }
+        }
+
+        // Try Carbon as last resort
+        try {
+            return Carbon::parse($date)->format('Y-m-d');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Clean phone number
+     */
+    protected function cleanPhoneNumber($phone): ?string
+    {
+        if (empty($phone)) return null;
+
+        // Remove all non-numeric characters
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+
+        // Remove leading zeros
+        $phone = ltrim($phone, '0');
+
+        // Add 94 if it's a 9-digit number (Sri Lankan mobile)
+        if (strlen($phone) === 9 && preg_match('/^7[0-9]{8}$/', $phone)) {
+            $phone = '94' . $phone;
+        }
+
+        return $phone;
+    }
+
+    /**
      * Generic row processing using config.
      */
     protected function processGenericRow(array $config, array $data): void
     {
         $modelClass = $config['model'];
         $uniqueKeyField = $config['unique_key'];
-        
+
         // Resolve Dependencies
         if (isset($config['dependencies'])) {
             foreach ($config['dependencies'] as $csvCol => $dep) {
@@ -213,17 +425,21 @@ class BulkImportService
             unset($data['role']);
 
             $user = User::updateOrCreate([$uniqueKeyField => $data[$uniqueKeyField]], $data);
-            
+
             if ($roleName) {
                 $user->syncRoles([$roleName]);
             }
             return;
         }
 
+        // Remove any fields that aren't fillable
+        $fillable = $config['fillable'];
+        $filteredData = array_intersect_key($data, array_flip($fillable));
+
         // Default updateOrCreate
         $modelClass::updateOrCreate(
-            [$uniqueKeyField => $data[$uniqueKeyField]],
-            $data
+            [$uniqueKeyField => $filteredData[$uniqueKeyField]],
+            $filteredData
         );
     }
 
@@ -243,7 +459,7 @@ class BulkImportService
             if (isset($config['special_fields'])) {
                 $headers = array_merge($headers, $config['special_fields']);
             }
-            
+
             $list[] = [
                 'table' => $table,
                 'headers' => $headers,

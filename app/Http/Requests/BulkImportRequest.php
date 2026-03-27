@@ -28,6 +28,7 @@ class BulkImportRequest extends FormRequest
                     'branches',
                     'levels',
                     'users',
+                    'customers',
                     'investment_products',
                     'system_settings'
                 ])
