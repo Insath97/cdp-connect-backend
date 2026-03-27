@@ -29,7 +29,16 @@ class BulkImportRequest extends FormRequest
                     'levels',
                     'users',
                     'customers',
+                    'investments',
+                    'beneficiaries',
+                    'receipts',
+                    'customer_bank_details',
+                    'commissions',
+                    'commission_settings',
                     'investment_products',
+                    'investment_product_rates',
+                    'quotations',
+                    'targets',
                     'system_settings'
                 ])
             ],

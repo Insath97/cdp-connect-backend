@@ -2,15 +2,23 @@
 
 namespace App\Services;
 
+use App\Models\Beneficiary;
 use App\Models\Branch;
+use App\Models\Commission;
+use App\Models\CommissionSetting;
 use App\Models\Country;
 use App\Models\Customer;
+use App\Models\CustomerBankDetail;
 use App\Models\Investment;
 use App\Models\InvestmentProduct;
+use App\Models\InvestmentProductRate;
 use App\Models\Level;
 use App\Models\Province;
+use App\Models\Quotation;
+use App\Models\Receipt;
 use App\Models\Region;
 use App\Models\SystemSetting;
+use App\Models\Target;
 use App\Models\User;
 use App\Models\Zone;
 use Illuminate\Http\UploadedFile;
@@ -113,8 +121,76 @@ class BulkImportService
                     'product_code' => ['model' => InvestmentProduct::class, 'field' => 'code', 'foreign_key' => 'investment_product_id'],
                     'created_by_username' => ['model' => User::class, 'field' => 'username', 'foreign_key' => 'created_by'],
                     'unit_head_username' => ['model' => User::class, 'field' => 'username', 'foreign_key' => 'unit_head_id'],
+                    'checked_by_username' => ['model' => User::class, 'field' => 'username', 'foreign_key' => 'checked_by'],
+                    'approved_by_username' => ['model' => User::class, 'field' => 'username', 'foreign_key' => 'approved_by'],
                 ],
-                'fillable' => ['policy_number', 'application_number', 'sales_code', 'reservation_date', 'target_period_key', 'investment_amount', 'bank', 'payment_type', 'payment_description', 'initial_payment', 'initial_payment_date', 'monthly_payment_amount', 'monthly_payment_date', 'payment_proof', 'status', 'notes'],
+                'fillable' => ['policy_number', 'application_number', 'sales_code', 'reservation_date', 'target_period_key', 'investment_amount', 'bank', 'payment_type', 'payment_description', 'initial_payment', 'initial_payment_date', 'monthly_payment_amount', 'monthly_payment_date', 'payment_proof', 'status', 'checked_at', 'approved_at', 'notes'],
+            ],
+            'beneficiaries' => [
+                'model' => Beneficiary::class,
+                'unique_key' => 'id_number',
+                'dependencies' => [
+                    'customer_code' => ['model' => Customer::class, 'field' => 'customer_code', 'foreign_key' => 'customer_id'],
+                ],
+                'fillable' => ['full_name', 'id_type', 'id_number', 'phone_primary', 'relationship', 'share_percentage'],
+            ],
+            'receipts' => [
+                'model' => Receipt::class,
+                'unique_key' => 'receipt_number',
+                'dependencies' => [
+                    'application_number' => ['model' => Investment::class, 'field' => 'application_number', 'foreign_key' => 'investment_id'],
+                ],
+                'fillable' => ['receipt_number', 'amount', 'printed_at'],
+            ],
+            'customer_bank_details' => [
+                'model' => CustomerBankDetail::class,
+                'unique_key' => 'account_number',
+                'dependencies' => [
+                    'customer_code' => ['model' => Customer::class, 'field' => 'customer_code', 'foreign_key' => 'customer_id'],
+                ],
+                'fillable' => ['bank_name', 'branch_name', 'account_number', 'payment_method'],
+            ],
+            'commissions' => [
+                'model' => Commission::class,
+                'unique_key' => 'id',
+                'dependencies' => [
+                    'application_number' => ['model' => Investment::class, 'field' => 'application_number', 'foreign_key' => 'investment_id'],
+                    'username' => ['model' => User::class, 'field' => 'username', 'foreign_key' => 'user_id'],
+                ],
+                'fillable' => ['investment_amount', 'commission_amount', 'commission_percentage', 'tier', 'period_key', 'status'],
+            ],
+            'commission_settings' => [
+                'model' => CommissionSetting::class,
+                'unique_key' => 'key',
+                'fillable' => ['key', 'value', 'description'],
+            ],
+            'investment_product_rates' => [
+                'model' => InvestmentProductRate::class,
+                'unique_key' => 'id',
+                'dependencies' => [
+                    'product_code' => ['model' => InvestmentProduct::class, 'field' => 'code', 'foreign_key' => 'investment_product_id'],
+                ],
+                'fillable' => ['year', 'roi_percentage'],
+            ],
+            'quotations' => [
+                'model' => Quotation::class,
+                'unique_key' => 'quotation_number',
+                'dependencies' => [
+                    'customer_code' => ['model' => Customer::class, 'field' => 'customer_code', 'foreign_key' => 'customer_id'],
+                    'branch_code' => ['model' => Branch::class, 'field' => 'code', 'foreign_key' => 'branch_id'],
+                    'product_code' => ['model' => InvestmentProduct::class, 'field' => 'code', 'foreign_key' => 'investment_product_id'],
+                    'created_by_username' => ['model' => User::class, 'field' => 'username', 'foreign_key' => 'created_by'],
+                ],
+                'fillable' => ['quotation_number', 'f_name', 'l_name', 'full_name', 'name_with_initials', 'id_type', 'id_number', 'phone_primary', 'email', 'address', 'investment_amount', 'monthly_return', 'annual_return', 'maturity_amount', 'month_6_breakdown', 'year_1_breakdown', 'year_2_breakdown', 'year_3_breakdown', 'year_4_breakdown', 'year_5_breakdown', 'status', 'is_active', 'valid_until', 'notes'],
+            ],
+            'targets' => [
+                'model' => Target::class,
+                'unique_key' => 'id',
+                'dependencies' => [
+                    'username' => ['model' => User::class, 'field' => 'username', 'foreign_key' => 'user_id'],
+                    'assigned_by_username' => ['model' => User::class, 'field' => 'username', 'foreign_key' => 'assigned_by'],
+                ],
+                'fillable' => ['period_type', 'period_key', 'target_amount', 'current_amount', 'achieved_amount', 'achievement_percentage', 'status', 'achieved_at'],
             ],
         ];
     }
