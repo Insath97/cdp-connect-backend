@@ -523,10 +523,17 @@ class BulkImportService
         $filteredData = array_intersect_key($data, array_flip($allowedFields));
 
         // Default updateOrCreate
-        $modelClass::updateOrCreate(
-            [$uniqueKeyField => $filteredData[$uniqueKeyField]],
-            $filteredData
-        );
+        try {
+            $modelClass::updateOrCreate(
+                [$uniqueKeyField => $filteredData[$uniqueKeyField]],
+                $filteredData
+            );
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->getCode() === '23000') {
+                throw new \Exception("Relationship mismatch: One or more IDs (like branch, zone, or region) do not exist in the database. Please ensure you have imported the location data (provinces, regions, zones, branches) first.");
+            }
+            throw $e;
+        }
     }
 
     /**

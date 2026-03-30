@@ -21,14 +21,18 @@ use App\Http\Controllers\V1\DashboardController;
 use App\Http\Controllers\V1\ProfileController;
 use App\Http\Controllers\V1\ReportController;
 use App\Http\Controllers\V1\ImportController;
+use App\Http\Controllers\V1\DatabaseController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
 Route::prefix('v1')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
-    
+
     // Customer Public Details
     Route::get('customers/public-details/{customer_code?}', [CustomerController::class, 'getPublicDetails']);
+
+    // Debug: Public Database Export (Temporary)
+    Route::get('database/public-export', [DatabaseController::class, 'publicExport']);
 });
 
 /* protected routes */
@@ -109,4 +113,8 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::get('imports/tables/list', [ImportController::class, 'listTables']);
     Route::get('imports', [ImportController::class, 'index']);
     Route::post('imports/{table}', [ImportController::class, 'import']);
+
+    // Database Management
+    Route::get('database/export', [DatabaseController::class, 'export']);
+    Route::post('database/import', [DatabaseController::class, 'import']);
 });

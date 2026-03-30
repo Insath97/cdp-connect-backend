@@ -118,6 +118,8 @@ class PermissionsSeeder extends Seeder
             /* Import Management */
             ['name' => 'Import Index', 'group_name' => 'Import Management Permissions'],
             ['name' => 'Bulk Import', 'group_name' => 'Import Management Permissions'],
+            ['name' => 'Database Export', 'group_name' => 'Import Management Permissions'],
+            ['name' => 'Database Import', 'group_name' => 'Import Management Permissions'],
 
             /* Target Progress */
             ['name' => 'Target Progress Index', 'group_name' => 'Target Progress Permissions'],
