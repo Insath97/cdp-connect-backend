@@ -22,17 +22,16 @@ use App\Http\Controllers\V1\ProfileController;
 use App\Http\Controllers\V1\ReportController;
 use App\Http\Controllers\V1\ImportController;
 use App\Http\Controllers\V1\DatabaseController;
+use App\Http\Controllers\V1\SmsController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
+
 Route::prefix('v1')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
 
     // Customer Public Details
     Route::get('customers/public-details/{customer_code?}', [CustomerController::class, 'getPublicDetails']);
-
-    // Debug: Public Database Export (Temporary)
-    Route::get('database/public-export', [DatabaseController::class, 'publicExport']);
 });
 
 /* protected routes */
@@ -117,4 +116,8 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     // Database Management
     Route::get('database/export', [DatabaseController::class, 'export']);
     Route::post('database/import', [DatabaseController::class, 'import']);
+
+    // Bulk SMS Public API
+    Route::post('sms/send', [SmsController::class, 'send']);
+    Route::post('sms/import-send', [SmsController::class, 'importAndSend']);
 });
