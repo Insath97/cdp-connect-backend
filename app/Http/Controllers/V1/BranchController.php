@@ -244,4 +244,31 @@ class BranchController extends Controller implements HasMiddleware
             ], 500);
         }
     }
+
+    public function getAvailableBranches(Request $request)
+    {
+        try {
+            $query = Branch::active();
+
+            if ($request->has('zone_id')) {
+                $query->where('zone_id', $request->zone_id);
+            }
+
+            $branches = $query->select('id', 'name', 'code', 'zone_id')
+                ->orderBy('id', 'asc')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Branches retrieved successfully',
+                'data' => $branches
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve branches',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
 }

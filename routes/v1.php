@@ -74,6 +74,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::apiResource('zones', ZoneController::class);
     Route::patch('zones/{id}/toggle-status', [ZoneController::class, 'toggleStatus']);
 
+    Route::get('branches/list', [BranchController::class, 'getAvailableBranches']);
     Route::apiResource('branches', BranchController::class);
     Route::patch('branches/{id}/toggle-status', [BranchController::class, 'toggleStatus']);
 
