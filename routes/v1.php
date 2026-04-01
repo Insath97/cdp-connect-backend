@@ -55,17 +55,22 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::get('roles/list/', [RoleController::class, 'getAvailableRoles']);
     Route::apiResource('roles', RoleController::class);
 
+    Route::get('levels/list', [LevelController::class, 'getAvailableLevels']);
     Route::apiResource('levels', LevelController::class);
 
+    Route::get('countries/list', [CountryController::class, 'getAvailableCountries']);
     Route::apiResource('countries', CountryController::class);
     Route::patch('countries/{id}/toggle-status', [CountryController::class, 'toggleStatus']);
 
+    Route::get('provinces/list', [ProvinceController::class, 'getAvailableProvinces']);
     Route::apiResource('provinces', ProvinceController::class);
     Route::patch('provinces/{id}/toggle-status', [ProvinceController::class, 'toggleStatus']);
 
+    Route::get('regions/list', [RegionController::class, 'getAvailableRegions']);
     Route::apiResource('regions', RegionController::class);
     Route::patch('regions/{id}/toggle-status', [RegionController::class, 'toggleStatus']);
 
+    Route::get('zones/list', [ZoneController::class, 'getAvailableZones']);
     Route::apiResource('zones', ZoneController::class);
     Route::patch('zones/{id}/toggle-status', [ZoneController::class, 'toggleStatus']);
 
@@ -75,6 +80,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::apiResource('users', UserController::class);
     Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
 
+    Route::get('investment-products/list', [InvestmentProductController::class, 'getAvailableInvestmentProducts']);
     Route::apiResource('investment-products', InvestmentProductController::class);
     Route::patch('investment-products/{id}/toggle-status', [InvestmentProductController::class, 'toggleStatus']);
 

@@ -232,4 +232,26 @@ class CountryController extends Controller implements HasMiddleware
             ], 500);
         }
     }
+
+    public function getAvailableCountries()
+    {
+        try {
+            $countries = Country::active()
+                ->select('id', 'name', 'code')
+                ->orderBy('name', 'asc')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Countries retrieved successfully',
+                'data' => $countries
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve countries',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
 }

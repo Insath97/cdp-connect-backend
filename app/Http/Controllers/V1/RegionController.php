@@ -240,4 +240,31 @@ class RegionController extends Controller implements HasMiddleware
             ], 500);
         }
     }
+
+    public function getAvailableRegions(Request $request)
+    {
+        try {
+            $query = Region::active();
+
+            if ($request->has('zone_id')) {
+                $query->where('zone_id', $request->zone_id);
+            }
+
+            $regions = $query->select('id', 'name', 'code', 'zone_id')
+                ->orderBy('name', 'asc')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Regions retrieved successfully',
+                'data' => $regions
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve regions',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
 }

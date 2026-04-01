@@ -240,4 +240,31 @@ class ProvinceController extends Controller implements HasMiddleware
             ], 500);
         }
     }
+
+    public function getAvailableProvinces(Request $request)
+    {
+        try {
+            $query = Province::active();
+
+            if ($request->has('country_id')) {
+                $query->where('country_id', $request->country_id);
+            }
+
+            $provinces = $query->select('id', 'name', 'code', 'country_id')
+                ->orderBy('name', 'asc')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Provinces retrieved successfully',
+                'data' => $provinces
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve provinces',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
 }

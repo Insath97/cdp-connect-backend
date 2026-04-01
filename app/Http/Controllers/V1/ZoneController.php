@@ -240,4 +240,31 @@ class ZoneController extends Controller implements HasMiddleware
             ], 500);
         }
     }
+
+    public function getAvailableZones(Request $request)
+    {
+        try {
+            $query = Zone::active();
+
+            if ($request->has('province_id')) {
+                $query->where('province_id', $request->province_id);
+            }
+
+            $zones = $query->select('id', 'name', 'code', 'province_id')
+                ->orderBy('name', 'asc')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Zones retrieved successfully',
+                'data' => $zones
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve zones',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
 }

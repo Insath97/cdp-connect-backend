@@ -270,4 +270,26 @@ class InvestmentProductController extends Controller implements HasMiddleware
             ], 500);
         }
     }
+
+    public function getAvailableInvestmentProducts()
+    {
+        try {
+            $products = InvestmentProduct::active()
+                ->select('id', 'name', 'code', 'duration_months')
+                ->orderBy('id', 'asc')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Investment products retrieved successfully',
+                'data' => $products
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve investment products',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
 }

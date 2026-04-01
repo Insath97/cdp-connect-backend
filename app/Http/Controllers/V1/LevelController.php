@@ -207,4 +207,26 @@ class LevelController extends Controller implements HasMiddleware
             ], 500);
         }
     }
+
+    public function getAvailableLevels()
+    {
+        try {
+            $levels = Level::active()
+                ->select('id', 'level_name', 'code')
+                ->orderBy('id', 'asc')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Levels retrieved successfully',
+                'data' => $levels
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve levels',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
 }
