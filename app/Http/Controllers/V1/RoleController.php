@@ -16,7 +16,7 @@ class RoleController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Role Index', only: ['index', 'show', 'getAvailableRoles']),
+            new Middleware('permission:Role Index', only: ['index', 'show']),
             new Middleware('permission:Role Create', only: ['store']),
             new Middleware('permission:Role Update', only: ['update']),
             new Middleware('permission:Role Delete', only: ['destroy']),
@@ -73,6 +73,13 @@ class RoleController extends Controller implements HasMiddleware
     {
         try {
             $data = $request->validated();
+
+            if ($data['name'] === 'Super Admin' && !auth('api')->user()->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized to create Super Admin role',
+                ], 403);
+            }
 
             $role = Role::create([
                 'name' => $data['name'],
@@ -146,6 +153,12 @@ class RoleController extends Controller implements HasMiddleware
             }
 
             if (isset($data['name'])) {
+                if (($data['name'] === 'Super Admin' || $role->name === 'Super Admin') && !auth('api')->user()->hasRole('Super Admin')) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Unauthorized to manage Super Admin role',
+                    ], 403);
+                }
                 $role->update(['name' => $data['name']]);
             }
 
@@ -230,13 +243,13 @@ class RoleController extends Controller implements HasMiddleware
 
             $query = Role::query();
 
-            if ($user->hasRole('Super Admin')) {
+            if (!$user->hasRole('Super Admin')) {
                 $query->where('name', '!=', 'Super Admin');
             }
 
             $query->where('guard_name', 'api');
 
-            $roles = $query->select('id', 'name', 'guard_name')->get();
+            $roles = $query->select('id', 'name', 'guard_name')->orderBy('id')->get();
 
             return response()->json([
                 'status' => 'success',
