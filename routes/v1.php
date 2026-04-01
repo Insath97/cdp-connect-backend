@@ -49,6 +49,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
 
     Route::get('dashboard', [DashboardController::class, 'index']);
 
+    Route::get('permissions/list', [PermissionController::class, 'getAvailablePermissions']);
     Route::apiResource('permissions', PermissionController::class);
 
     Route::get('roles/list/', [RoleController::class, 'getAvailableRoles']);

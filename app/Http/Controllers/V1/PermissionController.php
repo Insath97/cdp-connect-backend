@@ -75,9 +75,7 @@ class PermissionController extends Controller implements HasMiddleware
         }
     }
 
-    public function create()
-    {
-    }
+    public function create() {}
 
     public function store(CreatePermissionRequest $request)
     {
@@ -129,9 +127,7 @@ class PermissionController extends Controller implements HasMiddleware
         }
     }
 
-    public function edit(string $id)
-    {
-    }
+    public function edit(string $id) {}
 
     public function update(UpdatePermissionRequest $request, string $id)
     {
@@ -202,6 +198,29 @@ class PermissionController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to delete permission',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getAvailablePermissions()
+    {
+        try {
+            $permissions = Permission::select('id', 'name', 'group_name')
+                ->where('guard_name', 'api')
+                ->orderBy('group_name', 'asc')
+                ->orderBy('name', 'asc')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Permissions retrieved successfully',
+                'data' => $permissions
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve permissions',
                 'error' => $th->getMessage()
             ], 500);
         }
