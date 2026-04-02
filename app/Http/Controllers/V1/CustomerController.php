@@ -307,7 +307,8 @@ class CustomerController extends Controller implements HasMiddleware
     {
         try {
             if ($customer_code) {
-                $customer = Customer::with(['bankDetails', 'beneficiaries'])
+                $customer = Customer::with(['bankDetails:id,customer_id,full_name,id_type,id_number', 'beneficiaries:id,customer_id,bank_name'])
+                    ->select('id', 'customer_code', 'full_name', 'email', 'phone', 'id_type', 'id_number')
                     ->where('customer_code', $customer_code)->orderBy('id', 'asc')
                     ->first();
 
@@ -327,8 +328,9 @@ class CustomerController extends Controller implements HasMiddleware
 
             // If no customer_code, return all
             $perPage = request()->get('per_page', 15);
-            $customers = Customer::with(['bankDetails', 'beneficiaries'])
-                ->orderBy('created_at', 'desc')
+            $customers = Customer::with(['bankDetails:id,customer_id,full_name,id_type,id_number', 'beneficiaries:id,customer_id,bank_name'])
+                ->select('id', 'customer_code', 'full_name', 'email', 'id_type', 'id_number')
+                ->orderBy('id', 'asc')
                 ->paginate($perPage);
 
             return response()->json([
