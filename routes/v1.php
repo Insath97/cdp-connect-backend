@@ -23,6 +23,7 @@ use App\Http\Controllers\V1\ReportController;
 use App\Http\Controllers\V1\ImportController;
 use App\Http\Controllers\V1\DatabaseController;
 use App\Http\Controllers\V1\SmsController;
+use App\Http\Controllers\V1\PublicController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -32,6 +33,10 @@ Route::prefix('v1')->group(function () {
 
     // Customer Public Details
     Route::get('customers/public-details/{customer_code?}', [CustomerController::class, 'getPublicDetails']);
+
+    // Structured Public API
+    Route::get('public/customers', [PublicController::class, 'customers']);
+    Route::get('public/customers/{customer_code}', [PublicController::class, 'customerDetail']);
 
 });
 
