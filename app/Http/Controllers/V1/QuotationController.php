@@ -174,11 +174,17 @@ class QuotationController extends Controller implements HasMiddleware
             $sequence = $lastNum ? (int) substr($lastNum->quotation_number, -4) + 1 : 1;
             $quotationNumber = $prefix . str_pad($sequence, 4, '0', STR_PAD_LEFT);
 
+            // Determine who is creating this quotation
+            $createdBy = $user->id;
+            if ($user->user_type === 'admin' && !empty($data['created_by'])) {
+                $createdBy = $data['created_by'];
+            }
+
             // 7. Prepare and Create Quotation
             $quotationData = array_merge($data, [
                 'branch_id' => $branchId,
                 'quotation_number' => $quotationNumber,
-                'created_by' => $user->id,
+                'created_by' => $createdBy,
                 'status' => 'draft',
                 'monthly_return' => $monthlyReturn,
                 'annual_return' => $annualReturn,

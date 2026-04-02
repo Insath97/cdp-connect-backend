@@ -78,6 +78,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::apiResource('branches', BranchController::class);
     Route::patch('branches/{id}/toggle-status', [BranchController::class, 'toggleStatus']);
 
+    Route::get('users/list', [UserController::class, 'getAvailableUsers']);
     Route::apiResource('users', UserController::class);
     Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
 

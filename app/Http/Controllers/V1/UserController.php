@@ -446,4 +446,40 @@ class UserController extends Controller implements HasMiddleware
             ], 500);
         }
     }
+
+    /**
+     * Get a list of users for select box
+     */
+    public function getAvailableUsers(Request $request)
+    {
+        try {
+            $query = User::where('is_active', true);
+
+            // Filter by user_type if provided
+            if ($request->has('user_type')) {
+                $query->where('user_type', $request->user_type);
+            }
+
+            // Filter by branch if provided
+            if ($request->has('branch_id')) {
+                $query->where('branch_id', $request->branch_id);
+            }
+
+            $users = $query->select('id', 'name', 'username', 'user_type', 'branch_id')
+                ->orderBy('name', 'asc')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Users retrieved successfully',
+                'data' => $users
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve users',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
 }

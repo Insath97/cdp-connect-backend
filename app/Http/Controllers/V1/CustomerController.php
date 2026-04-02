@@ -302,13 +302,13 @@ class CustomerController extends Controller implements HasMiddleware
             ], 500);
         }
     }
-    
+
     public function getPublicDetails($customer_code = null)
     {
         try {
             if ($customer_code) {
                 $customer = Customer::with(['bankDetails', 'beneficiaries'])
-                    ->where('customer_code', $customer_code)
+                    ->where('customer_code', $customer_code)->orderBy('id', 'asc')
                     ->first();
 
                 if (!$customer) {
