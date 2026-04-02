@@ -75,9 +75,9 @@ class QuotationController extends Controller implements HasMiddleware
                 ->leftJoin('levels', 'users.level_id', '=', 'levels.id')
                 ->leftJoin('branches', 'quotations.branch_id', '=', 'branches.id')
                 ->select('quotations.*')
-                ->orderByRaw('COALESCE(levels.tire_level, 999) ASC')
-                ->orderBy('branches.name', 'asc')
-                ->orderBy('quotations.created_at', 'desc')
+                /* ->orderByRaw('COALESCE(levels.tire_level, 999) ASC') */
+                /* ->orderBy('branches.name', 'asc') */
+                ->orderBy('quotations.created_at', 'desc')  
                 ->paginate($perPage);
 
             return response()->json([

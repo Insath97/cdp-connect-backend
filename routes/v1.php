@@ -34,10 +34,6 @@ Route::prefix('v1')->group(function () {
     // Customer Public Details
     Route::get('customers/public-details/{customer_code?}', [CustomerController::class, 'getPublicDetails']);
 
-    // Structured Public API
-    Route::get('public/customers', [PublicController::class, 'customers']);
-    Route::get('public/customers/{customer_code}', [PublicController::class, 'customerDetail']);
-
 });
 
 /* protected routes */
