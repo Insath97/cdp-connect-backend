@@ -316,6 +316,14 @@ class QuotationController extends Controller implements HasMiddleware
     public function destroy($id)
     {
         try {
+            $user = Auth::guard('api')->user();
+            if (!$user->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only Super Admin can delete quotations.'
+                ], 403);
+            }
+
             $quotation = Quotation::findOrFail($id);
             $quotation->delete();
 
@@ -335,6 +343,14 @@ class QuotationController extends Controller implements HasMiddleware
     public function restore($id)
     {
         try {
+            $user = Auth::guard('api')->user();
+            if (!$user->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only Super Admin can restore quotations.'
+                ], 403);
+            }
+
             $quotation = Quotation::withTrashed()->findOrFail($id);
             $quotation->restore();
 
@@ -355,6 +371,14 @@ class QuotationController extends Controller implements HasMiddleware
     public function forceDelete($id)
     {
         try {
+            $user = Auth::guard('api')->user();
+            if (!$user->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only Super Admin can permanently delete quotations.'
+                ], 403);
+            }
+
             $quotation = Quotation::withTrashed()->findOrFail($id);
             $quotation->forceDelete();
 
