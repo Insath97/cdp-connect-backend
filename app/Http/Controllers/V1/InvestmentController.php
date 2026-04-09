@@ -515,11 +515,13 @@ class InvestmentController extends Controller implements HasMiddleware
 
         // 2. Unit Head Commission
         if ($investment->unit_head_id) {
+            $unitHeadCommissionAmount = ($amount * $unitHeadPct) / 100;
+
             Commission::create([
                 'investment_id' => $investment->id,
                 'user_id' => $investment->unit_head_id,
                 'investment_amount' => $amount,
-                'commission_amount' => ($amount * $unitHeadPct) / 100,
+                'commission_amount' => $unitHeadCommissionAmount,
                 'commission_percentage' => $unitHeadPct,
                 'tier' => 'unit_head',
                 'period_key' => $investment->target_period_key,
@@ -533,7 +535,7 @@ class InvestmentController extends Controller implements HasMiddleware
                     'investment_id' => $investment->id,
                     'user_id' => $unitHead->parent_user_id,
                     'investment_amount' => $amount,
-                    'commission_amount' => ($amount * $parentPct) / 100,
+                    'commission_amount' => ($unitHeadCommissionAmount * $parentPct) / 100,
                     'commission_percentage' => $parentPct,
                     'tier' => 'parent',
                     'period_key' => $investment->target_period_key,

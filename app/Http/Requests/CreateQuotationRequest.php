@@ -38,6 +38,7 @@ class CreateQuotationRequest extends FormRequest
             'investment_amount' => 'required|numeric|min:0',
             'notes' => 'nullable|string',
             'created_by' => 'nullable|exists:users,id',
+            'marketing_user_id' => 'nullable|exists:users,id',
         ];
     }
 

@@ -38,7 +38,8 @@ class Quotation extends Model
         'is_active',
         'valid_until',
         'notes',
-        'created_by'
+        'created_by',
+        'marketing_user_id'
     ];
 
     protected $casts = [
@@ -74,5 +75,10 @@ class Quotation extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function marketingUser()
+    {
+        return $this->belongsTo(User::class, 'marketing_user_id');
     }
 }

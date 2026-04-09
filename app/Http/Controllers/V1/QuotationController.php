@@ -42,7 +42,7 @@ class QuotationController extends Controller implements HasMiddleware
             $perPage = $request->get('per_page', 15);
             $user = Auth::guard('api')->user();
 
-            $query = Quotation::with(['customer', 'branch', 'investmentProduct', 'creator']);
+            $query = Quotation::with(['customer', 'branch', 'investmentProduct', 'creator', 'marketingUser']);
 
             // Hierarchy Visibility Logic
             if ($user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
@@ -83,7 +83,7 @@ class QuotationController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'success',
                 'message' => 'Quotations retrieved successfully',
-                'data' => $quotations->load(['customer:id,full_name,name_with_initials,id_type,id_number', 'branch:id,name,code', 'investmentProduct:id,name,code,duration_months,roi_percentage', 'creator:id,name,username,email'])
+                'data' => $quotations->load(['customer:id,full_name,name_with_initials,id_type,id_number', 'branch:id,name,code', 'investmentProduct:id,name,code,duration_months,roi_percentage', 'creator:id,name,username,email', 'marketingUser:id,name,username,email'])
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
@@ -100,17 +100,21 @@ class QuotationController extends Controller implements HasMiddleware
             $user = Auth::guard('api')->user();
             $data = $request->validated();
 
-            // 1. 14-Day Restriction (Based on id_number/NIC)
+            // 1. 14-Day Exclusive Lockout (Based on id_number/NIC and marketing_user_id)
             $lastQuotation = Quotation::where('id_number', $data['id_number'])
                 ->where('created_at', '>=', Carbon::now()->subDays(14))
+                ->latest()
                 ->first();
 
-           /*  if ($lastQuotation) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'A quotation was already created for this ID number within the last 14 days.'
-                ], 422);
-            } */
+            if ($lastQuotation) {
+                // If a different marketing user tries to create a quotation for this NIC
+                if ($lastQuotation->marketing_user_id !== ($data['marketing_user_id'] ?? null)) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'This customer is currently locked to another marketing user for 14 days.'
+                    ], 422);
+                }
+            }
 
             // 2. Intelligent Customer Selection/Lookup
             $customer = null;
@@ -208,7 +212,7 @@ class QuotationController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'success',
                 'message' => 'Quotation created successfully',
-                'data' => array_merge($quotation->load(['customer:id,full_name,name_with_initials', 'branch:id,name,code', 'investmentProduct:id,name,code,duration_months', 'creator'])->toArray(), [
+                'data' => array_merge($quotation->load(['customer:id,full_name,name_with_initials', 'branch:id,name,code', 'investmentProduct:id,name,code,duration_months', 'creator', 'marketingUser'])->toArray(), [
                     'yearly_breakdown' => $calculations['yearly_breakdown']
                 ])
             ], 201);
@@ -231,7 +235,7 @@ class QuotationController extends Controller implements HasMiddleware
     public function show($id)
     {
         try {
-            $quotation = Quotation::with(['customer', 'branch', 'investmentProduct', 'creator'])->find($id);
+            $quotation = Quotation::with(['customer', 'branch', 'investmentProduct', 'creator', 'marketingUser'])->find($id);
 
             if (!$quotation) {
                 return response()->json([
@@ -294,7 +298,7 @@ class QuotationController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'success',
                 'message' => 'Quotation updated successfully',
-                'data' => $quotation->load(['customer', 'branch', 'investmentProduct', 'creator'])
+                'data' => $quotation->load(['customer', 'branch', 'investmentProduct', 'creator', 'marketingUser'])
             ], 200);
 
         } catch (\Throwable $th) {

@@ -81,8 +81,8 @@ class DatabaseController extends Controller implements HasMiddleware
         try {
             $file = $request->file('file');
             
-            // Check file extension (basic check)
-            if ($file->getClientOriginalExtension() !== 'sql') {
+            // Check file extension (case-insensitive)
+            if (strtolower($file->getClientOriginalExtension()) !== 'sql') {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Invalid file type. Please upload a .sql file.'

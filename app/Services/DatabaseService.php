@@ -33,7 +33,7 @@ class DatabaseService
 
         $filename = "backup-" . date('Y-m-d-H-i-s') . ".sql";
         $directory = storage_path('app/backups');
-        
+
         if (!file_exists($directory)) {
             mkdir($directory, 0755, true);
         }
@@ -83,6 +83,7 @@ class DatabaseService
      */
     public function import(string $filePath): void
     {
+
         $connection = config('database.default');
         $config = config("database.connections.{$connection}");
 
@@ -121,14 +122,19 @@ class DatabaseService
             escapeshellarg($filePath)
         );
 
-        // Run the command
+        // Run the command and capture stderr
+        $command .= ' 2>&1';
         $output = [];
         $returnVar = 0;
         exec($command, $output, $returnVar);
 
         if ($returnVar !== 0) {
-            Log::error("Database import failed", ['output' => $output, 'command' => $command]);
-            throw new \Exception("Database import failed with exit code {$returnVar}. Ensure mysql client is in your PATH.");
+            $errorMessage = implode("\n", $output);
+            Log::error("Database import failed", [
+                'output' => $errorMessage,
+                'command' => $command
+            ]);
+            throw new \Exception("Database import failed: " . ($errorMessage ?: "Unknown error with exit code {$returnVar}."));
         }
     }
 }

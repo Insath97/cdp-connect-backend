@@ -39,6 +39,7 @@ class UpdateQuotationRequest extends FormRequest
             'status' => 'sometimes|in:draft,sent,accepted,rejected',
             'notes' => 'nullable|string',
             'is_active' => 'sometimes|boolean',
+            'marketing_user_id' => 'nullable|exists:users,id',
         ];
     }
 
