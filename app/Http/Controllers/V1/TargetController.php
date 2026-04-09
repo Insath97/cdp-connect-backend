@@ -108,24 +108,9 @@ class TargetController extends Controller implements HasMiddleware
             $data['assigned_by'] = $currentUser->id;
             $targetUser = User::with('level')->findOrFail($data['user_id']);
 
-            // 1. Admin Restriction: Only assign to Level 1 (GM)
-            if ($currentUser->hasRole('Super Admin')) {
-                if ($targetUser->level->tire_level !== 1) {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => 'Admins can only assign targets to top-level users (GM). Sub-targets must be assigned by their respective managers.'
-                    ], 422);
-                }
-            } else {
-                // 2. Hierarchy Restriction: Only assign to direct children
-                if ($targetUser->parent_user_id !== $currentUser->id) {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => 'You can only assign sub-targets to your direct subordinates.'
-                    ], 422);
-                }
-
-                // 3. Unallocated Target Check
+            // 1. Hierarchy Check and Budget Validation for Non-Admins
+            if (!$currentUser->hasRole('Super Admin')) {
+                // Unallocated Target Check
                 $parentTarget = Target::where('user_id', $currentUser->id)
                     ->where('period_type', $data['period_type'])
                     ->where('period_key', $data['period_key'])
@@ -220,11 +205,11 @@ class TargetController extends Controller implements HasMiddleware
             $data = $request->validated();
             $currentUser = Auth::user();
 
-            // Permission Check: Only assigner or Super Admin
-            if ($currentUser->id !== $target->assigned_by && !$currentUser->hasRole('Super Admin')) {
+            // Permission Check: Super Admin Only
+            if (!$currentUser->hasRole('Super Admin')) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Unauthorized. You can only update targets you assigned.'
+                    'message' => 'Unauthorized. Only Super Admins can update targets.'
                 ], 403);
             }
 
@@ -288,11 +273,11 @@ class TargetController extends Controller implements HasMiddleware
                 ], 404);
             }
 
-            // Permission check: Only assigner or Super Admin
-            if (Auth::id() !== $target->assigned_by && !Auth::guard('api')->user()->hasRole('Super Admin')) {
+            // Permission check: Super Admin Only
+            if (!Auth::guard('api')->user()->hasRole('Super Admin')) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'You can only delete targets you assigned'
+                    'message' => 'Unauthorized. Only Super Admins can delete targets.'
                 ], 403);
             }
 
