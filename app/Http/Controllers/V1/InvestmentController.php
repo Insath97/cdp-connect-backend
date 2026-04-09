@@ -87,15 +87,15 @@ class InvestmentController extends Controller implements HasMiddleware
                 $query->where('status', $request->status);
             }
 
-            // Ordering: GM -> AGM -> Branch (Hierarchical Order)
+            // Ordering: Newest first, then GM -> AGM -> Branch
             // Use leftJoin to avoid filtering out records that might not have a level or branch (e.g., Super Admin entries)
             $investments = $query->leftJoin('users', 'investments.created_by', '=', 'users.id')
                 ->leftJoin('levels', 'users.level_id', '=', 'levels.id')
                 ->leftJoin('branches', 'investments.branch_id', '=', 'branches.id')
                 ->select('investments.*')
+                ->orderBy('investments.created_at', 'desc')
                 ->orderByRaw('COALESCE(levels.tire_level, 999) ASC')
                 ->orderBy('branches.name', 'asc')
-                ->orderBy('investments.created_at', 'desc')
                 ->paginate($perPage);
 
             return response()->json([
