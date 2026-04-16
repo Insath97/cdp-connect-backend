@@ -27,6 +27,7 @@ class ReportController extends Controller implements HasMiddleware
         return [
             new Middleware('permission:Report Index', only: ['index', 'show']),
             new Middleware('permission:Report Agent Performance', only: ['agentPerformance']),
+            new Middleware('permission:Report Hierarchy Performance', only: ['']),
             new Middleware('permission:Report Investor Maturity', only: ['investorMaturity']),
         ];
     }
@@ -274,6 +275,54 @@ class ReportController extends Controller implements HasMiddleware
                     ];
                 });
 
+            // 5. Hierarchy Performance (Subordinates)
+            $descendantIds = $agent->getAllDescendantIds();
+            $hierarchyPerformance = [];
+
+            if (!empty($descendantIds)) {
+                $commissionsSubHierarchy = Commission::select('user_id', DB::raw('SUM(commission_amount) as total_commission'))
+                    ->where('period_key', $periodKey)
+                    ->groupBy('user_id');
+
+                $hierarchyPerformance = User::with(['level', 'branch'])
+                    ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id')
+                    ->whereIn('users.id', $descendantIds)
+                    ->leftJoinSub(
+                        Target::where('period_key', $periodKey),
+                        't',
+                        'users.id',
+                        '=',
+                        't.user_id'
+                    )
+                    ->leftJoinSub(
+                        $commissionsSubHierarchy,
+                        'c',
+                        'users.id',
+                        '=',
+                        'c.user_id'
+                    )
+                    ->addSelect([
+                        't.target_amount',
+                        't.achieved_amount',
+                        't.achievement_percentage',
+                        DB::raw('COALESCE(c.total_commission, 0) as total_commission')
+                    ])
+                    ->get()
+                    ->map(function ($u) {
+                        return [
+                            'id' => $u->id,
+                            'name' => $u->name,
+                            'username' => $u->username,
+                            'level' => $u->level->level_name ?? 'N/A',
+                            'branch' => $u->branch->name ?? 'N/A',
+                            'target_amount' => (float)($u->target_amount ?? 0),
+                            'achieved_amount' => (float)($u->achieved_amount ?? 0),
+                            'achievement_percentage' => (float)($u->achievement_percentage ?? 0),
+                            'total_commission' => (float)($u->total_commission ?? 0)
+                        ];
+                    });
+            }
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Agent performance data retrieved successfully',
@@ -282,15 +331,16 @@ class ReportController extends Controller implements HasMiddleware
                         'id' => $agent->id,
                         'name' => $agent->name,
                         'id_number' => $agent->id_number,
-                        'level' => $agent->level->name ?? 'N/A',
+                        'level' => $agent->level->level_name ?? 'N/A',
                         'branch' => $agent->branch->name ?? 'N/A',
-                        'target_amount' => $target ? $target->target_amount : 0,
-                        'achieved_amount' => $target ? $target->achieved_amount : 0,
-                        'achievement_percentage' => $target ? $target->achievement_percentage : 0,
+                        'target_amount' => $target ? (float)$target->target_amount : 0,
+                        'achieved_amount' => $target ? (float)$target->achieved_amount : 0,
+                        'achievement_percentage' => $target ? (float)$target->achievement_percentage : 0,
                         'total_commission' => (float) $totalCommission,
                         'period_key' => $periodKey
                     ],
-                    'customer_details' => $investments
+                    'customer_details' => $investments,
+                    'hierarchy_performance' => $hierarchyPerformance
                 ]
             ], 200);
 
@@ -304,6 +354,141 @@ class ReportController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to retrieve agent performance data',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Search for a hierarchy user and get performance metrics for them and ALL their descendants.
+     */
+    public function hierarchyPerformance(Request $request): JsonResponse
+    {
+        try {
+            $currentUser = Auth::guard('api')->user();
+            $search = $request->get('search');
+            $periodKey = $request->get('period_key', Carbon::now()->format('Y-m'));
+            $perPage = $request->get('per_page', 50);
+
+            if (!$search) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Search query is required (Name, Username or ID Number).'
+                ], 422);
+            }
+
+            // 1. Accessibility & Root User Search
+            $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
+
+            $rootQuery = User::where('user_type', 'hierarchy');
+
+            // If not admin, the searched user must be the current user or their descendant
+            if (!$isAdmin) {
+                $myDescendantIds = $currentUser->getAllDescendantIds();
+                $accessibleIds = array_merge([$currentUser->id], $myDescendantIds);
+                $rootQuery->whereIn('id', $accessibleIds);
+            }
+
+            $rootUser = $rootQuery->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('id_number', $search)
+                  ->orWhere('username', $search);
+            })->first();
+
+            if (!$rootUser) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Hierarchy user not found or access denied.'
+                ], 404);
+            }
+
+            // 2. Get all descendants of the root user
+            $allTargetUserIds = $rootUser->getAllDescendantIds();
+
+            if (empty($allTargetUserIds)) {
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Hierarchy performance report retrieved successfully (No subordinates found)',
+                    'data' => [],
+                    'meta' => [
+                        'root_user' => [
+                            'id' => $rootUser->id,
+                            'name' => $rootUser->name
+                        ],
+                        'period_key' => $periodKey
+                    ]
+                ], 200);
+            }
+
+            // 3. Fetch all users in this branch with their Target and Commission
+            $commissionsSub = Commission::select('user_id', DB::raw('SUM(commission_amount) as total_commission'))
+                ->where('period_key', $periodKey)
+                ->groupBy('user_id');
+
+            $results = User::with(['level', 'branch'])
+                ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id', 'users.parent_user_id')
+                ->whereIn('users.id', $allTargetUserIds)
+                ->leftJoinSub(
+                    Target::where('period_key', $periodKey),
+                    't',
+                    'users.id',
+                    '=',
+                    't.user_id'
+                )
+                ->leftJoinSub(
+                    $commissionsSub,
+                    'c',
+                    'users.id',
+                    '=',
+                    'c.user_id'
+                )
+                ->addSelect([
+                    't.target_amount',
+                    't.achieved_amount',
+                    't.achievement_percentage',
+                    't.period_key',
+                    DB::raw('COALESCE(c.total_commission, 0) as total_commission')
+                ])
+                ->paginate($perPage);
+
+            $results->getCollection()->transform(function ($u) {
+                return [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'username' => $u->username,
+                    'level' => $u->level->level_name ?? 'N/A',
+                    'branch' => $u->branch->name ?? 'N/A',
+                    'target_amount' => (float)($u->target_amount ?? 0),
+                    'achieved_amount' => (float)($u->achieved_amount ?? 0),
+                    'achievement_percentage' => (float)($u->achievement_percentage ?? 0),
+                    'total_commission' => (float)($u->total_commission ?? 0),
+                    'period_key' => $u->period_key ?? 'N/A'
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Hierarchy performance report retrieved successfully',
+                'data' => $results,
+                'meta' => [
+                    'root_user' => [
+                        'id' => $rootUser->id,
+                        'name' => $rootUser->name
+                    ],
+                    'period_key' => $periodKey
+                ]
+            ], 200);
+
+        } catch (\Throwable $th) {
+            Log::error('Hierarchy performance report failed', [
+                'error' => $th->getMessage(),
+                'user_id' => Auth::id(),
+                'search' => $request->get('search')
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve hierarchy performance report',
                 'error' => $th->getMessage()
             ], 500);
         }

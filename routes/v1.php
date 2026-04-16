@@ -117,6 +117,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
 
     Route::get('reports/hierarchy', [ReportController::class, 'index']);
     Route::get('reports/agent-performance', [ReportController::class, 'agentPerformance']);
+    Route::get('reports/hierarchy-performance', [ReportController::class, 'hierarchyPerformance']);
     Route::get('reports/investor-maturity', [ReportController::class, 'investorMaturity']);
     Route::get('reports/hierarchy/{id}', [ReportController::class, 'show']);
 
