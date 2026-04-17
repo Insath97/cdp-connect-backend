@@ -124,6 +124,16 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
         return $this->belongsTo(Province::class);
     }
 
+    public function investments()
+    {
+        return $this->hasMany(Investment::class, 'unit_head_id');
+    }
+
+    public function createdInvestments()
+    {
+        return $this->hasMany(Investment::class, 'created_by');
+    }
+
     /* Helper Methods */
 
     public function canLogin(): bool

@@ -131,6 +131,8 @@ class PermissionsSeeder extends Seeder
             /* Report Management */
             ['name' => 'Report Index', 'group_name' => 'Report Management Permissions'],
             ['name' => 'Report Agent Performance', 'group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Hierarchy Performance', 'group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Hierarchy Detailed', 'group_name' => 'Report Management Permissions'],
             ['name' => 'Report Investor Maturity', 'group_name' => 'Report Management Permissions'],
 
             /* Dashboard Management */

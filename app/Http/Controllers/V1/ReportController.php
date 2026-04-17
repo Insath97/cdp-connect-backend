@@ -27,7 +27,8 @@ class ReportController extends Controller implements HasMiddleware
         return [
             new Middleware('permission:Report Index', only: ['index', 'show']),
             new Middleware('permission:Report Agent Performance', only: ['agentPerformance']),
-            new Middleware('permission:Report Hierarchy Performance', only: ['']),
+            new Middleware('permission:Report Hierarchy Performance', only: ['hierarchyPerformance']),
+            new Middleware('permission:Report Hierarchy Detailed', only: ['hierarchyDetailedReport']),
             new Middleware('permission:Report Investor Maturity', only: ['investorMaturity']),
         ];
     }
@@ -489,6 +490,182 @@ class ReportController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to retrieve hierarchy performance report',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Search for a hierarchy user and get detailed performance metrics for them and their entire branch.
+     * Includes personal metrics, total branch business, and individual subordinate metrics.
+     */
+    public function hierarchyDetailedReport(Request $request): JsonResponse
+    {
+        try {
+            $currentUser = Auth::guard('api')->user();
+            $search = $request->get('search');
+            $periodKey = $request->get('period_key', Carbon::now()->format('Y-m'));
+            $perPage = $request->get('per_page', 50);
+
+            if (!$search) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Search query is required (Name, Username or ID Number).'
+                ], 422);
+            }
+
+            // 1. Accessibility & Root User Search
+            $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
+            $rootQuery = User::with(['level', 'branch'])->where('user_type', 'hierarchy');
+
+            if (!$isAdmin) {
+                $myDescendantIds = $currentUser->getAllDescendantIds();
+                $accessibleIds = array_merge([$currentUser->id], $myDescendantIds);
+                $rootQuery->whereIn('id', $accessibleIds);
+            }
+
+            $rootUser = $rootQuery->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('id_number', $search)
+                  ->orWhere('username', $search);
+            })->first();
+
+            if (!$rootUser) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Hierarchy user not found or access denied.'
+                ], 404);
+            }
+
+            // 2. Fetch Root User's Target/Achievement Data
+            $rootTarget = Target::where('user_id', $rootUser->id)
+                ->where('period_key', $periodKey)
+                ->first();
+
+            // 3. Get all descendants of the root user
+            $descendantIds = $rootUser->getAllDescendantIds();
+
+            // 4. Fetch all subordinates in this branch with their Target, Commission and Business Details
+            $commissionsSub = Commission::select('user_id', DB::raw('SUM(commission_amount) as total_commission'))
+                ->where('period_key', $periodKey)
+                ->groupBy('user_id');
+
+            $descendantsQuery = User::with([
+                'level', 
+                'branch',
+                'investments' => function($q) use ($periodKey) {
+                    $q->where('target_period_key', $periodKey)
+                      ->with(['customer', 'investmentProduct']);
+                }
+            ])
+                ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id', 'users.parent_user_id')
+                ->whereIn('users.id', $descendantIds)
+                ->leftJoinSub(
+                    Target::where('period_key', $periodKey),
+                    't',
+                    'users.id',
+                    '=',
+                    't.user_id'
+                )
+                ->leftJoinSub(
+                    $commissionsSub,
+                    'c',
+                    'users.id',
+                    '=',
+                    'c.user_id'
+                )
+                ->addSelect([
+                    't.target_amount',
+                    't.achieved_amount',
+                    't.achievement_percentage',
+                    't.period_key',
+                    DB::raw('COALESCE(c.total_commission, 0) as total_commission')
+                ]);
+
+            $descendants = $descendantsQuery->paginate($perPage);
+
+            $descendants->getCollection()->transform(function ($u) {
+                $businessDetails = $u->investments->map(function ($inv) {
+                    return [
+                        'customer_name' => $inv->customer->full_name ?? 'N/A',
+                        'policy_number' => $inv->policy_number ?? ($inv->application_number ?? 'N/A'),
+                        'investment_amount' => (float)$inv->investment_amount,
+                        'plan' => $inv->investmentProduct->name ?? 'N/A',
+                        'date' => $inv->reservation_date ? $inv->reservation_date->format('Y-m-d') : 'N/A',
+                        'status' => $inv->status
+                    ];
+                });
+
+                return [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'username' => $u->username,
+                    'level' => $u->level->level_name ?? 'N/A',
+                    'branch' => $u->branch->name ?? 'N/A',
+                    'target_amount' => (float)($u->target_amount ?? 0),
+                    'achieved_amount' => (float)($u->achieved_amount ?? 0),
+                    'achievement_percentage' => (float)($u->achievement_percentage ?? 0),
+                    'remaining_amount' => (float)max(0, ($u->target_amount ?? 0) - ($u->achieved_amount ?? 0)),
+                    'total_commission' => (float)($u->total_commission ?? 0),
+                    'period_key' => $u->period_key ?? 'N/A',
+                    'business_details' => $businessDetails
+                ];
+            });
+
+            // 5. Construct Summary
+            $rootUser->load(['investments' => function($q) use ($periodKey) {
+                $q->where('target_period_key', $periodKey)
+                  ->with(['customer', 'investmentProduct']);
+            }]);
+
+            $rootBusinessDetails = $rootUser->investments->map(function ($inv) {
+                return [
+                    'customer_name' => $inv->customer->full_name ?? 'N/A',
+                    'policy_number' => $inv->policy_number ?? ($inv->application_number ?? 'N/A'),
+                    'investment_amount' => (float)$inv->investment_amount,
+                    'plan' => $inv->investmentProduct->name ?? 'N/A',
+                    'date' => $inv->reservation_date ? $inv->reservation_date->format('Y-m-d') : 'N/A',
+                    'status' => $inv->status
+                ];
+            });
+
+            $searchedUserSummary = [
+                'id' => $rootUser->id,
+                'name' => $rootUser->name,
+                'username' => $rootUser->username,
+                'level' => $rootUser->level->level_name ?? 'N/A',
+                'branch' => $rootUser->branch->name ?? 'N/A',
+                'target_amount' => $rootTarget ? (float)$rootTarget->target_amount : 0,
+                'achieved_amount' => $rootTarget ? (float)$rootTarget->achieved_amount : 0,
+                'achievement_percentage' => $rootTarget ? (float)$rootTarget->achievement_percentage : 0,
+                'remaining_amount' => $rootTarget ? (float)$rootTarget->remaining_amount : 0,
+                'period_key' => $periodKey,
+                'business_details' => $rootBusinessDetails
+            ];
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Hierarchy detailed report retrieved successfully',
+                'data' => [
+                    'searched_user' => $searchedUserSummary,
+                    'hierarchy_summary' => [
+                        'total_business' => $rootTarget ? (float)$rootTarget->achieved_amount : 0,
+                        'total_subordinates' => count($descendantIds)
+                    ],
+                    'descendants_performance' => $descendants
+                ]
+            ], 200);
+
+        } catch (\Throwable $th) {
+            Log::error('Hierarchy detailed report failed', [
+                'error' => $th->getMessage(),
+                'user_id' => Auth::id(),
+                'search' => $request->get('search')
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve hierarchy detailed report',
                 'error' => $th->getMessage()
             ], 500);
         }
