@@ -6,6 +6,10 @@ use Illuminate\Console\Command;
 use App\Models\User;
 use App\Models\Target;
 use App\Models\Level;
+use App\Models\Investment;
+use App\Models\Commission;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class RecalculateTargets extends Command
 {
@@ -14,14 +18,17 @@ class RecalculateTargets extends Command
      *
      * @var string
      */
-    protected $signature = 'app:recalculate-targets {--user_id= : Recalculate for a specific user} {--period= : The period key (Y-m), defaults to current month}';
+    protected $signature = 'app:recalculate-targets 
+                            {--user_id= : Recalculate for a specific user} 
+                            {--period= : The period key (Y-m), defaults to current month}
+                            {--commissions : Regenerate commissions for approved investments in the period}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Recalculate target achievements based on actual investment data in the hierarchy.';
+    protected $description = 'Recalculate target achievements and commissions based on actual investment data.';
 
     /**
      * Execute the console command.
@@ -31,36 +38,105 @@ class RecalculateTargets extends Command
         $userId = $this->option('user_id');
         $period = $this->option('period') ?? date('Y-m');
 
+        if ($this->option('commissions')) {
+            $this->regenerateCommissions($period);
+        }
+
         if ($userId) {
-            $user = User::find($userId);
-            if (!$user) {
-                $this->error("User not found.");
-                return 1;
-            }
-
-            $this->info("Recalculating target for {$user->name} in period {$period}...");
-            if (Target::recalculateForUser($userId, $period)) {
-                $this->info("Successfully updated.");
-            } else {
-                $this->error("Failed to update. Does the user have a target for this period?");
-            }
+            $this->recalculateSingleUser($userId, $period);
         } else {
-            $this->info("Recalculating all targets for period {$period}...");
-            
-            // Recalculate in order of levels (bottom to top for safety, though recalculateForUser is independent)
-            $targets = Target::where('period_key', $period)->get();
-            $bar = $this->output->createProgressBar($targets->count());
+            $this->recalculateAllUsers($period);
+        }
 
-            foreach ($targets as $target) {
-                Target::recalculateForUser($target->user_id, $period);
+        return 0;
+    }
+
+    /**
+     * Regenerate commissions for all approved investments in a period.
+     */
+    protected function regenerateCommissions($period)
+    {
+        $this->info("Regenerating commissions for period {$period}...");
+
+        DB::beginTransaction();
+        try {
+            // 1. Delete existing commissions for the period to avoid duplicates
+            Commission::where('period_key', $period)->delete();
+
+            // 2. Fetch all approved investments for that period
+            $investments = Investment::where('target_period_key', $period)
+                ->where('status', 'approved')
+                ->with(['unitHead', 'investmentProduct'])
+                ->get();
+
+            if ($investments->isEmpty()) {
+                $this->warn("No approved investments found for period {$period}.");
+                DB::commit();
+                return;
+            }
+
+            $bar = $this->output->createProgressBar($investments->count());
+            $bar->start();
+
+            foreach ($investments as $investment) {
+                Commission::generateForInvestment($investment);
                 $bar->advance();
             }
 
             $bar->finish();
             $this->newLine();
-            $this->info("Finished recalculating " . $targets->count() . " targets.");
+            DB::commit();
+            $this->info("Successfully regenerated commissions for " . $investments->count() . " investments.");
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            $this->error("Failed to regenerate commissions: " . $th->getMessage());
+            Log::error("Commission regeneration failed", ['error' => $th->getMessage(), 'period' => $period]);
+        }
+    }
+
+    /**
+     * Recalculate target for a single user.
+     */
+    protected function recalculateSingleUser($userId, $period)
+    {
+        $user = User::find($userId);
+        if (!$user) {
+            $this->error("User not found.");
+            return;
         }
 
-        return 0;
+        $this->info("Recalculating target for {$user->name} in period {$period}...");
+        if (Target::recalculateForUser($userId, $period)) {
+            $this->info("Successfully updated.");
+        } else {
+            $this->error("Failed to update. Does the user have a target for this period?");
+        }
+    }
+
+    /**
+     * Recalculate targets for all users in a period.
+     */
+    protected function recalculateAllUsers($period)
+    {
+        $this->info("Recalculating all targets for period {$period}...");
+
+        $targets = Target::where('period_key', $period)->get();
+        
+        if ($targets->isEmpty()) {
+            $this->warn("No targets found for period {$period}.");
+            return;
+        }
+
+        $bar = $this->output->createProgressBar($targets->count());
+        $bar->start();
+
+        foreach ($targets as $target) {
+            Target::recalculateForUser($target->user_id, $period);
+            $bar->advance();
+        }
+
+        $bar->finish();
+        $this->newLine();
+        $this->info("Finished recalculating " . $targets->count() . " targets.");
     }
 }
