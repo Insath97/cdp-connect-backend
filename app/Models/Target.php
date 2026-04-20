@@ -68,6 +68,9 @@ class Target extends Model
     /**
      * Recursively update achieved_amount for a user and their superiors.
      */
+    /**
+     * Recursively update achieved_amount for a user and their superiors.
+     */
     public static function syncAchievement($userId, $periodKey, $amount, $isDeep = false)
     {
         Log::info("Syncing target achievement", [
@@ -82,11 +85,13 @@ class Target extends Model
             ->first();
 
         if ($target) {
-            // 1. Increment total achieved amount for this person
-            $target->achieved_amount += $amount;
+            // 1. Increment total achieved amount atomically in the database
+            $target->increment('achieved_amount', $amount);
+            
+            // Refresh model to get the updated amount and recalculate related fields
+            $target->refresh();
 
-            // 2. Reduce remaining target level for this person (Robust calculation)
-            // Use target_amount - achieved_amount to ensure it's always in sync with progress
+            // 2. Update remaining target level
             $target->current_amount = max(0, $target->target_amount - $target->achieved_amount);
 
             // 3. Calculate achievement percentage relative to THEIR own target
@@ -97,22 +102,20 @@ class Target extends Model
                 $target->achievement_percentage = $target->achieved_amount > 0 ? 100.00 : 0;
             }
 
+            // Check if achieved status needs to be updated
+            if ($target->current_amount <= 0 || $target->achieved_amount >= $target->target_amount) {
+                $target->status = 'achieved';
+                $target->achieved_at = $target->achieved_at ?? now();
+            }
+
             $target->save();
 
             Log::info("Target updated in hierarchy", [
                 'target_id' => $target->id,
                 'user_id' => $target->user_id,
-                'target_amount' => $target->target_amount,
                 'achieved_amount' => $target->achieved_amount,
-                'current_amount' => $target->current_amount,
-                'percentage' => $target->achievement_percentage,
                 'is_deep' => $isDeep
             ]);
-
-            // Check if achieved
-            if ($target->current_amount <= 0 || $target->achieved_amount >= $target->target_amount) {
-                $target->update(['status' => 'achieved', 'achieved_at' => now()]);
-            }
         } else {
             Log::warning("Target NOT FOUND for sync. This user's amounts will NOT be updated, but moving up the hierarchy.", [
                 'user_id' => $userId,
@@ -126,5 +129,50 @@ class Target extends Model
         if ($user && $user->parent_user_id) {
             self::syncAchievement($user->parent_user_id, $periodKey, $amount, true);
         }
+    }
+
+    /**
+     * Full recalculation of achieved amount for a specific user and period based on their branch's business.
+     */
+    public static function recalculateForUser($userId, $periodKey)
+    {
+        $user = User::find($userId);
+        if (!$user) return false;
+
+        $target = self::where('user_id', $userId)
+            ->where('period_key', $periodKey)
+            ->first();
+
+        if (!$target) return false;
+
+        // Get all approved investments in this user's branch for the period
+        $descendantIds = $user->getAllDescendantIds();
+        $allIds = array_merge([$userId], $descendantIds);
+
+        $totalApproved = \App\Models\Investment::whereIn('unit_head_id', $allIds)
+            ->where('target_period_key', $periodKey)
+            ->where('status', 'approved')
+            ->sum('investment_amount');
+
+        // Update target fields
+        $target->achieved_amount = $totalApproved;
+        $target->current_amount = max(0, $target->target_amount - $totalApproved);
+
+        if ($target->target_amount > 0) {
+            $percentage = ($totalApproved / $target->target_amount) * 100;
+            $target->achievement_percentage = min($percentage, 999.99);
+        } else {
+            $target->achievement_percentage = $totalApproved > 0 ? 100.00 : 0;
+        }
+
+        if ($target->current_amount <= 0 || $totalApproved >= $target->target_amount) {
+            $target->status = 'achieved';
+            $target->achieved_at = $target->achieved_at ?? now();
+        } else {
+            $target->status = 'active'; // Revert to active if no longer achieved (e.g. if investments were deleted)
+            $target->achieved_at = null;
+        }
+
+        return $target->save();
     }
 }

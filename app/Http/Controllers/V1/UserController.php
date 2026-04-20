@@ -482,4 +482,40 @@ class UserController extends Controller implements HasMiddleware
             ], 500);
         }
     }
+
+    /**
+     * Get a list of users for select box filtered by specific levels (Consultant, Senior Consultant, Group Leader, Senior Group Leader)
+     */
+    public function getHierarchyUsersByBranch(Request $request)
+    {
+        try {
+            // Level IDs from LevelSeeder: 8=SGL, 9=GL, 10=SC, 11=C
+            $hierarchyLevels = [9, 10, 11];
+
+            $query = User::where('is_active', true)
+                ->whereIn('level_id', $hierarchyLevels);
+
+            // Filter by branch if provided
+            if ($request->has('branch_id')) {
+                $query->where('branch_id', $request->branch_id);
+            }
+
+            $users = $query->select('id', 'name', 'username', 'employee_code', 'level_id', 'branch_id')
+                ->with(['level:id,level_name'])
+                ->orderByRaw('FIELD(level_id, 9, 10, 11)') 
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Hierarchy users retrieved successfully',
+                'data' => $users
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve hierarchy users',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
 }
