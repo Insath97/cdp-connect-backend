@@ -108,6 +108,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::get('investments/maturity-report', [InvestmentController::class, 'investorMaturity']);
     Route::apiResource('investments', InvestmentController::class);
     Route::patch('investments/{id}/approve', [InvestmentController::class, 'approve']);
+    Route::delete('investments/{id}/approved-delete', [InvestmentController::class, 'destroyApprovedInvestement']);
     Route::get('investments/{id}/certificate', [InvestmentController::class, 'printCertificate']);
 
     Route::get('target-progress', [TargetProgressController::class, 'index']);

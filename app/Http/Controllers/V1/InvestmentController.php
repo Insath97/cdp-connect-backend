@@ -11,6 +11,7 @@ use App\Models\Target;
 use App\Models\Beneficiary;
 use App\Models\CustomerBankDetail;
 use App\Models\Commission;
+use App\Http\Requests\UpdateInvestmentRequest;
 use App\Mail\InvestmentApprovedMail;
 use App\Services\SmsService;
 use App\Models\CommissionSetting;
@@ -367,7 +368,7 @@ class InvestmentController extends Controller implements HasMiddleware
         //
     }
 
-    public function update(Request $request, string $id) {}
+
 
     /**
      * Approve the specified investment.
@@ -618,11 +619,235 @@ class InvestmentController extends Controller implements HasMiddleware
         }
     }
 
+    public function update(UpdateInvestmentRequest $request, string $id)
+    {
+        DB::beginTransaction();
+        try {
+            $user = Auth::guard('api')->user();
+            $investment = Investment::with(['beneficiary', 'bankDetail'])->findOrFail($id);
+
+            // 1. Strict Role Check: Only Super Admin can edit
+            if (!$user->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only Super Admin can update investment details.'
+                ], 403);
+            }
+
+            $data = $request->validated();
+            $oldAmount = (float) $investment->investment_amount;
+            $oldUnitHeadId = $investment->unit_head_id;
+            $oldPeriodKey = $investment->target_period_key;
+            $status = $investment->status;
+
+            // 2. Handle reservation_date -> target_period_key
+            if (isset($data['reservation_date'])) {
+                $reservationDate = Carbon::parse($data['reservation_date']);
+                $data['target_period_key'] = $reservationDate->format('Y-m');
+            }
+
+            // 3. Handle payment_proof file updates
+            $imagePath = $this->handleFileUpload($request, 'payment_proof', $investment->payment_proof, 'investments/payment', $investment->application_number);
+            if ($imagePath) {
+                $data['payment_proof'] = $imagePath;
+            }
+
+            // 4. Handle Nested Beneficiary Update/Creation
+            if ($request->has('beneficiary')) {
+                if ($investment->beneficiary_id && $investment->beneficiary) {
+                    $investment->beneficiary->update($request->beneficiary);
+                } else {
+                    $beneficiary = Beneficiary::create(array_merge($request->beneficiary, [
+                        'customer_id' => $investment->customer_id
+                    ]));
+                    $data['beneficiary_id'] = $beneficiary->id;
+                }
+            }
+
+            // 5. Handle Nested Bank Detail Update/Creation
+            if ($request->has('bank_detail')) {
+                if ($investment->customer_bank_detail_id && $investment->bankDetail) {
+                    $investment->bankDetail->update($request->bank_detail);
+                } else {
+                    $bankDetail = CustomerBankDetail::create(array_merge($request->bank_detail, [
+                        'customer_id' => $investment->customer_id
+                    ]));
+                    $data['customer_bank_detail_id'] = $bankDetail->id;
+                }
+            }
+
+            $investment->update($data);
+            $investment->refresh();
+
+            // 6. Handle Target Re-sync if status is 'approved' and amounts/unit head changed
+            if ($status === 'approved') {
+                $newAmount = (float) $investment->investment_amount;
+                $newUnitHeadId = $investment->unit_head_id;
+                $newPeriodKey = $investment->target_period_key;
+
+                if ($oldAmount !== $newAmount || $oldUnitHeadId !== $newUnitHeadId || $oldPeriodKey !== $newPeriodKey) {
+                    // Recalculate for old state
+                    Target::recalculateForUser($oldUnitHeadId, $oldPeriodKey);
+                    
+                    // Recalculate for new state (if different)
+                    if ($oldUnitHeadId !== $newUnitHeadId || $oldPeriodKey !== $newPeriodKey) {
+                        Target::recalculateForUser($newUnitHeadId, $newPeriodKey);
+                    }
+                }
+            }
+
+            DB::commit();
+
+            Log::info('Investment updated by Super Admin', [
+                'admin_id' => $user->id,
+                'investment_id' => $investment->id,
+                'updated_fields' => array_keys($data)
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Investment updated successfully',
+                'data' => $investment->load(['customer', 'branch', 'investmentProduct', 'beneficiary', 'bankDetail', 'unitHead'])
+            ], 200);
+
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            Log::error('Investment update failed', [
+                'error' => $th->getMessage(),
+                'admin_id' => Auth::guard('api')->id(),
+                'investment_id' => $id
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to update investment',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
     /**
      * Remove the specified resource from storage.
      */
     public function destroy(string $id)
     {
-        //
+        try {
+            $user = Auth::guard('api')->user();
+            $investment = Investment::findOrFail($id);
+
+            // 1. Strict Role Check: Only Super Admin can delete
+            if (!$user->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only Super Admin can delete investments.'
+                ], 403);
+            }
+
+            $status = $investment->status;
+
+            // 2. Prevent deletion of approved investments
+            if ($status === 'approved') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Approved investments cannot be deleted.'
+                ], 422);
+            }
+
+            $unitHeadId = $investment->unit_head_id;
+            $periodKey = $investment->target_period_key;
+
+            // 3. Handle file cleanup
+            if ($investment->payment_proof) {
+                $this->deleteFile($investment->payment_proof);
+            }
+
+            // 4. Soft Delete
+            $investment->delete();
+
+            // 4. Handle Target Re-sync if it was 'approved'
+            if ($status === 'approved') {
+                Target::recalculateForUser($unitHeadId, $periodKey);
+            }
+
+            Log::info('Investment deleted by Super Admin', [
+                'admin_id' => $user->id,
+                'investment_id' => $id
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Investment deleted successfully'
+            ], 200);
+
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to delete investment',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    public function destroyApprovedInvestement (string $id)
+    {
+         try {
+            $user = Auth::guard('api')->user();
+            $investment = Investment::findOrFail($id);
+
+            // 1. Strict Role Check: Only Super Admin can delete
+            if (!$user->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only Super Admin can delete investments.'
+                ], 403);
+            }
+
+            $status = $investment->status;
+            $unitHeadId = $investment->unit_head_id;
+            $periodKey = $investment->target_period_key;
+
+            // 3. Handle file cleanup
+            if ($investment->payment_proof) {
+                $this->deleteFile($investment->payment_proof);
+            }
+
+            // 4. Soft Delete
+            $investment->delete();
+
+            // 5. Hierarchical Target Re-sync if it was 'approved'
+            if ($status === 'approved') {
+                $this->recalculateHierarchyTargets($unitHeadId, $periodKey);
+            }
+
+            Log::info('Approved investment deleted by Super Admin', [
+                'admin_id' => $user->id,
+                'investment_id' => $id
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Approved investment deleted successfully'
+            ], 200);
+
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to delete approved investment',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Recursively recalculate targets up the hierarchy.
+     */
+    protected function recalculateHierarchyTargets($userId, $periodKey)
+    {
+        Target::recalculateForUser($userId, $periodKey);
+
+        $user = \App\Models\User::find($userId);
+        if ($user && $user->parent_user_id) {
+            $this->recalculateHierarchyTargets($user->parent_user_id, $periodKey);
+        }
     }
 }

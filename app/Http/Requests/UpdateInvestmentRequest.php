@@ -11,7 +11,7 @@ class UpdateInvestmentRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -21,8 +21,68 @@ class UpdateInvestmentRequest extends FormRequest
      */
     public function rules(): array
     {
+        $id = $this->route('investment');
+
         return [
-            //
+            'application_number' => 'sometimes|string|unique:investments,application_number,' . $id,
+            'sales_code' => 'sometimes|string|unique:investments,sales_code,' . $id,
+            'reservation_date' => 'sometimes|date',
+            'customer_id' => 'sometimes|exists:customers,id',
+            'branch_id' => 'sometimes|exists:branches,id',
+            'investment_product_id' => 'sometimes|exists:investment_products,id',
+            'beneficiary_id' => 'nullable|exists:beneficiaries,id',
+            'customer_bank_detail_id' => 'nullable|exists:customer_bank_details,id',
+
+            // Nested Beneficiary Data (Optional update)
+            'beneficiary' => 'nullable|array',
+            'beneficiary.full_name' => 'required_with:beneficiary|string|max:255',
+            'beneficiary.id_type' => 'required_with:beneficiary|in:nic,passport,driving_license,other',
+            'beneficiary.id_number' => 'required_with:beneficiary|string|max:50',
+            'beneficiary.phone_primary' => 'required_with:beneficiary|string|max:20',
+            'beneficiary.relationship' => 'required_with:beneficiary|string|max:100',
+            'beneficiary.share_percentage' => 'required_with:beneficiary|numeric|min:0|max:100',
+
+            // Nested Bank Detail Data (Optional update)
+            'bank_detail' => 'nullable|array',
+            'bank_detail.bank_name' => 'required_with:bank_detail|string|max:255',
+            'bank_detail.branch_name' => 'required_with:bank_detail|string|max:255',
+            'bank_detail.account_number' => 'required_with:bank_detail|string|max:50',
+            'bank_detail.payment_method' => 'required_with:bank_detail|in:bank_transfer,cheque,cash',
+
+            'investment_amount' => 'sometimes|numeric|min:0',
+            'bank' => 'sometimes|in:HNB,Sampath,Commercial Bank,Peoples Bank,NSB,Other',
+            'payment_type' => 'sometimes|in:full_payment,monthly',
+            'payment_description' => 'nullable|string',
+            'payment_proof' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'initial_payment' => 'sometimes|numeric|min:0',
+            'initial_payment_date' => 'nullable|date',
+            'monthly_payment_amount' => 'nullable|numeric|min:0',
+            'monthly_payment_date' => 'nullable|date',
+            'unit_head_id' => 'sometimes|exists:users,id',
+            'notes' => 'nullable|string',
+            'status' => 'sometimes|in:pending,approved,rejected',
         ];
+    }
+
+    protected function failedValidation(\Illuminate\Contracts\Validation\Validator $validator)
+    {
+        $errorMessages = $validator->errors();
+
+        $fieldErrors = collect($errorMessages->getMessages())->map(function ($messages, $field) {
+            return [
+                'field' => $field,
+                'messages' => $messages,
+            ];
+        })->values();
+
+        $message = $fieldErrors->count() > 1
+            ? 'There are multiple validation errors. Please review the form and correct the issues.'
+            : 'There is an issue with the input for ' . $fieldErrors->first()['field'] . '.';
+
+        throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
+            'status' => 'error',
+            'message' => $message,
+            'errors' => $fieldErrors,
+        ], 422));
     }
 }
