@@ -35,7 +35,12 @@ class TargetController extends Controller implements HasMiddleware
             $query = Target::with(['user', 'assigner']);
 
             // Hierarchy visibility logic
-            if (!$user->hasRole('Super Admin')) {
+            if ($user->hasRole('Branch Coordinator')) {
+                $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+                $query->whereHas('user', function($uq) use ($assignedBranchIds) {
+                    $uq->whereIn('branch_id', $assignedBranchIds);
+                });
+            } elseif (!$user->hasRole('Super Admin')) {
                 $descendantIds = $user->getAllDescendantIds();
                 $accessibleUserIds = array_merge([$user->id], $descendantIds);
 

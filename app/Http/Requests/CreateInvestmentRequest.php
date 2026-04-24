@@ -28,7 +28,19 @@ class CreateInvestmentRequest extends FormRequest
             'sales_code' => 'nullable|string|unique:investments,sales_code',
             'reservation_date' => 'required|date',
             'customer_id' => 'required|exists:customers,id',
-            'branch_id' => 'sometimes|exists:branches,id',
+            'branch_id' => [
+                'sometimes',
+                'exists:branches,id',
+                function ($attribute, $value, $fail) {
+                    $currentUser = auth('api')->user();
+                    if ($currentUser && $currentUser->hasRole('Branch Coordinator')) {
+                        $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                        if (!in_array($value, $assignedBranchIds)) {
+                            $fail('The selected branch is not assigned to you.');
+                        }
+                    }
+                }
+            ],
             'investment_product_id' => 'required|exists:investment_products,id',
             'beneficiary_id' => 'nullable|exists:beneficiaries,id',
             'customer_bank_detail_id' => 'nullable|exists:customer_bank_details,id',

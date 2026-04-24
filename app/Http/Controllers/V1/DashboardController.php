@@ -35,16 +35,26 @@ class DashboardController extends Controller implements HasMiddleware
 
             // 1. Determine User Scope
             $isAdmin = $user->hasRole('Super Admin') || $user->user_type === 'admin';
+            $isBranchCoordinator = $user->hasRole('Branch Coordinator');
             $descendantIds = [];
+            $assignedBranchIds = [];
 
-            if (!$isAdmin) {
+            if ($isBranchCoordinator) {
+                $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+            }
+
+            if (!$isAdmin && !$isBranchCoordinator) {
                 $descendantIds = $user->getAllDescendantIds();
             }
 
             // 2. Fetch Target Statistics
             $targetQuery = Target::where('period_key', $periodKey);
 
-            if (!$isAdmin) {
+            if ($isBranchCoordinator) {
+                $targetQuery->whereHas('user', function($uq) use ($assignedBranchIds) {
+                    $uq->whereIn('branch_id', $assignedBranchIds);
+                });
+            } elseif (!$isAdmin) {
                 // Hierarchical logic: include self and all descendants
                 $accessibleUserIds = array_merge([$user->id], $descendantIds);
                 $targetQuery->whereIn('user_id', $accessibleUserIds);
@@ -75,7 +85,11 @@ class DashboardController extends Controller implements HasMiddleware
                 $monthLabel = $date->format('M');
 
                 $monthTargetQuery = Target::where('period_key', $monthKey);
-                if (!$isAdmin) {
+                if ($isBranchCoordinator) {
+                    $monthTargetQuery->whereHas('user', function($uq) use ($assignedBranchIds) {
+                        $uq->whereIn('branch_id', $assignedBranchIds);
+                    });
+                } elseif (!$isAdmin) {
                     $monthTargetQuery->whereIn('user_id', $accessibleUserIds);
                 }
 
@@ -91,7 +105,7 @@ class DashboardController extends Controller implements HasMiddleware
                 ];
             }
 
-            // 4. Additional Quick Stats (Hierarchy Aware)
+            // 4. Additional Quick Stats (Hierarchy/Branch Aware)
             $customerCount = 0;
             $activeCustomerCount = 0;
             $approvedCustomerCount = 0;
@@ -110,6 +124,29 @@ class DashboardController extends Controller implements HasMiddleware
                 $quotationCount = Quotation::count();
                 $totalInvestmentVolume = Investment::where('status', 'approved')->sum('investment_amount');
                 $approvedCustomerCount = Investment::where('status', 'approved')->distinct('customer_id')->count('customer_id');
+            } elseif ($isBranchCoordinator) {
+                $customerCount = Customer::whereHas('user', function($uq) use ($assignedBranchIds) {
+                    $uq->whereIn('branch_id', $assignedBranchIds);
+                })->count();
+                $activeCustomerCount = Customer::whereHas('user', function($uq) use ($assignedBranchIds) {
+                    $uq->whereIn('branch_id', $assignedBranchIds);
+                })->where('is_active', true)->count();
+
+                $investmentCount = Investment::whereIn('branch_id', $assignedBranchIds)->count();
+                $approvedInvestmentCount = Investment::whereIn('branch_id', $assignedBranchIds)->where('status', 'approved')->count();
+                $pendingInvestmentCount = Investment::whereIn('branch_id', $assignedBranchIds)
+                    ->where('status', 'pending')
+                    ->count();
+
+                $quotationCount = Quotation::whereIn('branch_id', $assignedBranchIds)->count();
+                $totalInvestmentVolume = Investment::whereIn('branch_id', $assignedBranchIds)
+                    ->where('status', 'approved')
+                    ->sum('investment_amount');
+
+                $approvedCustomerCount = Investment::whereIn('branch_id', $assignedBranchIds)
+                    ->where('status', 'approved')
+                    ->distinct('customer_id')
+                    ->count('customer_id');
             } else {
                 // $accessibleUserIds set in step 2
                 $customerCount = Customer::whereIn('customer_id', $accessibleUserIds)->count();
@@ -136,7 +173,9 @@ class DashboardController extends Controller implements HasMiddleware
             $distributionData = [];
             $distributionQuery = Investment::where('status', 'approved');
 
-            if (!$isAdmin) {
+            if ($isBranchCoordinator) {
+                $distributionQuery->whereIn('branch_id', $assignedBranchIds);
+            } elseif (!$isAdmin) {
                 $distributionQuery->whereIn('created_by', $accessibleUserIds);
             }
 
@@ -147,10 +186,10 @@ class DashboardController extends Controller implements HasMiddleware
 
             if ($totalInvestmentVolume > 0) {
                 foreach ($productVolumes as $pv) {
-                    $percentage = ($pv->volume / $totalInvestmentVolume) * 100;
+                    $itemPercentage = ($pv->volume / $totalInvestmentVolume) * 100;
                     $distributionData[] = [
                         'name' => $pv->name,
-                        'value' => round($percentage, 2)
+                        'value' => round($itemPercentage, 2)
                     ];
                 }
             } else {
@@ -182,9 +221,10 @@ class DashboardController extends Controller implements HasMiddleware
                         'total_investment_volume' => round($totalInvestmentVolume, 2),
                     ],
                     'user_context' => [
-                        'role' => $isAdmin ? 'Admin' : 'Hierarchy User',
+                        'role' => $isAdmin ? 'Admin' : ($isBranchCoordinator ? 'Branch Coordinator' : 'Hierarchy User'),
                         'level' => $user->level?->name ?? 'N/A',
-                        'descendants_count' => count($descendantIds)
+                        'descendants_count' => count($descendantIds),
+                        'assigned_branches_count' => count($assignedBranchIds)
                     ]
                 ]
             ], 200);

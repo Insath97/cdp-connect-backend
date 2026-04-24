@@ -30,7 +30,20 @@ class CreateUserRequest extends FormRequest
             'email' => 'required|email|max:255|unique:users,email',
             'password' => 'required|string|min:8',
             'user_type' => 'required|in:admin,hierarchy,customer',
-            'role' => 'required|string|exists:roles,name',
+            'role' => [
+                'required',
+                'string',
+                'exists:roles,name',
+                function ($attribute, $value, $fail) {
+                    $currentUser = auth('api')->user();
+                    if ($currentUser && $currentUser->hasRole('Branch Coordinator')) {
+                        $restrictedRoles = ['Admin', 'Super Admin', 'CEO', 'COO'];
+                        if (in_array($value, $restrictedRoles)) {
+                            $fail('You are not authorized to assign this role.');
+                        }
+                    }
+                }
+            ],
 
             // Employee Code (Required for hierarchy users)
             'employee_code' => 'required_if:user_type,hierarchy|nullable|string|max:255|unique:users,employee_code',
@@ -40,7 +53,19 @@ class CreateUserRequest extends FormRequest
             'parent_user_id' => 'nullable|exists:users,id',
 
             // Location fields (required based on business logic, but nullable in DB)
-            'branch_id' => 'nullable|exists:branches,id',
+            'branch_id' => [
+                'nullable',
+                'exists:branches,id',
+                function ($attribute, $value, $fail) {
+                    $currentUser = auth('api')->user();
+                    if ($currentUser && $currentUser->hasRole('Branch Coordinator')) {
+                        $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                        if (!in_array($value, $assignedBranchIds)) {
+                            $fail('The selected branch is not assigned to you.');
+                        }
+                    }
+                }
+            ],
             'zone_id' => 'nullable|exists:zones,id',
             'region_id' => 'nullable|exists:regions,id',
             'province_id' => 'nullable|exists:provinces,id',
@@ -52,6 +77,10 @@ class CreateUserRequest extends FormRequest
             // Identification based on user type (Staff vs Customer)
             'id_type' => 'required_if:user_type,admin,hierarchy|nullable|in:nic,passport,driving_license,other',
             'id_number' => 'required_if:user_type,admin,hierarchy|nullable|string|max:255|unique:users,id_number',
+
+            // Branch Coordinator assigned branches
+            'assigned_branch_ids' => 'nullable|array',
+            'assigned_branch_ids.*' => 'exists:branches,id',
         ];
     }
 

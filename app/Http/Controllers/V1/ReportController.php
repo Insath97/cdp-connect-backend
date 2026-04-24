@@ -45,12 +45,16 @@ class ReportController extends Controller implements HasMiddleware
 
             // 1. Determine accessible user IDs
             $isAdmin = $user->hasRole('Super Admin') || ($user->user_type === 'admin');
+            $isBranchCoordinator = $user->hasRole('Branch Coordinator');
 
             $query = User::with(['level', 'branch'])
                 ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id', 'users.user_type','users.id_type','users.id_number')
                 ->where('users.user_type', 'hierarchy');
 
-            if (!$isAdmin) {
+            if ($isBranchCoordinator) {
+                $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+                $query->whereIn('users.branch_id', $assignedBranchIds);
+            } elseif (!$isAdmin) {
                 $descendantIds = $user->getAllDescendantIds();
                 $accessibleIds = array_merge([$user->id], $descendantIds);
                 $query->whereIn('users.id', $accessibleIds);
@@ -217,11 +221,15 @@ class ReportController extends Controller implements HasMiddleware
 
             // 1. Accessibility & Query Setup
             $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
+            $isBranchCoordinator = $currentUser->hasRole('Branch Coordinator');
 
             $query = User::with(['level', 'branch'])
                 ->where('user_type', 'hierarchy');
 
-            if (!$isAdmin) {
+            if ($isBranchCoordinator) {
+                $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                $query->whereIn('branch_id', $assignedBranchIds);
+            } elseif (!$isAdmin) {
                 $descendantIds = $currentUser->getAllDescendantIds();
                 $accessibleIds = array_merge([$currentUser->id], $descendantIds);
                 $query->whereIn('id', $accessibleIds);
@@ -380,11 +388,16 @@ class ReportController extends Controller implements HasMiddleware
 
             // 1. Accessibility & Root User Search
             $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
+            $isBranchCoordinator = $currentUser->hasRole('Branch Coordinator');
 
             $rootQuery = User::where('user_type', 'hierarchy');
 
-            // If not admin, the searched user must be the current user or their descendant
-            if (!$isAdmin) {
+            // If Branch Coordinator, restrict to assigned branches
+            if ($isBranchCoordinator) {
+                $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                $rootQuery->whereIn('branch_id', $assignedBranchIds);
+            } elseif (!$isAdmin) {
+                // If hierarchy user, the searched user must be the current user or their descendant
                 $myDescendantIds = $currentUser->getAllDescendantIds();
                 $accessibleIds = array_merge([$currentUser->id], $myDescendantIds);
                 $rootQuery->whereIn('id', $accessibleIds);
@@ -683,7 +696,10 @@ class ReportController extends Controller implements HasMiddleware
             $query = Investment::with(['customer', 'investmentProduct.annualRates', 'branch', 'creator']);
 
             // 1. Hierarchy Visibility Logic
-            if (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
+            if ($user->hasRole('Branch Coordinator')) {
+                $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+                $query->whereIn('branch_id', $assignedBranchIds);
+            } elseif (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
                 // Hierarchical users see their own and descendants' investments
                 $descendantIds = $user->getAllDescendantIds();
                 $accessibleUserIds = array_merge([$user->id], $descendantIds);

@@ -36,8 +36,14 @@ class UserController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         try {
+            $currentUser = Auth::guard('api')->user();
             $perPage = $request->get('per_page', 15);
             $query = User::with(['level', 'branch', 'parent', 'roles']);
+
+            if ($currentUser->hasRole('Branch Coordinator')) {
+                $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                $query->whereIn('branch_id', $assignedBranchIds);
+            }
 
             if ($request->has('search')) {
                 $search = $request->search;
@@ -111,6 +117,16 @@ class UserController extends Controller implements HasMiddleware
             $currentUser = auth("api")->user();
             $data = $request->validated();
 
+            if ($currentUser->hasRole('Branch Coordinator')) {
+                $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                if (!isset($data['branch_id']) || !in_array($data['branch_id'], $assignedBranchIds)) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Unauthorized. You can only create users in your assigned branches.'
+                    ], 403);
+                }
+            }
+
             // Hash password
             $rawPassword = $data['password'];
             $data['password'] = Hash::make($rawPassword);
@@ -137,6 +153,11 @@ class UserController extends Controller implements HasMiddleware
             // Assign Role
             if (isset($data['role'])) {
                 $user->assignRole($data['role']);
+            }
+
+            // Sync Assigned Branches (for Branch Coordinator)
+            if (isset($data['assigned_branch_ids'])) {
+                $user->assignedBranches()->sync($data['assigned_branch_ids']);
             }
 
             // Send Email
@@ -245,6 +266,17 @@ class UserController extends Controller implements HasMiddleware
                 ], 404);
             }
 
+            $currentUser = Auth::guard('api')->user();
+            if ($currentUser->hasRole('Branch Coordinator')) {
+                $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                if (!$user->branch_id || !in_array($user->branch_id, $assignedBranchIds)) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Unauthorized. This user is not in your assigned branches.'
+                    ], 403);
+                }
+            }
+
             Log::info('User viewed', [
                 'viewer_id' => Auth::id(),
                 'viewed_user_id' => $user->id
@@ -283,7 +315,26 @@ class UserController extends Controller implements HasMiddleware
                 ], 404);
             }
 
+            $currentUser = Auth::guard('api')->user();
             $data = $request->validated();
+
+            if ($currentUser->hasRole('Branch Coordinator')) {
+                $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                
+                if ($user->branch_id && !in_array($user->branch_id, $assignedBranchIds)) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Unauthorized. This user is not in your assigned branches.'
+                    ], 403);
+                }
+
+                if (isset($data['branch_id']) && !in_array($data['branch_id'], $assignedBranchIds)) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Unauthorized. You cannot move a user to a branch you are not assigned to.'
+                    ], 403);
+                }
+            }
 
             if (isset($data['password'])) {
                 $data['password'] = Hash::make($data['password']);
@@ -312,6 +363,11 @@ class UserController extends Controller implements HasMiddleware
 
             if (isset($data['role'])) {
                 $user->syncRoles([$data['role']]);
+            }
+
+            // Sync Assigned Branches (for Branch Coordinator)
+            if (isset($data['assigned_branch_ids'])) {
+                $user->assignedBranches()->sync($data['assigned_branch_ids']);
             }
 
             $user->refresh();
@@ -453,7 +509,13 @@ class UserController extends Controller implements HasMiddleware
     public function getAvailableUsers(Request $request)
     {
         try {
+            $currentUser = Auth::guard('api')->user();
             $query = User::where('is_active', true);
+
+            if ($currentUser->hasRole('Branch Coordinator')) {
+                $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                $query->whereIn('branch_id', $assignedBranchIds);
+            }
 
             // Filter by user_type if provided
             if ($request->has('user_type')) {
@@ -489,11 +551,18 @@ class UserController extends Controller implements HasMiddleware
     public function getHierarchyUsersByBranch(Request $request)
     {
         try {
+            $perPage = $request->input('per_page', 15);
+            $currentUser = Auth::guard('api')->user();
             // Level IDs from LevelSeeder: 8=SGL, 9=GL, 10=SC, 11=C
             $hierarchyLevels = [9, 10, 11];
 
             $query = User::where('is_active', true)
                 ->whereIn('level_id', $hierarchyLevels);
+
+            if ($currentUser->hasRole('Branch Coordinator')) {
+                $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                $query->whereIn('branch_id', $assignedBranchIds);
+            }
 
             // Filter by branch if provided
             if ($request->has('branch_id')) {
