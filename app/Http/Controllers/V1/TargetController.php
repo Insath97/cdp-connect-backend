@@ -73,6 +73,8 @@ class TargetController extends Controller implements HasMiddleware
 
             if ($request->has('period_key')) {
                 $query->where('period_key', $request->period_key);
+            } else {
+                $query->where('period_key', now()->format('Y-m'));
             }
 
             if ($request->has('status')) {
@@ -314,6 +316,12 @@ class TargetController extends Controller implements HasMiddleware
             $query = Target::where('user_id', Auth::id())
                 ->with(['assigner'])
                 ->orderBy('created_at', 'desc');
+
+            if ($request->has('period_key')) {
+                $query->where('period_key', $request->period_key);
+            } else {
+                $query->where('period_key', now()->format('Y-m'));
+            }
 
             $targets = $query->paginate($perPage);
 

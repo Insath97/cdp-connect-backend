@@ -150,62 +150,69 @@ class DashboardController extends Controller implements HasMiddleware
             $totalInvestmentVolume = 0;
 
             if ($isAdmin) {
-                $customerCount = Customer::count();
-                $activeCustomerCount = Customer::where('is_active', true)->count();
-                $investmentCount = Investment::count();
-                $approvedInvestmentCount = Investment::where('status', 'approved')->count();
-                $pendingInvestmentCount = Investment::where('status', 'pending')->count();
-                $quotationCount = Quotation::count();
-                $totalInvestmentVolume = Investment::where('status', 'approved')->sum('investment_amount');
-                $approvedCustomerCount = Investment::where('status', 'approved')->distinct('customer_id')->count('customer_id');
+                $customerCount = Customer::where('created_at', 'like', "{$periodKey}%")->count();
+                $activeCustomerCount = Customer::where('is_active', true)->where('created_at', 'like', "{$periodKey}%")->count();
+                $investmentCount = Investment::where('target_period_key', $periodKey)->count();
+                $approvedInvestmentCount = Investment::where('status', 'approved')->where('target_period_key', $periodKey)->count();
+                $pendingInvestmentCount = Investment::where('status', 'pending')->where('target_period_key', $periodKey)->count();
+                $quotationCount = Quotation::where('created_at', 'like', "{$periodKey}%")->count();
+                $totalInvestmentVolume = Investment::where('status', 'approved')->where('target_period_key', $periodKey)->sum('investment_amount');
+                $approvedCustomerCount = Investment::where('status', 'approved')->where('target_period_key', $periodKey)->distinct('customer_id')->count('customer_id');
             } elseif ($isBranchCoordinator) {
                 $customerCount = Customer::whereHas('user', function ($uq) use ($assignedBranchIds) {
                     $uq->whereIn('branch_id', $assignedBranchIds);
-                })->count();
+                })->where('created_at', 'like', "{$periodKey}%")->count();
                 $activeCustomerCount = Customer::whereHas('user', function ($uq) use ($assignedBranchIds) {
                     $uq->whereIn('branch_id', $assignedBranchIds);
-                })->where('is_active', true)->count();
+                })->where('is_active', true)->where('created_at', 'like', "{$periodKey}%")->count();
 
-                $investmentCount = Investment::whereIn('branch_id', $assignedBranchIds)->count();
-                $approvedInvestmentCount = Investment::whereIn('branch_id', $assignedBranchIds)->where('status', 'approved')->count();
+                $investmentCount = Investment::whereIn('branch_id', $assignedBranchIds)->where('target_period_key', $periodKey)->count();
+                $approvedInvestmentCount = Investment::whereIn('branch_id', $assignedBranchIds)->where('status', 'approved')->where('target_period_key', $periodKey)->count();
                 $pendingInvestmentCount = Investment::whereIn('branch_id', $assignedBranchIds)
                     ->where('status', 'pending')
+                    ->where('target_period_key', $periodKey)
                     ->count();
 
-                $quotationCount = Quotation::whereIn('branch_id', $assignedBranchIds)->count();
+                $quotationCount = Quotation::whereIn('branch_id', $assignedBranchIds)->where('created_at', 'like', "{$periodKey}%")->count();
                 $totalInvestmentVolume = Investment::whereIn('branch_id', $assignedBranchIds)
                     ->where('status', 'approved')
+                    ->where('target_period_key', $periodKey)
                     ->sum('investment_amount');
 
                 $approvedCustomerCount = Investment::whereIn('branch_id', $assignedBranchIds)
                     ->where('status', 'approved')
+                    ->where('target_period_key', $periodKey)
                     ->distinct('customer_id')
                     ->count('customer_id');
             } else {
                 // $accessibleUserIds set in step 2
-                $customerCount = Customer::whereIn('customer_id', $accessibleUserIds)->count();
-                $activeCustomerCount = Customer::whereIn('customer_id', $accessibleUserIds)->where('is_active', true)->count();
+                $customerCount = Customer::whereIn('customer_id', $accessibleUserIds)->where('created_at', 'like', "{$periodKey}%")->count();
+                $activeCustomerCount = Customer::whereIn('customer_id', $accessibleUserIds)->where('is_active', true)->where('created_at', 'like', "{$periodKey}%")->count();
 
-                $investmentCount = Investment::whereIn('created_by', $accessibleUserIds)->count();
-                $approvedInvestmentCount = Investment::whereIn('created_by', $accessibleUserIds)->where('status', 'approved')->count();
+                $investmentCount = Investment::whereIn('created_by', $accessibleUserIds)->where('target_period_key', $periodKey)->count();
+                $approvedInvestmentCount = Investment::whereIn('created_by', $accessibleUserIds)->where('status', 'approved')->where('target_period_key', $periodKey)->count();
                 $pendingInvestmentCount = Investment::whereIn('created_by', $accessibleUserIds)
                     ->where('status', 'pending')
+                    ->where('target_period_key', $periodKey)
                     ->count();
 
-                $quotationCount = Quotation::whereIn('created_by', $accessibleUserIds)->count();
+                $quotationCount = Quotation::whereIn('created_by', $accessibleUserIds)->where('created_at', 'like', "{$periodKey}%")->count();
                 $totalInvestmentVolume = Investment::whereIn('created_by', $accessibleUserIds)
                     ->where('status', 'approved')
+                    ->where('target_period_key', $periodKey)
                     ->sum('investment_amount');
 
                 $approvedCustomerCount = Investment::whereIn('created_by', $accessibleUserIds)
                     ->where('status', 'approved')
+                    ->where('target_period_key', $periodKey)
                     ->distinct('customer_id')
                     ->count('customer_id');
             }
 
             // 5. Revenue Distribution (Sector Overview)
             $distributionData = [];
-            $distributionQuery = Investment::where('investments.status', 'approved');
+            $distributionQuery = Investment::where('investments.status', 'approved')
+                ->where('investments.target_period_key', $periodKey);
 
             if ($isBranchCoordinator) {
                 $distributionQuery->whereIn('investments.branch_id', $assignedBranchIds);

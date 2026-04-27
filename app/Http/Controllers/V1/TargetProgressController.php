@@ -57,6 +57,8 @@ class TargetProgressController extends Controller implements HasMiddleware
 
             if ($request->has('period_key')) {
                 $query->where('period_key', $request->period_key);
+            } else {
+                $query->where('period_key', now()->format('Y-m'));
             }
 
             $targets = $query->orderBy('period_key', 'desc')->get();
