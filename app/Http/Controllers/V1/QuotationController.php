@@ -47,7 +47,7 @@ class QuotationController extends Controller implements HasMiddleware
             // Hierarchy Visibility Logic
             if ($user->hasRole('Branch Coordinator')) {
                 $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
-                $query->whereIn('branch_id', $assignedBranchIds);
+                $query->whereIn('quotations.branch_id', $assignedBranchIds);
             } elseif ($user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
                 // Hierarchical users (GM, AGM, etc.) see their own and descendants
                 $descendantIds = $user->getAllDescendantIds();
@@ -67,7 +67,7 @@ class QuotationController extends Controller implements HasMiddleware
                         ], 403);
                     }
                 }
-                $query->where('branch_id', $request->branch_id);
+                $query->where('quotations.branch_id', $request->branch_id);
             }
 
             // Search by Quotation Number or Customer Name

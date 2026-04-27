@@ -59,7 +59,7 @@ class InvestmentController extends Controller implements HasMiddleware
             // Hierarchy Visibility Logic
             if ($user->hasRole('Branch Coordinator')) {
                 $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
-                $query->whereIn('branch_id', $assignedBranchIds);
+                $query->whereIn('investments.branch_id', $assignedBranchIds);
             } elseif (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
                 // Hierarchical users (GM, AGM, etc.) see their own and descendants
                 $descendantIds = $user->getAllDescendantIds();
@@ -79,7 +79,7 @@ class InvestmentController extends Controller implements HasMiddleware
                         ], 403);
                     }
                 }
-                $query->where('branch_id', $request->branch_id);
+                $query->where('investments.branch_id', $request->branch_id);
             }
 
             // Search by Policy, Application, Sales Code, or Customer Name
@@ -528,7 +528,7 @@ class InvestmentController extends Controller implements HasMiddleware
             // 1. Hierarchy Visibility Logic
             if ($user->hasRole('Branch Coordinator')) {
                 $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
-                $query->whereIn('branch_id', $assignedBranchIds);
+                $query->whereIn('investments.branch_id', $assignedBranchIds);
             } elseif (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
                 // Hierarchical users see their own and descendants' investments
                 $descendantIds = $user->getAllDescendantIds();
@@ -555,7 +555,7 @@ class InvestmentController extends Controller implements HasMiddleware
                         ], 403);
                     }
                 }
-                $query->where('branch_id', $request->branch_id);
+                $query->where('investments.branch_id', $request->branch_id);
             }
 
             if ($request->has('search')) {

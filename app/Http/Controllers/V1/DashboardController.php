@@ -41,6 +41,19 @@ class DashboardController extends Controller implements HasMiddleware
 
             if ($isBranchCoordinator) {
                 $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+
+                // If a specific branch is requested, validate and restrict scope
+                $requestBranchId = $request->get('branch_id');
+                if ($requestBranchId) {
+                    if (in_array($requestBranchId, $assignedBranchIds)) {
+                        $assignedBranchIds = [$requestBranchId];
+                    } else {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => 'Unauthorized access to this branch data.'
+                        ], 403);
+                    }
+                }
             }
 
             if (!$isAdmin && !$isBranchCoordinator) {
@@ -51,8 +64,9 @@ class DashboardController extends Controller implements HasMiddleware
             $targetQuery = Target::where('period_key', $periodKey);
 
             if ($isBranchCoordinator) {
-                $targetQuery->whereHas('user', function($uq) use ($assignedBranchIds) {
-                    $uq->whereIn('branch_id', $assignedBranchIds);
+                $targetQuery->whereHas('user', function ($uq) use ($assignedBranchIds) {
+                    $uq->whereIn('branch_id', $assignedBranchIds)
+                        ->where('level_id', 6); // Target focus: Branch Managers
                 });
             } elseif (!$isAdmin) {
                 // Hierarchical logic: include self and all descendants
@@ -67,6 +81,15 @@ class DashboardController extends Controller implements HasMiddleware
 
             $totalTarget = (float) ($stats->total_target ?? 0);
             $totalAchieved = (float) ($stats->total_achieved ?? 0);
+
+            // For Branch Coordinators, we can also use direct investment totals for achievement to ensure real-time accuracy
+            if ($isBranchCoordinator) {
+                $totalAchieved = (float) Investment::whereIn('branch_id', $assignedBranchIds)
+                    ->where('status', 'approved')
+                    ->where('target_period_key', $periodKey)
+                    ->sum('investment_amount');
+            }
+
             $remaining = max(0, $totalTarget - $totalAchieved);
 
             $percentage = 0;
@@ -86,8 +109,9 @@ class DashboardController extends Controller implements HasMiddleware
 
                 $monthTargetQuery = Target::where('period_key', $monthKey);
                 if ($isBranchCoordinator) {
-                    $monthTargetQuery->whereHas('user', function($uq) use ($assignedBranchIds) {
-                        $uq->whereIn('branch_id', $assignedBranchIds);
+                    $monthTargetQuery->whereHas('user', function ($uq) use ($assignedBranchIds) {
+                        $uq->whereIn('branch_id', $assignedBranchIds)
+                            ->where('level_id', 6);
                     });
                 } elseif (!$isAdmin) {
                     $monthTargetQuery->whereIn('user_id', $accessibleUserIds);
@@ -98,9 +122,19 @@ class DashboardController extends Controller implements HasMiddleware
                     SUM(achieved_amount) as revenue
                 ')->first();
 
+                $monthRevenue = (float) ($monthStats->revenue ?? 0);
+
+                // Use direct investment data for historical accuracy for Branch Coordinators
+                if ($isBranchCoordinator) {
+                    $monthRevenue = (float) Investment::whereIn('branch_id', $assignedBranchIds)
+                        ->where('status', 'approved')
+                        ->where('target_period_key', $monthKey)
+                        ->sum('investment_amount');
+                }
+
                 $performanceChart[] = [
                     'month' => $monthLabel,
-                    'revenue' => (float) ($monthStats->revenue ?? 0),
+                    'revenue' => $monthRevenue,
                     'target' => (float) ($monthStats->target ?? 0),
                 ];
             }
@@ -125,10 +159,10 @@ class DashboardController extends Controller implements HasMiddleware
                 $totalInvestmentVolume = Investment::where('status', 'approved')->sum('investment_amount');
                 $approvedCustomerCount = Investment::where('status', 'approved')->distinct('customer_id')->count('customer_id');
             } elseif ($isBranchCoordinator) {
-                $customerCount = Customer::whereHas('user', function($uq) use ($assignedBranchIds) {
+                $customerCount = Customer::whereHas('user', function ($uq) use ($assignedBranchIds) {
                     $uq->whereIn('branch_id', $assignedBranchIds);
                 })->count();
-                $activeCustomerCount = Customer::whereHas('user', function($uq) use ($assignedBranchIds) {
+                $activeCustomerCount = Customer::whereHas('user', function ($uq) use ($assignedBranchIds) {
                     $uq->whereIn('branch_id', $assignedBranchIds);
                 })->where('is_active', true)->count();
 
@@ -171,10 +205,10 @@ class DashboardController extends Controller implements HasMiddleware
 
             // 5. Revenue Distribution (Sector Overview)
             $distributionData = [];
-            $distributionQuery = Investment::where('status', 'approved');
+            $distributionQuery = Investment::where('investments.status', 'approved');
 
             if ($isBranchCoordinator) {
-                $distributionQuery->whereIn('branch_id', $assignedBranchIds);
+                $distributionQuery->whereIn('investments.branch_id', $assignedBranchIds);
             } elseif (!$isAdmin) {
                 $distributionQuery->whereIn('created_by', $accessibleUserIds);
             }
@@ -228,7 +262,6 @@ class DashboardController extends Controller implements HasMiddleware
                     ]
                 ]
             ], 200);
-
         } catch (\Throwable $th) {
             Log::error('Dashboard data retrieval failed', [
                 'error' => $th->getMessage(),
