@@ -38,7 +38,7 @@ class UserController extends Controller implements HasMiddleware
         try {
             $currentUser = Auth::guard('api')->user();
             $perPage = $request->get('per_page', 15);
-            $query = User::with(['level', 'branch', 'parent', 'roles']);
+            $query = User::with(['level', 'branch', 'parent', 'roles', 'assignedBranches:id,name,code']);
 
             if ($currentUser->hasRole('Branch Coordinator')) {
                 $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
@@ -86,6 +86,11 @@ class UserController extends Controller implements HasMiddleware
                 if (isset($userData['roles'])) {
                     foreach ($userData['roles'] as &$role) {
                         unset($role['pivot']);
+                    }
+                }
+                if (isset($userData['assigned_branches'])) {
+                    foreach ($userData['assigned_branches'] as &$branch) {
+                        unset($branch['pivot']);
                     }
                 }
                 return $userData;
@@ -220,7 +225,8 @@ class UserController extends Controller implements HasMiddleware
             $user->load([
                 'roles' => function ($q) {
                     $q->select('id', 'name');
-                }
+                },
+                'assignedBranches:id,name,code'
             ]);
 
             Log::info('User created', [
@@ -233,6 +239,11 @@ class UserController extends Controller implements HasMiddleware
             if (isset($userData['roles'])) {
                 foreach ($userData['roles'] as &$role) {
                     unset($role['pivot']);
+                }
+            }
+            if (isset($userData['assigned_branches'])) {
+                foreach ($userData['assigned_branches'] as &$branch) {
+                    unset($branch['pivot']);
                 }
             }
 
@@ -257,7 +268,7 @@ class UserController extends Controller implements HasMiddleware
     public function show(string $id)
     {
         try {
-            $user = User::with(['level', 'branch', 'zone', 'region', 'province', 'parent', 'children', 'roles'])->find($id);
+            $user = User::with(['level', 'branch', 'zone', 'region', 'province', 'parent', 'children', 'roles', 'assignedBranches:id,name,code'])->find($id);
 
             if (!$user) {
                 return response()->json([
@@ -286,6 +297,11 @@ class UserController extends Controller implements HasMiddleware
             if (isset($userData['roles'])) {
                 foreach ($userData['roles'] as &$role) {
                     unset($role['pivot']);
+                }
+            }
+            if (isset($userData['assigned_branches'])) {
+                foreach ($userData['assigned_branches'] as &$branch) {
+                    unset($branch['pivot']);
                 }
             }
 
@@ -374,7 +390,8 @@ class UserController extends Controller implements HasMiddleware
             $user->load([
                 'roles' => function ($q) {
                     $q->select('id', 'name');
-                }
+                },
+                'assignedBranches:id,name,code'
             ]);
 
             Log::info('User updated', [
@@ -387,6 +404,11 @@ class UserController extends Controller implements HasMiddleware
             if (isset($userData['roles'])) {
                 foreach ($userData['roles'] as &$role) {
                     unset($role['pivot']);
+                }
+            }
+            if (isset($userData['assigned_branches'])) {
+                foreach ($userData['assigned_branches'] as &$branch) {
+                    unset($branch['pivot']);
                 }
             }
 

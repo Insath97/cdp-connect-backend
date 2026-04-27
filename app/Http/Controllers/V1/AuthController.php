@@ -76,7 +76,7 @@ class AuthController extends Controller
                     ->with(['permissions' => function ($query) {
                         $query->select('id', 'name');
                     }]);
-            }]);
+            }, 'assignedBranches:id,name,code']);
 
             if ($user->relationLoaded('roles')) {
                 $user->roles->each->makeHidden(['pivot']);
@@ -85,6 +85,10 @@ class AuthController extends Controller
                         $role->permissions->each->makeHidden(['pivot']);
                     }
                 });
+            }
+
+            if ($user->relationLoaded('assignedBranches')) {
+                $user->assignedBranches->each->makeHidden(['pivot']);
             }
 
             return response()->json([
@@ -144,7 +148,7 @@ class AuthController extends Controller
                     ->with(['permissions' => function ($query) {
                         $query->select('id', 'name');
                     }]);
-            }]);
+            }, 'assignedBranches:id,name,code']);
 
             if ($user->relationLoaded('roles')) {
                 $user->roles->each->makeHidden(['pivot']);
@@ -153,6 +157,10 @@ class AuthController extends Controller
                         $role->permissions->each->makeHidden(['pivot']);
                     }
                 });
+            }
+
+            if ($user->relationLoaded('assignedBranches')) {
+                $user->assignedBranches->each->makeHidden(['pivot']);
             }
 
             return response()->json([
