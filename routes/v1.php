@@ -138,4 +138,5 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     // Bulk SMS Public API
     Route::post('sms/send', [SmsController::class, 'send']);
     Route::post('sms/import-send', [SmsController::class, 'importAndSend']);
+    Route::post('sms/send-to-all', [SmsController::class, 'sendToAllCustomers']);
 });

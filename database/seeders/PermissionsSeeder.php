@@ -141,6 +141,7 @@ class PermissionsSeeder extends Seeder
             /* SMS Management */
             ['name' => 'Sms Send', 'group_name' => 'SMS Management Permissions'],
             ['name' => 'Sms Import Send', 'group_name' => 'SMS Management Permissions'],
+            ['name' => 'Sms Send All', 'group_name' => 'SMS Management Permissions'],
         ];
 
         foreach ($permissions as $permission) {
