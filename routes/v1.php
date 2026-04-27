@@ -91,6 +91,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
 
     Route::apiResource('targets', TargetController::class);
     Route::get('my-targets', [TargetController::class, 'myTargets']);
+    Route::post('targets/bulk-setup', [TargetController::class, 'bulkSetup']);
     Route::patch('targets/{id}/active', [TargetController::class, 'markActive']);
     Route::patch('targets/{id}/achieved', [TargetController::class, 'markAchieved']);
     Route::patch('targets/{id}/expired', [TargetController::class, 'markExpired']);

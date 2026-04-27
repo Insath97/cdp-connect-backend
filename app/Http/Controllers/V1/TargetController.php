@@ -24,6 +24,7 @@ class TargetController extends Controller implements HasMiddleware
             new Middleware('permission:Target Update', only: ['update']),
             new Middleware('permission:Target Delete', only: ['destroy']),
             new Middleware('permission:My Targets', only: ['myTargets']),
+            new Middleware('permission:Target Create', only: ['bulkSetup']),
         ];
     }
 
@@ -325,6 +326,79 @@ class TargetController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to retrieve my targets',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    public function bulkSetup(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            if (!$user->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized. Only Super Admins can setup bulk targets.'
+                ], 403);
+            }
+
+            $request->validate([
+                'source_period_key' => 'required|string',
+                'target_period_key' => 'required|string',
+            ]);
+
+            $sourceKey = $request->source_period_key;
+            $targetKey = $request->target_period_key;
+
+            $sourceTargets = Target::where('period_key', $sourceKey)->get();
+
+            if ($sourceTargets->isEmpty()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "No targets found for source period: {$sourceKey}"
+                ], 404);
+            }
+
+            $count = 0;
+            foreach ($sourceTargets as $sourceTarget) {
+                Target::updateOrCreate(
+                    [
+                        'user_id' => $sourceTarget->user_id,
+                        'period_key' => $targetKey,
+                        'period_type' => $sourceTarget->period_type,
+                    ],
+                    [
+                        'assigned_by' => $user->id,
+                        'target_amount' => $sourceTarget->target_amount,
+                        'current_amount' => $sourceTarget->target_amount,
+                        'achieved_amount' => 0,
+                        'achievement_percentage' => 0,
+                        'status' => 'active',
+                        'achieved_at' => null,
+                    ]
+                );
+                $count++;
+            }
+
+            Log::info('Bulk target setup completed', [
+                'user_id' => $user->id,
+                'source' => $sourceKey,
+                'target' => $targetKey,
+                'count' => $count
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "Successfully setup {$count} targets for {$targetKey} from {$sourceKey}",
+                'data' => [
+                    'processed_count' => $count
+                ]
+            ], 200);
+
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to setup bulk targets',
                 'error' => $th->getMessage()
             ], 500);
         }
