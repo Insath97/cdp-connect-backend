@@ -295,7 +295,7 @@ class ReportController extends Controller implements HasMiddleware
                     ->groupBy('user_id');
 
                 $hierarchyPerformance = User::with(['level', 'branch'])
-                    ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id')
+                    ->select('users.id', 'users.name', 'users.username','users.employee_code', 'users.level_id', 'users.branch_id')
                     ->whereIn('users.id', $descendantIds)
                     ->leftJoinSub(
                         Target::where('period_key', $periodKey),
@@ -871,6 +871,7 @@ class ReportController extends Controller implements HasMiddleware
             'id' => $user->id,
             'name' => $user->name,
             'username' => $user->username,
+            'employee_code' => $user->employee_code,
             'level' => $user->level->level_name ?? 'N/A',
             'branch' => $user->branch->name ?? 'N/A',
             'metrics' => [
