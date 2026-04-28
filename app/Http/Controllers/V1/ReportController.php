@@ -471,6 +471,7 @@ class ReportController extends Controller implements HasMiddleware
                     'id' => $u->id,
                     'name' => $u->name,
                     'username' => $u->username,
+                    'employee_code' => $u->employee_code,
                     'level' => $u->level->level_name ?? 'N/A',
                     'branch' => $u->branch->name ?? 'N/A',
                     'target_amount' => (float)($u->target_amount ?? 0),
