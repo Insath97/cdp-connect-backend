@@ -29,7 +29,7 @@ class ReportController extends Controller implements HasMiddleware
             new Middleware('permission:Report Agent Performance', only: ['agentPerformance']),
             new Middleware('permission:Report Hierarchy Performance', only: ['hierarchyPerformance']),
             new Middleware('permission:Report Hierarchy Detailed', only: ['hierarchyDetailedReport']),
-            new Middleware('permission:Report Hierarchy Date Wise', only: ['']),
+            new Middleware('permission:Report Hierarchy Date Wise', only: ['hierarchyDateWiseReport']),
             new Middleware('permission:Report Investor Maturity', only: ['investorMaturity']),
         ];
     }
@@ -887,6 +887,7 @@ class ReportController extends Controller implements HasMiddleware
                     'amount' => (float)$inv->investment_amount,
                     'plan' => $inv->investmentProduct->name ?? 'N/A',
                     'date' => $inv->reservation_date ? $inv->reservation_date->format('Y-m-d') : 'N/A',
+                    'status' => $inv->status
                 ];
             }),
             'subordinates' => $childrenNodes
