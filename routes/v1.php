@@ -23,7 +23,7 @@ use App\Http\Controllers\V1\ReportController;
 use App\Http\Controllers\V1\ImportController;
 use App\Http\Controllers\V1\DatabaseController;
 use App\Http\Controllers\V1\SmsController;
-use App\Http\Controllers\V1\PublicController;
+use App\Http\Controllers\V1\MaintenanceController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -139,4 +139,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::post('sms/send', [SmsController::class, 'send']);
     Route::post('sms/import-send', [SmsController::class, 'importAndSend']);
     Route::post('sms/send-to-all', [SmsController::class, 'sendToAllCustomers']);
+
+    // Maintenance Routes
+    Route::post('maintenance/recalculate-targets', [MaintenanceController::class, 'recalculateTargets']);
 });
