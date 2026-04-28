@@ -131,16 +131,17 @@ class SmsController extends Controller implements HasMiddleware
     {
         try {
             $user = auth('api')->user();
+
+            if (!$user->hasRole('Super Admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized. Only Super Admin can perform this action.'
+                ], 403);
+            }
+
             $message = $request->input('message', $this->getDefaultMessage());
 
             $customerQuery = Customer::where('is_active', true);
-
-            if ($user->hasRole('Branch Coordinator')) {
-                $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
-                $customerQuery->whereHas('user', function ($uq) use ($assignedBranchIds) {
-                    $uq->whereIn('branch_id', $assignedBranchIds);
-                });
-            }
 
             $customers = $customerQuery->select('phone_primary', 'phone_secondary')->get();
 
@@ -148,9 +149,6 @@ class SmsController extends Controller implements HasMiddleware
             foreach ($customers as $customer) {
                 if (!empty($customer->phone_primary)) {
                     $numbers[] = $customer->phone_primary;
-                }
-                if (!empty($customer->phone_secondary)) {
-                    $numbers[] = $customer->phone_secondary;
                 }
             }
 
