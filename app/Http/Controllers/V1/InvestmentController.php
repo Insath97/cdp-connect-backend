@@ -454,13 +454,16 @@ class InvestmentController extends Controller implements HasMiddleware
                     'monthly_payout_day' => Carbon::parse($investment->monthly_payment_date)->day,
                 ];
 
+                $sendSms = $request->boolean('send_sms', false);
+
                 // Send Email
-                if ($recipientEmail) {
+                if ($sendSms && $recipientEmail) {
                     Mail::to($recipientEmail)->send(new InvestmentApprovedMail($data));
                 }
 
                 // Send SMS
-                if ($recipientPhone) {
+
+                if ($sendSms && $recipientPhone) {
                     $amount = number_format($investment->investment_amount, 0);
                     $duration = $investment->investmentProduct->duration_months ?? 0;
                     $welcomeSms = "Dear {$investment->customer->full_name},\n\n" .
@@ -712,7 +715,7 @@ class InvestmentController extends Controller implements HasMiddleware
                 if ($oldAmount !== $newAmount || $oldUnitHeadId !== $newUnitHeadId || $oldPeriodKey !== $newPeriodKey) {
                     // Recalculate for old state
                     Target::recalculateForUser($oldUnitHeadId, $oldPeriodKey);
-                    
+
                     // Recalculate for new state (if different)
                     if ($oldUnitHeadId !== $newUnitHeadId || $oldPeriodKey !== $newPeriodKey) {
                         Target::recalculateForUser($newUnitHeadId, $newPeriodKey);
@@ -733,7 +736,6 @@ class InvestmentController extends Controller implements HasMiddleware
                 'message' => 'Investment updated successfully',
                 'data' => $investment->load(['customer', 'branch', 'investmentProduct', 'beneficiary', 'bankDetail', 'unitHead'])
             ], 200);
-
         } catch (\Throwable $th) {
             DB::rollBack();
             Log::error('Investment update failed', [
@@ -802,7 +804,6 @@ class InvestmentController extends Controller implements HasMiddleware
                 'status' => 'success',
                 'message' => 'Investment deleted successfully'
             ], 200);
-
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => 'error',
@@ -812,9 +813,9 @@ class InvestmentController extends Controller implements HasMiddleware
         }
     }
 
-    public function destroyApprovedInvestement (string $id)
+    public function destroyApprovedInvestement(string $id)
     {
-         try {
+        try {
             $user = Auth::guard('api')->user();
             $investment = Investment::findOrFail($id);
 
@@ -852,7 +853,6 @@ class InvestmentController extends Controller implements HasMiddleware
                 'status' => 'success',
                 'message' => 'Approved investment deleted successfully'
             ], 200);
-
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => 'error',
