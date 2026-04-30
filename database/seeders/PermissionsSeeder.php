@@ -135,6 +135,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Report Hierarchy Detailed', 'group_name' => 'Report Management Permissions'],
             ['name' => 'Report Investor Maturity', 'group_name' => 'Report Management Permissions'],
             ['name' => 'Report Hierarchy Date Wise', 'group_name' => 'Report Management Permissions' ],
+            ['name' => 'Report Investor Maturity', 'group_name' => 'Report Management Permissions'],
 
             /* Dashboard Management */
             ['name' => 'Dashboard View', 'group_name' => 'Dashboard Management Permissions'],
@@ -143,7 +144,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Sms Send', 'group_name' => 'SMS Management Permissions'],
             ['name' => 'Sms Import Send', 'group_name' => 'SMS Management Permissions'],
             ['name' => 'Sms Send All', 'group_name' => 'SMS Management Permissions'],
-            
+
             /* Maintenance Management */
             ['name' => 'Maintenance Access', 'group_name' => 'Maintenance Management Permissions'],
         ];
