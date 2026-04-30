@@ -907,7 +907,7 @@ class ReportController extends Controller implements HasMiddleware
             $perPage = $request->get('per_page', 15);
             $user = Auth::guard('api')->user();
 
-            $query = Investment::with(['customer', 'investmentProduct.annualRates', 'branch', 'creator']);
+            $query = Investment::with(['customer', 'investmentProduct.annualRates', 'branch', 'creator', 'bankDetail']);
 
             // 1. Hierarchy Visibility Logic
             if ($user->hasRole('Branch Coordinator')) {
@@ -974,6 +974,12 @@ class ReportController extends Controller implements HasMiddleware
                     'payout_schedule' => $calculations['yearly_breakdown'] ?? [],
                     'creator' => $inv->creator->name ?? 'N/A',
                     'branch' => $inv->branch->name ?? 'N/A',
+                    'account_details' => [
+                        'bank_name' => $inv->bankDetail->bank_name ?? 'N/A',
+                        'branch_name' => $inv->bankDetail->branch_name ?? 'N/A',
+                        'account_number' => $inv->bankDetail->account_number ?? 'N/A',
+                        'payment_method' => $inv->bankDetail->payment_method ?? 'N/A',
+                    ],
                     'status' => $inv->status
                 ];
             });
