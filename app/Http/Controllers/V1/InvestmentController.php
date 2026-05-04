@@ -11,6 +11,7 @@ use App\Models\Target;
 use App\Models\Beneficiary;
 use App\Models\CustomerBankDetail;
 use App\Models\Commission;
+use App\Models\InvestmentPayout;
 use App\Http\Requests\UpdateInvestmentRequest;
 use App\Mail\InvestmentApprovedMail;
 use App\Services\SmsService;
@@ -429,6 +430,9 @@ class InvestmentController extends Controller implements HasMiddleware
             // 4. Calculate and Store Commissions
             $this->processCommissions($investment);
 
+            // 4.1 Generate Payout Schedule
+            $this->generatePayoutSchedule($investment);
+
             DB::commit();
 
             Log::info('Investment approved', [
@@ -515,6 +519,50 @@ class InvestmentController extends Controller implements HasMiddleware
     protected function processCommissions(Investment $investment)
     {
         Commission::generateForInvestment($investment);
+    }
+
+    /**
+     * Generate monthly payout schedule for an approved investment.
+     */
+    protected function generatePayoutSchedule(Investment $investment)
+    {
+        try {
+            $product = $investment->investmentProduct;
+            if (!$product) return;
+
+            $calculations = $this->calculateInvestmentROI((float)$investment->investment_amount, $product);
+            
+            $startDate = $investment->reservation_date ?? $investment->created_at;
+            $payoutDate = Carbon::parse($startDate);
+
+            $payouts = [];
+            foreach ($calculations['yearly_breakdown'] ?? [] as $yearData) {
+                $monthlyPayout = $yearData['monthly_payout'];
+                $monthsInYear = $yearData['duration_months'];
+
+                for ($i = 0; $i < $monthsInYear; $i++) {
+                    $payoutDate->addMonth(); // Payout starts 1 month after reservation
+                    $payouts[] = [
+                        'investment_id' => $investment->id,
+                        'scheduled_date' => $payoutDate->format('Y-m-d'),
+                        'amount' => round($monthlyPayout, 2),
+                        'status' => 'unpaid',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+            }
+
+            if (!empty($payouts)) {
+                InvestmentPayout::insert($payouts);
+            }
+
+        } catch (\Throwable $th) {
+            Log::error('Failed to generate payout schedule', [
+                'investment_id' => $investment->id,
+                'error' => $th->getMessage()
+            ]);
+        }
     }
 
     /**

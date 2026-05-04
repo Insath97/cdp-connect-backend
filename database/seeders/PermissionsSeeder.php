@@ -114,6 +114,8 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Investment Approve', 'group_name' => 'Investment Management Permissions'],
             ['name' => 'Investment Certificate', 'group_name' => 'Investment Management Permissions'],
             ['name' => 'Investment Maturity', 'group_name' => 'Investment Management Permissions'],
+            ['name' => 'Investment Payout Index', 'group_name' => 'Investment Management Permissions'],
+            ['name' => 'Investment Payout Update', 'group_name' => 'Investment Management Permissions'],
 
             /* Import Management */
             ['name' => 'Import Index', 'group_name' => 'Import Management Permissions'],

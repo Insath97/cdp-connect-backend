@@ -100,4 +100,9 @@ class Investment extends Model
     {
         return $this->hasMany(Receipt::class);
     }
+
+    public function payouts()
+    {
+        return $this->hasMany(InvestmentPayout::class);
+    }
 }

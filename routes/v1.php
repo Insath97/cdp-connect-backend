@@ -24,6 +24,7 @@ use App\Http\Controllers\V1\ImportController;
 use App\Http\Controllers\V1\DatabaseController;
 use App\Http\Controllers\V1\SmsController;
 use App\Http\Controllers\V1\MaintenanceController;
+use App\Http\Controllers\V1\InvestmentPayoutController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -111,6 +112,11 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::patch('investments/{id}/approve', [InvestmentController::class, 'approve']);
     Route::delete('investments/{id}/approved-delete', [InvestmentController::class, 'destroyApprovedInvestement']);
     Route::get('investments/{id}/certificate', [InvestmentController::class, 'printCertificate']);
+
+    // Investment Payouts
+    Route::get('investment-payouts', [InvestmentPayoutController::class, 'index']);
+    Route::post('investment-payouts/sync-legacy', [InvestmentPayoutController::class, 'generateLegacyPayouts']);
+    Route::patch('investment-payouts/{id}/status', [InvestmentPayoutController::class, 'updateStatus']);
 
     Route::get('target-progress', [TargetProgressController::class, 'index']);
     Route::get('target-progress/{period_key}', [TargetProgressController::class, 'show']);
