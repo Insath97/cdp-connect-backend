@@ -36,6 +36,9 @@ class DashboardController extends Controller implements HasMiddleware
             // 1. Determine User Scope
             $isSuperAdmin = $user->hasRole('Super Admin');
             $isBranchCoordinator = $user->hasRole('Branch Coordinator');
+            $isRegularAdmin = ($user->user_type === 'admin');
+            $isAdminView = $isSuperAdmin || $isRegularAdmin;
+
             $descendantIds = [];
             $assignedBranchIds = [];
             $accessibleUserIds = [];
@@ -55,8 +58,8 @@ class DashboardController extends Controller implements HasMiddleware
                         ], 403);
                     }
                 }
-            } elseif (!$isSuperAdmin) {
-                // Hierarchy logic: include self and all descendants for everyone else
+            } elseif (!$isAdminView) {
+                // Hierarchy logic: include self and all descendants for regular employees/managers
                 $descendantIds = $user->getAllDescendantIds();
                 $accessibleUserIds = array_merge([$user->id], $descendantIds);
             }
@@ -69,8 +72,13 @@ class DashboardController extends Controller implements HasMiddleware
                     $uq->whereIn('branch_id', $assignedBranchIds)
                         ->where('level_id', 6); // Target focus: Branch Managers
                 });
-            } elseif (!$isSuperAdmin) {
-                $targetQuery->whereIn('user_id', $accessibleUserIds);
+            } elseif ($isAdminView) {
+                $targetQuery->whereHas('user', function ($uq) {
+                    $uq->where('level_id', 1); // Company view: GM (Level 1)
+                });
+            } else {
+                // Hierarchy User: Show only their own aggregate target record
+                $targetQuery->where('user_id', $user->id);
             }
 
             $stats = $targetQuery->selectRaw('
@@ -81,13 +89,17 @@ class DashboardController extends Controller implements HasMiddleware
             $totalTarget = (float) ($stats->total_target ?? 0);
             $totalAchieved = (float) ($stats->total_achieved ?? 0);
 
-            // For Branch Coordinators, use direct investment totals for real-time accuracy
-            if ($isBranchCoordinator) {
-                $totalAchieved = (float) Investment::query()
-                    ->whereIn('branch_id', $assignedBranchIds)
+            // Use direct investment totals for real-time accuracy for high-level views
+            if ($isBranchCoordinator || $isAdminView) {
+                $revQuery = Investment::query()
                     ->where('status', 'approved')
-                    ->where('target_period_key', $periodKey)
-                    ->sum('investment_amount');
+                    ->where('target_period_key', $periodKey);
+                
+                if ($isBranchCoordinator) {
+                    $revQuery->whereIn('branch_id', $assignedBranchIds);
+                }
+
+                $totalAchieved = (float) $revQuery->sum('investment_amount');
             }
 
             $remaining = max(0, $totalTarget - $totalAchieved);
@@ -113,8 +125,12 @@ class DashboardController extends Controller implements HasMiddleware
                         $uq->whereIn('branch_id', $assignedBranchIds)
                             ->where('level_id', 6);
                     });
-                } elseif (!$isSuperAdmin) {
-                    $monthTargetQuery->whereIn('user_id', $accessibleUserIds);
+                } elseif ($isAdminView) {
+                    $monthTargetQuery->whereHas('user', function ($uq) {
+                        $uq->where('level_id', 1);
+                    });
+                } else {
+                    $monthTargetQuery->where('user_id', $user->id);
                 }
 
                 $monthStats = $monthTargetQuery->selectRaw('
@@ -148,22 +164,24 @@ class DashboardController extends Controller implements HasMiddleware
                 $customerBaseQuery->whereHas('user', fn($uq) => $uq->whereIn('branch_id', $assignedBranchIds));
                 $investmentBaseQuery->whereIn('branch_id', $assignedBranchIds);
                 $quotationBaseQuery->whereIn('branch_id', $assignedBranchIds);
-            } elseif (!$isSuperAdmin) {
+            } elseif (!$isAdminView) {
+                // Scoped view for hierarchy users
                 $customerBaseQuery->whereIn('customer_id', $accessibleUserIds);
                 $investmentBaseQuery->whereIn('created_by', $accessibleUserIds);
                 $quotationBaseQuery->whereIn('created_by', $accessibleUserIds);
             }
+            // Admins see global view (no extra filters)
 
             $customerCount = (clone $customerBaseQuery)->count();
             $activeCustomerCount = (clone $customerBaseQuery)->where('is_active', true)->count();
-            
+
             $investmentCount = (clone $investmentBaseQuery)->count();
             $approvedInvestmentCount = (clone $investmentBaseQuery)->where('status', 'approved')->count();
             $pendingInvestmentCount = (clone $investmentBaseQuery)->where('status', 'pending')->count();
-            
+
             $quotationCount = $quotationBaseQuery->count();
             $totalInvestmentVolume = (clone $investmentBaseQuery)->where('status', 'approved')->sum('investment_amount');
-            
+
             $approvedCustomerCount = (clone $investmentBaseQuery)
                 ->where('status', 'approved')
                 ->distinct()
@@ -177,7 +195,7 @@ class DashboardController extends Controller implements HasMiddleware
 
             if ($isBranchCoordinator) {
                 $distributionQuery->whereIn('investments.branch_id', $assignedBranchIds);
-            } elseif (!$isSuperAdmin) {
+            } elseif (!$isAdminView) {
                 $distributionQuery->whereIn('created_by', $accessibleUserIds);
             }
 
@@ -220,7 +238,7 @@ class DashboardController extends Controller implements HasMiddleware
                         'total_investment_volume' => round($totalInvestmentVolume, 2),
                     ],
                     'user_context' => [
-                        'role' => $isSuperAdmin ? 'Super Admin' : ($isBranchCoordinator ? 'Branch Coordinator' : 'Hierarchy User'),
+                        'role' => $isSuperAdmin ? 'Super Admin' : ($isBranchCoordinator ? 'Branch Coordinator' : ($isRegularAdmin ? 'Admin' : 'Hierarchy User')),
                         'level' => $user->level?->name ?? 'N/A',
                         'descendants_count' => count($descendantIds),
                         'assigned_branches_count' => count($assignedBranchIds)
