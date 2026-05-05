@@ -38,10 +38,9 @@ class Receipt extends Model
     public static function generateReceiptNumber()
     {
         return DB::transaction(function () {
-            // Get the count of existing receipts to determine the sequence.
-            // Assuming sequence starts from 12 as per user example (712).
-            $count = self::count();
-            $sequence = 12 + $count;
+            // Get the maximum ID to determine the next sequence.
+            $maxId = self::max('id') ?? 0;
+            $sequence = 12 + $maxId;
 
             $prefix = "267";
             $fixedSeven = "7";

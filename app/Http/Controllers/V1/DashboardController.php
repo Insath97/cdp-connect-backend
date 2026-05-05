@@ -34,10 +34,11 @@ class DashboardController extends Controller implements HasMiddleware
             $periodKey = $request->get('period_key', Carbon::now()->format('Y-m'));
 
             // 1. Determine User Scope
-            $isAdmin = $user->hasRole('Super Admin') || $user->user_type === 'admin';
+            $isSuperAdmin = $user->hasRole('Super Admin');
             $isBranchCoordinator = $user->hasRole('Branch Coordinator');
             $descendantIds = [];
             $assignedBranchIds = [];
+            $accessibleUserIds = [];
 
             if ($isBranchCoordinator) {
                 $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
@@ -54,23 +55,21 @@ class DashboardController extends Controller implements HasMiddleware
                         ], 403);
                     }
                 }
-            }
-
-            if (!$isAdmin && !$isBranchCoordinator) {
+            } elseif (!$isSuperAdmin) {
+                // Hierarchy logic: include self and all descendants for everyone else
                 $descendantIds = $user->getAllDescendantIds();
+                $accessibleUserIds = array_merge([$user->id], $descendantIds);
             }
 
             // 2. Fetch Target Statistics
-            $targetQuery = Target::where('period_key', $periodKey);
+            $targetQuery = Target::query()->where('period_key', $periodKey);
 
             if ($isBranchCoordinator) {
                 $targetQuery->whereHas('user', function ($uq) use ($assignedBranchIds) {
                     $uq->whereIn('branch_id', $assignedBranchIds)
                         ->where('level_id', 6); // Target focus: Branch Managers
                 });
-            } elseif (!$isAdmin) {
-                // Hierarchical logic: include self and all descendants
-                $accessibleUserIds = array_merge([$user->id], $descendantIds);
+            } elseif (!$isSuperAdmin) {
                 $targetQuery->whereIn('user_id', $accessibleUserIds);
             }
 
@@ -82,9 +81,10 @@ class DashboardController extends Controller implements HasMiddleware
             $totalTarget = (float) ($stats->total_target ?? 0);
             $totalAchieved = (float) ($stats->total_achieved ?? 0);
 
-            // For Branch Coordinators, we can also use direct investment totals for achievement to ensure real-time accuracy
+            // For Branch Coordinators, use direct investment totals for real-time accuracy
             if ($isBranchCoordinator) {
-                $totalAchieved = (float) Investment::whereIn('branch_id', $assignedBranchIds)
+                $totalAchieved = (float) Investment::query()
+                    ->whereIn('branch_id', $assignedBranchIds)
                     ->where('status', 'approved')
                     ->where('target_period_key', $periodKey)
                     ->sum('investment_amount');
@@ -107,13 +107,13 @@ class DashboardController extends Controller implements HasMiddleware
                 $monthKey = $date->format('Y-m');
                 $monthLabel = $date->format('M');
 
-                $monthTargetQuery = Target::where('period_key', $monthKey);
+                $monthTargetQuery = Target::query()->where('period_key', $monthKey);
                 if ($isBranchCoordinator) {
                     $monthTargetQuery->whereHas('user', function ($uq) use ($assignedBranchIds) {
                         $uq->whereIn('branch_id', $assignedBranchIds)
                             ->where('level_id', 6);
                     });
-                } elseif (!$isAdmin) {
+                } elseif (!$isSuperAdmin) {
                     $monthTargetQuery->whereIn('user_id', $accessibleUserIds);
                 }
 
@@ -124,9 +124,9 @@ class DashboardController extends Controller implements HasMiddleware
 
                 $monthRevenue = (float) ($monthStats->revenue ?? 0);
 
-                // Use direct investment data for historical accuracy for Branch Coordinators
                 if ($isBranchCoordinator) {
-                    $monthRevenue = (float) Investment::whereIn('branch_id', $assignedBranchIds)
+                    $monthRevenue = (float) Investment::query()
+                        ->whereIn('branch_id', $assignedBranchIds)
                         ->where('status', 'approved')
                         ->where('target_period_key', $monthKey)
                         ->sum('investment_amount');
@@ -140,83 +140,44 @@ class DashboardController extends Controller implements HasMiddleware
             }
 
             // 4. Additional Quick Stats (Hierarchy/Branch Aware)
-            $customerCount = 0;
-            $activeCustomerCount = 0;
-            $approvedCustomerCount = 0;
-            $quotationCount = 0;
-            $investmentCount = 0;
-            $approvedInvestmentCount = 0;
-            $pendingInvestmentCount = 0;
-            $totalInvestmentVolume = 0;
+            $customerBaseQuery = Customer::query()->where('created_at', 'like', "{$periodKey}%");
+            $investmentBaseQuery = Investment::query()->where('target_period_key', $periodKey);
+            $quotationBaseQuery = Quotation::query()->where('created_at', 'like', "{$periodKey}%");
 
-            if ($isAdmin) {
-                $customerCount = Customer::where('created_at', 'like', "{$periodKey}%")->count();
-                $activeCustomerCount = Customer::where('is_active', true)->where('created_at', 'like', "{$periodKey}%")->count();
-                $investmentCount = Investment::where('target_period_key', $periodKey)->count();
-                $approvedInvestmentCount = Investment::where('status', 'approved')->where('target_period_key', $periodKey)->count();
-                $pendingInvestmentCount = Investment::where('status', 'pending')->where('target_period_key', $periodKey)->count();
-                $quotationCount = Quotation::where('created_at', 'like', "{$periodKey}%")->count();
-                $totalInvestmentVolume = Investment::where('status', 'approved')->where('target_period_key', $periodKey)->sum('investment_amount');
-                $approvedCustomerCount = Investment::where('status', 'approved')->where('target_period_key', $periodKey)->distinct('customer_id')->count('customer_id');
-            } elseif ($isBranchCoordinator) {
-                $customerCount = Customer::whereHas('user', function ($uq) use ($assignedBranchIds) {
-                    $uq->whereIn('branch_id', $assignedBranchIds);
-                })->where('created_at', 'like', "{$periodKey}%")->count();
-                $activeCustomerCount = Customer::whereHas('user', function ($uq) use ($assignedBranchIds) {
-                    $uq->whereIn('branch_id', $assignedBranchIds);
-                })->where('is_active', true)->where('created_at', 'like', "{$periodKey}%")->count();
-
-                $investmentCount = Investment::whereIn('branch_id', $assignedBranchIds)->where('target_period_key', $periodKey)->count();
-                $approvedInvestmentCount = Investment::whereIn('branch_id', $assignedBranchIds)->where('status', 'approved')->where('target_period_key', $periodKey)->count();
-                $pendingInvestmentCount = Investment::whereIn('branch_id', $assignedBranchIds)
-                    ->where('status', 'pending')
-                    ->where('target_period_key', $periodKey)
-                    ->count();
-
-                $quotationCount = Quotation::whereIn('branch_id', $assignedBranchIds)->where('created_at', 'like', "{$periodKey}%")->count();
-                $totalInvestmentVolume = Investment::whereIn('branch_id', $assignedBranchIds)
-                    ->where('status', 'approved')
-                    ->where('target_period_key', $periodKey)
-                    ->sum('investment_amount');
-
-                $approvedCustomerCount = Investment::whereIn('branch_id', $assignedBranchIds)
-                    ->where('status', 'approved')
-                    ->where('target_period_key', $periodKey)
-                    ->distinct('customer_id')
-                    ->count('customer_id');
-            } else {
-                // $accessibleUserIds set in step 2
-                $customerCount = Customer::whereIn('customer_id', $accessibleUserIds)->where('created_at', 'like', "{$periodKey}%")->count();
-                $activeCustomerCount = Customer::whereIn('customer_id', $accessibleUserIds)->where('is_active', true)->where('created_at', 'like', "{$periodKey}%")->count();
-
-                $investmentCount = Investment::whereIn('created_by', $accessibleUserIds)->where('target_period_key', $periodKey)->count();
-                $approvedInvestmentCount = Investment::whereIn('created_by', $accessibleUserIds)->where('status', 'approved')->where('target_period_key', $periodKey)->count();
-                $pendingInvestmentCount = Investment::whereIn('created_by', $accessibleUserIds)
-                    ->where('status', 'pending')
-                    ->where('target_period_key', $periodKey)
-                    ->count();
-
-                $quotationCount = Quotation::whereIn('created_by', $accessibleUserIds)->where('created_at', 'like', "{$periodKey}%")->count();
-                $totalInvestmentVolume = Investment::whereIn('created_by', $accessibleUserIds)
-                    ->where('status', 'approved')
-                    ->where('target_period_key', $periodKey)
-                    ->sum('investment_amount');
-
-                $approvedCustomerCount = Investment::whereIn('created_by', $accessibleUserIds)
-                    ->where('status', 'approved')
-                    ->where('target_period_key', $periodKey)
-                    ->distinct('customer_id')
-                    ->count('customer_id');
+            if ($isBranchCoordinator) {
+                $customerBaseQuery->whereHas('user', fn($uq) => $uq->whereIn('branch_id', $assignedBranchIds));
+                $investmentBaseQuery->whereIn('branch_id', $assignedBranchIds);
+                $quotationBaseQuery->whereIn('branch_id', $assignedBranchIds);
+            } elseif (!$isSuperAdmin) {
+                $customerBaseQuery->whereIn('customer_id', $accessibleUserIds);
+                $investmentBaseQuery->whereIn('created_by', $accessibleUserIds);
+                $quotationBaseQuery->whereIn('created_by', $accessibleUserIds);
             }
+
+            $customerCount = (clone $customerBaseQuery)->count();
+            $activeCustomerCount = (clone $customerBaseQuery)->where('is_active', true)->count();
+            
+            $investmentCount = (clone $investmentBaseQuery)->count();
+            $approvedInvestmentCount = (clone $investmentBaseQuery)->where('status', 'approved')->count();
+            $pendingInvestmentCount = (clone $investmentBaseQuery)->where('status', 'pending')->count();
+            
+            $quotationCount = $quotationBaseQuery->count();
+            $totalInvestmentVolume = (clone $investmentBaseQuery)->where('status', 'approved')->sum('investment_amount');
+            
+            $approvedCustomerCount = (clone $investmentBaseQuery)
+                ->where('status', 'approved')
+                ->distinct()
+                ->count('customer_id');
 
             // 5. Revenue Distribution (Sector Overview)
             $distributionData = [];
-            $distributionQuery = Investment::where('investments.status', 'approved')
+            $distributionQuery = Investment::query()
+                ->where('investments.status', 'approved')
                 ->where('investments.target_period_key', $periodKey);
 
             if ($isBranchCoordinator) {
                 $distributionQuery->whereIn('investments.branch_id', $assignedBranchIds);
-            } elseif (!$isAdmin) {
+            } elseif (!$isSuperAdmin) {
                 $distributionQuery->whereIn('created_by', $accessibleUserIds);
             }
 
@@ -233,9 +194,6 @@ class DashboardController extends Controller implements HasMiddleware
                         'value' => round($itemPercentage, 2)
                     ];
                 }
-            } else {
-                // Optional: Provide empty state or handle zero volume
-                $distributionData = [];
             }
 
             return response()->json([
@@ -262,7 +220,7 @@ class DashboardController extends Controller implements HasMiddleware
                         'total_investment_volume' => round($totalInvestmentVolume, 2),
                     ],
                     'user_context' => [
-                        'role' => $isAdmin ? 'Admin' : ($isBranchCoordinator ? 'Branch Coordinator' : 'Hierarchy User'),
+                        'role' => $isSuperAdmin ? 'Super Admin' : ($isBranchCoordinator ? 'Branch Coordinator' : 'Hierarchy User'),
                         'level' => $user->level?->name ?? 'N/A',
                         'descendants_count' => count($descendantIds),
                         'assigned_branches_count' => count($assignedBranchIds)
