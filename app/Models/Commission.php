@@ -37,13 +37,13 @@ class Commission extends Model
 
         $amount = (float) $investment->investment_amount;
 
-        // Eligible Level IDs: 8=SGL, 9=GL, 10=SC, 11=C
-        $eligibleLevels = [8, 9, 10, 11];
+        // Eligible Level IDs: 14=SGL, 15=GL, 16=SC, 17=C
+        $eligibleLevels = [14,15,16,17]; // Added new levels based on LevelSeeder
 
         // 2. Unit Head Commission
         if ($investment->unit_head_id) {
             $unitHead = $investment->unitHead;
-            
+
             // Ensure we have the level_id
             if ($unitHead && in_array($unitHead->level_id, $eligibleLevels)) {
                 $unitHeadCommissionAmount = ($amount * $unitHeadPct) / 100;
@@ -63,7 +63,7 @@ class Commission extends Model
                 if ($unitHead->parent_user_id) {
                     // Fetch parent with their level
                     $parent = \App\Models\User::find($unitHead->parent_user_id);
-                    
+
                     if ($parent && in_array($parent->level_id, $eligibleLevels)) {
                         self::create([
                             'investment_id' => $investment->id,

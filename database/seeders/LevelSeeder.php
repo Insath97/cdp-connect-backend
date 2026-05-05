@@ -3,154 +3,443 @@
 namespace Database\Seeders;
 
 use App\Models\Level;
+
 use Illuminate\Database\Seeder;
 
 class LevelSeeder extends Seeder
+
 {
+
     /**
+
      * Run the database seeds.
+
      */
+
     public function run(): void
+
     {
+
         $levels = [
+
             [
+
                 "id" => 1,
-                "level_name" => "GM",
-                "slug" => "gm",
-                "code" => "gm-001",
+
+                "level_name" => "General Sales Manager",
+
+                "slug" => "gsm",
+
+                "code" => "GSM001",
+
                 "tire_level" => 1,
+
                 "category" => "executive",
+
                 "isActive" => 1,
+
                 "is_single_user" => 1,
+
                 "created_at" => "2026-02-19 14:02:35",
+
                 "updated_at" => "2026-02-19 14:02:35",
+
             ],
+
             [
+
                 "id" => 2,
-                "level_name" => "AGM",
-                "slug" => "agm",
-                "code" => "AGM001",
+
+                "level_name" => "Head of National Sales",
+
+                "slug" => "hns",
+
+                "code" => "HNS001",
+
                 "tire_level" => 2,
+
                 "category" => "executive",
+
                 "isActive" => 1,
+
                 "is_single_user" => 0,
+
                 "created_at" => "2026-02-19 14:03:19",
+
                 "updated_at" => "2026-02-19 14:03:19",
+
             ],
+
             [
+
                 "id" => 3,
-                "level_name" => "Provincial Manager",
-                "slug" => "provincial-manager",
-                "code" => "PM",
+
+                "level_name" => "Senior Provincial Sales Manager",
+
+                "slug" => "senior-provincial-sales-manager",
+
+                "code" => "SPSM",
+
                 "tire_level" => 3,
+
                 "category" => "executive",
+
                 "isActive" => 1,
+
                 "is_single_user" => 0,
+
                 "created_at" => "2026-02-19 15:27:52",
+
                 "updated_at" => "2026-02-19 15:27:52",
+
             ],
-             [
+
+            [
+
                 "id" => 4,
-                "level_name" => "Zonal Manager",
-                "slug" => "zonal-manager",
-                "code" => "ZM",
+
+                "level_name" => "Provincial Sales Manager",
+
+                "slug" => "provincial-sales-manager",
+
+                "code" => "PSM",
+
                 "tire_level" => 4,
+
                 "category" => "executive",
+
                 "isActive" => 1,
+
                 "is_single_user" => 0,
-                "created_at" => "2026-02-19 15:28:55",
-                "updated_at" => "2026-02-19 15:28:55",
+
+                "created_at" => "2026-02-19 15:27:52",
+
+                "updated_at" => "2026-02-19 15:27:52",
+
             ],
+
             [
+
                 "id" => 5,
-                "level_name" => "Regional Manager",
-                "slug" => "regional-manager",
-                "code" => "RM",
+
+                "level_name" => "Senior Zonal Sales Manager",
+
+                "slug" => "senior-zonal-sales-manager",
+
+                "code" => "SZSM",
+
                 "tire_level" => 5,
+
                 "category" => "executive",
+
                 "isActive" => 1,
+
                 "is_single_user" => 0,
-                "created_at" => "2026-02-19 15:28:24",
-                "updated_at" => "2026-02-19 15:28:24",
+
+                "created_at" => "2026-02-19 15:28:55",
+
+                "updated_at" => "2026-02-19 15:28:55",
+
             ],
+
             [
+
                 "id" => 6,
-                "level_name" => "Branch Manager",
-                "slug" => "branch-manager",
-                "code" => "BM",
+
+                "level_name" => "Zonal Sales Manager",
+
+                "slug" => "zonal-sales-manager",
+
+                "code" => "ZSM",
+
                 "tire_level" => 6,
+
                 "category" => "executive",
+
                 "isActive" => 1,
+
                 "is_single_user" => 0,
-                "created_at" => "2026-02-19 15:29:36",
-                "updated_at" => "2026-02-19 15:29:36",
+
+                "created_at" => "2026-02-19 15:28:55",
+
+                "updated_at" => "2026-02-19 15:28:55",
+
             ],
+
             [
+
                 "id" => 7,
-                "level_name" => "BDM",
-                "slug" => "bdm",
-                "code" => "BDM",
+
+                "level_name" => "Deputy Zonal Sales Manager",
+
+                "slug" => "deputy-zonal-sales-manager",
+
+                "code" => "DZSM",
+
                 "tire_level" => 7,
+
                 "category" => "executive",
+
                 "isActive" => 1,
+
                 "is_single_user" => 0,
-                "created_at" => "2026-02-19 15:30:19",
-                "updated_at" => "2026-02-19 15:30:19",
+
+                "created_at" => "2026-02-19 15:28:55",
+
+                "updated_at" => "2026-02-19 15:28:55",
+
             ],
+
             [
+
                 "id" => 8,
-                "level_name" => "Senior Group Leader",
-                "slug" => "senior-group-leader",
-                "code" => "SGL",
+
+                "level_name" => "Senior Regional Sales Manager",
+
+                "slug" => "senior-regional-sales-manager",
+
+                "code" => "SRSM",
+
                 "tire_level" => 8,
+
                 "category" => "executive",
+
                 "isActive" => 1,
+
                 "is_single_user" => 0,
-                "created_at" => "2026-02-19 15:34:55",
-                "updated_at" => "2026-02-19 15:35:06",
+
+                "created_at" => "2026-02-19 15:28:24",
+
+                "updated_at" => "2026-02-19 15:28:24",
+
             ],
+
             [
+
                 "id" => 9,
-                "level_name" => "Group Leader",
-                "slug" => "group-leader",
-                "code" => "GL",
+
+                "level_name" => "Regional Sales Manager",
+
+                "slug" => "regional-sales-manager",
+
+                "code" => "RSM",
+
                 "tire_level" => 9,
+
                 "category" => "executive",
+
                 "isActive" => 1,
+
                 "is_single_user" => 0,
-                "created_at" => "2026-02-19 15:35:49",
-                "updated_at" => "2026-02-19 15:35:49",
+
+                "created_at" => "2026-02-19 15:28:24",
+
+                "updated_at" => "2026-02-19 15:28:24",
+
             ],
+
             [
+
                 "id" => 10,
-                "level_name" => "Senior Consultant",
-                "slug" => "senior-consultant",
-                "code" => "SC",
+
+                "level_name" => "Assistant Regional Sales Manager",
+
+                "slug" => "assistant-regional-sales-manager",
+
+                "code" => "ARSM",
+
                 "tire_level" => 10,
+
                 "category" => "executive",
+
                 "isActive" => 1,
+
                 "is_single_user" => 0,
-                "created_at" => "2026-02-19 15:36:46",
-                "updated_at" => "2026-02-19 15:37:02",
+
+                "created_at" => "2026-02-19 15:28:24",
+
+                "updated_at" => "2026-02-19 15:28:24",
+
             ],
+
             [
+
                 "id" => 11,
-                "level_name" => "Consultant",
-                "slug" => "consultant",
-                "code" => "C",
+
+                "level_name" => "Senior Branch Sales Manager",
+
+                "slug" => "senior-branch-sales-manager",
+
+                "code" => "SBSM",
+
                 "tire_level" => 11,
+
                 "category" => "executive",
+
                 "isActive" => 1,
+
                 "is_single_user" => 0,
-                "created_at" => "2026-02-19 15:37:19",
-                "updated_at" => "2026-02-19 15:37:19",
+
+                "created_at" => "2026-02-19 15:29:36",
+
+                "updated_at" => "2026-02-19 15:29:36",
+
             ],
+
+            [
+
+                "id" => 12,
+
+                "level_name" => "Branch Sales Manager",
+
+                "slug" => "branch-sales-manager",
+
+                "code" => "BSM",
+
+                "tire_level" => 12,
+
+                "category" => "executive",
+
+                "isActive" => 1,
+
+                "is_single_user" => 0,
+
+                "created_at" => "2026-02-19 15:29:36",
+
+                "updated_at" => "2026-02-19 15:29:36",
+
+            ],
+
+            [
+
+                "id" => 13,
+
+                "level_name" => "Assistant Branch Sales Manager",
+
+                "slug" => "assistant-branch-sales-manager",
+
+                "code" => "ABSM",
+
+                "tire_level" => 13,
+
+                "category" => "executive",
+
+                "isActive" => 1,
+
+                "is_single_user" => 0,
+
+                "created_at" => "2026-02-19 15:29:36",
+
+                "updated_at" => "2026-02-19 15:29:36",
+
+            ],
+
+            [
+
+                "id" => 14,
+
+                "level_name" => "Senior Group Leader",
+
+                "slug" => "senior-group-leader",
+
+                "code" => "SGL",
+
+                "tire_level" => 14,
+
+                "category" => "executive",
+
+                "isActive" => 1,
+
+                "is_single_user" => 0,
+
+                "created_at" => "2026-02-19 15:34:55",
+
+                "updated_at" => "2026-02-19 15:35:06",
+
+            ],
+
+            [
+
+                "id" => 15,
+
+                "level_name" => "Group Leader",
+
+                "slug" => "group-leader",
+
+                "code" => "GL",
+
+                "tire_level" => 15,
+
+                "category" => "executive",
+
+                "isActive" => 1,
+
+                "is_single_user" => 0,
+
+                "created_at" => "2026-02-19 15:35:49",
+
+                "updated_at" => "2026-02-19 15:35:49",
+
+            ],
+
+            [
+
+                "id" => 16,
+
+                "level_name" => "Senior Consultant",
+
+                "slug" => "senior-consultant",
+
+                "code" => "SC",
+
+                "tire_level" => 16,
+
+                "category" => "executive",
+
+                "isActive" => 1,
+
+                "is_single_user" => 0,
+
+                "created_at" => "2026-02-19 15:36:46",
+
+                "updated_at" => "2026-02-19 15:37:02",
+
+            ],
+
+            [
+
+                "id" => 17,
+
+                "level_name" => "Consultant",
+
+                "slug" => "consultant",
+
+                "code" => "C",
+
+                "tire_level" => 17,
+
+                "category" => "executive",
+
+                "isActive" => 1,
+
+                "is_single_user" => 0,
+
+                "created_at" => "2026-02-19 15:37:19",
+
+                "updated_at" => "2026-02-19 15:37:19",
+
+            ],
+
         ];
 
         foreach ($levels as $level) {
+
             Level::updateOrCreate(
+
                 ['id' => $level['id']],
+
                 $level
+
             );
         }
     }
