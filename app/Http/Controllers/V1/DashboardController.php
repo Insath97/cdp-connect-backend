@@ -70,7 +70,7 @@ class DashboardController extends Controller implements HasMiddleware
             if ($isBranchCoordinator) {
                 $targetQuery->whereHas('user', function ($uq) use ($assignedBranchIds) {
                     $uq->whereIn('branch_id', $assignedBranchIds)
-                        ->where('level_id', 11)// Target focus: Branch Managers
+                        ->where('level_id', 11); // Target focus: Branch Managers
                 });
             } elseif ($isAdminView) {
                 $targetQuery->whereHas('user', function ($uq) {
