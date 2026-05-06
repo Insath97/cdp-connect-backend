@@ -65,20 +65,20 @@ class DashboardController extends Controller implements HasMiddleware
             }
 
             // 2. Fetch Target Statistics
-            $targetQuery = Target::query()->where('period_key', $periodKey);
+            $targetQuery = Target::query()->where('period_key', '=', $periodKey, 'and');
 
             if ($isBranchCoordinator) {
                 $targetQuery->whereHas('user', function ($uq) use ($assignedBranchIds) {
                     $uq->whereIn('branch_id', $assignedBranchIds)
-                        ->where('level_id', 11); // Target focus: Branch Managers
+                        ->where('level_id', '=', 11, 'and'); // Target focus: Branch Managers
                 });
             } elseif ($isAdminView) {
                 $targetQuery->whereHas('user', function ($uq) {
-                    $uq->where('level_id', 1); // Company view: GM (Level 1)
+                    $uq->where('level_id', '=', 1, 'and'); // Company view: GM (Level 1)
                 });
             } else {
                 // Hierarchy User: Show only their own aggregate target record
-                $targetQuery->where('user_id', $user->id);
+                $targetQuery->where('user_id', '=', $user->id, 'and');
             }
 
             $stats = $targetQuery->selectRaw('
@@ -92,11 +92,11 @@ class DashboardController extends Controller implements HasMiddleware
             // Use direct investment totals for real-time accuracy for high-level views
             if ($isBranchCoordinator || $isAdminView) {
                 $revQuery = Investment::query()
-                    ->where('status', 'approved')
-                    ->where('target_period_key', $periodKey);
+                    ->where('status', '=', 'approved', 'and')
+                    ->where('target_period_key', '=', $periodKey, 'and');
                 
                 if ($isBranchCoordinator) {
-                    $revQuery->whereIn('branch_id', $assignedBranchIds);
+                    $revQuery->whereIn('branch_id', $assignedBranchIds, 'and', false);
                 }
 
                 $totalAchieved = (float) $revQuery->sum('investment_amount');
@@ -119,18 +119,18 @@ class DashboardController extends Controller implements HasMiddleware
                 $monthKey = $date->format('Y-m');
                 $monthLabel = $date->format('M');
 
-                $monthTargetQuery = Target::query()->where('period_key', $monthKey);
+                $monthTargetQuery = Target::query()->where('period_key', '=', $monthKey, 'and');
                 if ($isBranchCoordinator) {
                     $monthTargetQuery->whereHas('user', function ($uq) use ($assignedBranchIds) {
                         $uq->whereIn('branch_id', $assignedBranchIds)
-                            ->where('level_id', 11);
+                            ->where('level_id', '=', 11, 'and');
                     });
                 } elseif ($isAdminView) {
                     $monthTargetQuery->whereHas('user', function ($uq) {
-                        $uq->where('level_id', 1);
+                        $uq->where('level_id', '=', 1, 'and');
                     });
                 } else {
-                    $monthTargetQuery->where('user_id', $user->id);
+                    $monthTargetQuery->where('user_id', '=', $user->id, 'and');
                 }
 
                 $monthStats = $monthTargetQuery->selectRaw('
@@ -143,8 +143,8 @@ class DashboardController extends Controller implements HasMiddleware
                 if ($isBranchCoordinator) {
                     $monthRevenue = (float) Investment::query()
                         ->whereIn('branch_id', $assignedBranchIds)
-                        ->where('status', 'approved')
-                        ->where('target_period_key', $monthKey)
+                        ->where('status', '=', 'approved', 'and')
+                        ->where('target_period_key', '=', $monthKey, 'and')
                         ->sum('investment_amount');
                 }
 
@@ -156,47 +156,47 @@ class DashboardController extends Controller implements HasMiddleware
             }
 
             // 4. Additional Quick Stats (Hierarchy/Branch Aware)
-            $customerBaseQuery = Customer::query()->where('created_at', 'like', "{$periodKey}%");
-            $investmentBaseQuery = Investment::query()->where('target_period_key', $periodKey);
-            $quotationBaseQuery = Quotation::query()->where('created_at', 'like', "{$periodKey}%");
+            $customerBaseQuery = Customer::query()->where('created_at', 'like', "{$periodKey}%", 'and');
+            $investmentBaseQuery = Investment::query()->where('target_period_key', '=', $periodKey, 'and');
+            $quotationBaseQuery = Quotation::query()->where('created_at', 'like', "{$periodKey}%", 'and');
 
             if ($isBranchCoordinator) {
                 $customerBaseQuery->whereHas('user', fn($uq) => $uq->whereIn('branch_id', $assignedBranchIds));
-                $investmentBaseQuery->whereIn('branch_id', $assignedBranchIds);
-                $quotationBaseQuery->whereIn('branch_id', $assignedBranchIds);
+                $investmentBaseQuery->whereIn('branch_id', $assignedBranchIds, 'and', false);
+                $quotationBaseQuery->whereIn('branch_id', $assignedBranchIds, 'and', false);
             } elseif (!$isAdminView) {
                 // Scoped view for hierarchy users
                 $customerBaseQuery->whereIn('customer_id', $accessibleUserIds);
-                $investmentBaseQuery->whereIn('created_by', $accessibleUserIds);
-                $quotationBaseQuery->whereIn('created_by', $accessibleUserIds);
+                $investmentBaseQuery->whereIn('created_by', $accessibleUserIds, 'and', false);
+                $quotationBaseQuery->whereIn('created_by', $accessibleUserIds, 'and', false);
             }
             // Admins see global view (no extra filters)
 
             $customerCount = (clone $customerBaseQuery)->count();
-            $activeCustomerCount = (clone $customerBaseQuery)->where('is_active', true)->count();
+            $activeCustomerCount = (clone $customerBaseQuery)->where('is_active', '=', true, 'and')->count();
 
             $investmentCount = (clone $investmentBaseQuery)->count();
-            $approvedInvestmentCount = (clone $investmentBaseQuery)->where('status', 'approved')->count();
-            $pendingInvestmentCount = (clone $investmentBaseQuery)->where('status', 'pending')->count();
+            $approvedInvestmentCount = (clone $investmentBaseQuery)->where('status', '=', 'approved', 'and')->count();
+            $pendingInvestmentCount = (clone $investmentBaseQuery)->where('status', '=', 'pending', 'and')->count();
 
             $quotationCount = $quotationBaseQuery->count();
-            $totalInvestmentVolume = (clone $investmentBaseQuery)->where('status', 'approved')->sum('investment_amount');
+            $totalInvestmentVolume = (clone $investmentBaseQuery)->where('status', '=', 'approved', 'and')->sum('investment_amount');
 
             $approvedCustomerCount = (clone $investmentBaseQuery)
-                ->where('status', 'approved')
+                ->where('status', '=', 'approved', 'and')
                 ->distinct()
                 ->count('customer_id');
 
             // 5. Revenue Distribution (Sector Overview)
             $distributionData = [];
             $distributionQuery = Investment::query()
-                ->where('investments.status', 'approved')
-                ->where('investments.target_period_key', $periodKey);
+                ->where('investments.status', '=', 'approved', 'and')
+                ->where('investments.target_period_key', '=', $periodKey, 'and');
 
             if ($isBranchCoordinator) {
-                $distributionQuery->whereIn('investments.branch_id', $assignedBranchIds);
+                $distributionQuery->whereIn('investments.branch_id', $assignedBranchIds, 'and', false);
             } elseif (!$isAdminView) {
-                $distributionQuery->whereIn('created_by', $accessibleUserIds);
+                $distributionQuery->whereIn('created_by', $accessibleUserIds, 'and', false);
             }
 
             $productVolumes = $distributionQuery->join('investment_products', 'investments.investment_product_id', '=', 'investment_products.id')

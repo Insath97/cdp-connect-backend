@@ -49,8 +49,8 @@ class ReportController extends Controller implements HasMiddleware
             $isBranchCoordinator = $user->hasRole('Branch Coordinator');
 
             $query = User::with(['level', 'branch'])
-                ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id', 'users.user_type','users.id_type','users.id_number')
-                ->where('users.user_type', 'hierarchy');
+                ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id', 'users.user_type', 'users.id_type', 'users.id_number')
+                ->where('users.user_type', '=', 'hierarchy', 'and');
 
             if ($isBranchCoordinator) {
                 $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
@@ -65,19 +65,19 @@ class ReportController extends Controller implements HasMiddleware
             if ($request->has('search')) {
                 $search = $request->search;
                 $query->where(function ($q) use ($search) {
-                    $q->where('users.name', 'like', "%{$search}%")
-                        ->orWhere('users.username', 'like', "%{$search}%");
+                    $q->where('users.name', 'like', "%{$search}%", 'and')
+                        ->orWhere('users.username', 'like', "%{$search}%", 'and');
                 });
             }
 
             // 3. Join Targets and Commissions for the given period
             // Subquery for commission to avoid double counting if multiple targets existed (though unlikely)
             $commissionsSub = Commission::select('user_id', DB::raw('SUM(commission_amount) as total_commission'))
-                ->where('period_key', $periodKey)
+                ->where('period_key', '=', $periodKey, 'and')
                 ->groupBy('user_id');
 
             $reports = $query->leftJoinSub(
-                Target::where('period_key', $periodKey),
+                Target::where('period_key', '=', $periodKey, 'and'),
                 't',
                 'users.id',
                 '=',
@@ -106,7 +106,6 @@ class ReportController extends Controller implements HasMiddleware
                     'period_key' => $periodKey
                 ]
             ], 200);
-
         } catch (\Throwable $th) {
             Log::error('Report generation failed', [
                 'error' => $th->getMessage(),
@@ -146,10 +145,10 @@ class ReportController extends Controller implements HasMiddleware
             // 2. Fetch specific user data
             $userReport = User::with(['level', 'branch'])
                 ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id', 'users.user_type')
-                ->where('users.id', $id)
-                ->where('users.user_type', 'hierarchy')
+                ->where('users.id', '=', $id, 'and')
+                ->where('users.user_type', '=', 'hierarchy', 'and')
                 ->leftJoinSub(
-                    Target::where('period_key', $periodKey),
+                    Target::where('period_key', '=', $periodKey, 'and'),
                     't',
                     'users.id',
                     '=',
@@ -157,7 +156,7 @@ class ReportController extends Controller implements HasMiddleware
                 )
                 ->leftJoinSub(
                     Commission::select('user_id', DB::raw('SUM(commission_amount) as total_commission'))
-                        ->where('period_key', $periodKey)
+                        ->where('period_key', '=', $periodKey, 'and')
                         ->groupBy('user_id'),
                     'c',
                     'users.id',
@@ -187,7 +186,6 @@ class ReportController extends Controller implements HasMiddleware
                     'period_key' => $periodKey
                 ]
             ], 200);
-
         } catch (\Throwable $th) {
             Log::error('Detailed report failed', [
                 'error' => $th->getMessage(),
@@ -225,7 +223,7 @@ class ReportController extends Controller implements HasMiddleware
             $isBranchCoordinator = $currentUser->hasRole('Branch Coordinator');
 
             $query = User::with(['level', 'branch'])
-                ->where('user_type', 'hierarchy');
+                ->where('user_type', '=', 'hierarchy', 'and');
 
             if ($isBranchCoordinator) {
                 $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
@@ -238,9 +236,9 @@ class ReportController extends Controller implements HasMiddleware
 
             // 2. Execute Search
             $agent = $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('id_number', $search)
-                  ->orWhere('username', $search);
+                $q->where('name', 'like', "%{$search}%", 'and')
+                    ->orWhere('id_number', '=', $search, 'and')
+                    ->orWhere('username', '=', $search, 'and');
             })->first();
 
             if (!$agent) {
@@ -251,19 +249,19 @@ class ReportController extends Controller implements HasMiddleware
             }
 
             // 3. Performance Metrics (Target & Commission)
-            $target = Target::where('user_id', $agent->id)
-                ->where('period_key', $periodKey)
+            $target = Target::where('user_id', '=', $agent->id, 'and')
+                ->where('period_key', '=', $periodKey, 'and')
                 ->first();
 
-            $totalCommission = Commission::where('user_id', $agent->id)
-                ->where('period_key', $periodKey)
+            $totalCommission = Commission::where('user_id', '=', $agent->id, 'and')
+                ->where('period_key', '=', $periodKey, 'and')
                 ->sum('commission_amount');
 
             // 4. Customer Details (Investments)
             // Retrieve important datas as requested: Customer Name, Plan, Period, Amount, Maturity details
             $investments = Investment::with(['customer', 'investmentProduct.annualRates'])
-                ->where('unit_head_id', $agent->id)
-                ->where('target_period_key', $periodKey)
+                ->where('unit_head_id', '=', $agent->id, 'and')
+                ->where('target_period_key', '=', $periodKey, 'and')
                 ->get()
                 ->map(function ($inv) {
                     $calculations = [];
@@ -291,14 +289,14 @@ class ReportController extends Controller implements HasMiddleware
 
             if (!empty($descendantIds)) {
                 $commissionsSubHierarchy = Commission::select('user_id', DB::raw('SUM(commission_amount) as total_commission'))
-                    ->where('period_key', $periodKey)
+                    ->where('period_key', '=', $periodKey, 'and')
                     ->groupBy('user_id');
 
                 $hierarchyPerformance = User::with(['level', 'branch'])
-                    ->select('users.id', 'users.name', 'users.username','users.employee_code', 'users.level_id', 'users.branch_id')
+                    ->select('users.id', 'users.name', 'users.username', 'users.employee_code', 'users.level_id', 'users.branch_id')
                     ->whereIn('users.id', $descendantIds)
                     ->leftJoinSub(
-                        Target::where('period_key', $periodKey),
+                        Target::where('period_key', '=', $periodKey, 'and'),
                         't',
                         'users.id',
                         '=',
@@ -353,7 +351,6 @@ class ReportController extends Controller implements HasMiddleware
                     'hierarchy_performance' => $hierarchyPerformance
                 ]
             ], 200);
-
         } catch (\Throwable $th) {
             Log::error('Agent performance search failed', [
                 'error' => $th->getMessage(),
@@ -391,7 +388,7 @@ class ReportController extends Controller implements HasMiddleware
             $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
             $isBranchCoordinator = $currentUser->hasRole('Branch Coordinator');
 
-            $rootQuery = User::where('user_type', 'hierarchy');
+            $rootQuery = User::where('user_type', '=', 'hierarchy', 'and');
 
             // If Branch Coordinator, restrict to assigned branches
             if ($isBranchCoordinator) {
@@ -405,9 +402,9 @@ class ReportController extends Controller implements HasMiddleware
             }
 
             $rootUser = $rootQuery->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('id_number', $search)
-                  ->orWhere('username', $search);
+                $q->where('name', 'like', "%{$search}%", 'and')
+                    ->orWhere('id_number', '=', $search, 'and')
+                    ->orWhere('username', '=', $search, 'and');
             })->first();
 
             if (!$rootUser) {
@@ -437,14 +434,14 @@ class ReportController extends Controller implements HasMiddleware
 
             // 3. Fetch all users in this branch with their Target and Commission
             $commissionsSub = Commission::select('user_id', DB::raw('SUM(commission_amount) as total_commission'))
-                ->where('period_key', $periodKey)
+                ->where('period_key', '=', $periodKey, 'and')
                 ->groupBy('user_id');
 
             $results = User::with(['level', 'branch'])
                 ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id', 'users.parent_user_id')
                 ->whereIn('users.id', $allTargetUserIds)
                 ->leftJoinSub(
-                    Target::where('period_key', $periodKey),
+                    Target::where('period_key', '=', $periodKey, 'and'),
                     't',
                     'users.id',
                     '=',
@@ -494,7 +491,6 @@ class ReportController extends Controller implements HasMiddleware
                     'period_key' => $periodKey
                 ]
             ], 200);
-
         } catch (\Throwable $th) {
             Log::error('Hierarchy performance report failed', [
                 'error' => $th->getMessage(),
@@ -531,7 +527,7 @@ class ReportController extends Controller implements HasMiddleware
 
             // 1. Accessibility & Root User Search
             $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
-            $rootQuery = User::with(['level', 'branch'])->where('user_type', 'hierarchy');
+            $rootQuery = User::with(['level', 'branch'])->where('user_type', '=', 'hierarchy', 'and');
 
             if (!$isAdmin) {
                 $myDescendantIds = $currentUser->getAllDescendantIds();
@@ -540,9 +536,9 @@ class ReportController extends Controller implements HasMiddleware
             }
 
             $rootUser = $rootQuery->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('id_number', $search)
-                  ->orWhere('username', $search);
+                $q->where('name', 'like', "%{$search}%", 'and')
+                    ->orWhere('id_number', '=', $search, 'and')
+                    ->orWhere('username', '=', $search, 'and');
             })->first();
 
             if (!$rootUser) {
@@ -553,8 +549,8 @@ class ReportController extends Controller implements HasMiddleware
             }
 
             // 2. Fetch Root User's Target/Achievement Data
-            $rootTarget = Target::where('user_id', $rootUser->id)
-                ->where('period_key', $periodKey)
+            $rootTarget = Target::where('user_id', '=', $rootUser->id, 'and')
+                ->where('period_key', '=', $periodKey, 'and')
                 ->first();
 
             // 3. Get all descendants of the root user
@@ -562,21 +558,21 @@ class ReportController extends Controller implements HasMiddleware
 
             // 4. Fetch all subordinates in this branch with their Target, Commission and Business Details
             $commissionsSub = Commission::select('user_id', DB::raw('SUM(commission_amount) as total_commission'))
-                ->where('period_key', $periodKey)
+                ->where('period_key', '=', $periodKey, 'and')
                 ->groupBy('user_id');
 
             $descendantsQuery = User::with([
                 'level',
                 'branch',
-                'investments' => function($q) use ($periodKey) {
-                    $q->where('target_period_key', $periodKey)
-                      ->with(['customer', 'investmentProduct']);
+                'investments' => function ($q) use ($periodKey) {
+                    $q->where('target_period_key', '=', $periodKey, 'and')
+                        ->with(['customer', 'investmentProduct']);
                 }
             ])
                 ->select('users.id', 'users.name', 'users.username', 'users.level_id', 'users.branch_id', 'users.parent_user_id')
                 ->whereIn('users.id', $descendantIds)
                 ->leftJoinSub(
-                    Target::where('period_key', $periodKey),
+                    Target::where('period_key', '=', $periodKey, 'and'),
                     't',
                     'users.id',
                     '=',
@@ -628,9 +624,9 @@ class ReportController extends Controller implements HasMiddleware
             });
 
             // 5. Construct Summary
-            $rootUser->load(['investments' => function($q) use ($periodKey) {
-                $q->where('target_period_key', $periodKey)
-                  ->with(['customer', 'investmentProduct']);
+            $rootUser->load(['investments' => function ($q) use ($periodKey) {
+                $q->where('target_period_key', '=', $periodKey, 'and')
+                    ->with(['customer', 'investmentProduct']);
             }]);
 
             $rootBusinessDetails = $rootUser->investments->map(function ($inv) {
@@ -670,7 +666,6 @@ class ReportController extends Controller implements HasMiddleware
                     'descendants_performance' => $descendants
                 ]
             ], 200);
-
         } catch (\Throwable $th) {
             Log::error('Hierarchy detailed report failed', [
                 'error' => $th->getMessage(),
@@ -724,7 +719,7 @@ class ReportController extends Controller implements HasMiddleware
             $rootUsers = [];
             if ($search) {
                 // Search for specific user
-                $searchQuery = User::where('user_type', 'hierarchy');
+                $searchQuery = User::where('user_type', '=', 'hierarchy', 'and');
                 if ($isBranchCoordinator) {
                     $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
                     $searchQuery->whereIn('branch_id', $assignedBranchIds);
@@ -735,9 +730,9 @@ class ReportController extends Controller implements HasMiddleware
                 }
 
                 $targetUser = $searchQuery->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('id_number', $search)
-                      ->orWhere('username', $search);
+                    $q->where('name', 'like', "%{$search}%", 'and')
+                        ->orWhere('id_number', '=', $search, 'and')
+                        ->orWhere('username', '=', $search, 'and');
                 })->first();
 
                 if (!$targetUser) {
@@ -749,17 +744,17 @@ class ReportController extends Controller implements HasMiddleware
                 if ($isAdmin) {
                     // Admins see all top-level hierarchy users (those without a parent)
                     $rootUsers = User::with(['level', 'branch'])
-                        ->where('user_type', 'hierarchy')
+                        ->where('user_type', '=', 'hierarchy', 'and')
                         ->whereNull('parent_user_id')
                         ->join('levels', 'users.level_id', '=', 'levels.id')
                         ->orderBy('levels.tire_level', 'asc')
                         ->select('users.*')
                         ->get();
-                    
+
                     // If no top-level users found (orphans), just get all GMs or high level tiers
                     if ($rootUsers->isEmpty()) {
                         $rootUsers = User::with(['level', 'branch'])
-                            ->where('user_type', 'hierarchy')
+                            ->where('user_type', '=', 'hierarchy', 'and')
                             ->join('levels', 'users.level_id', '=', 'levels.id')
                             ->orderBy('levels.tire_level', 'asc')
                             ->select('users.*')
@@ -769,7 +764,7 @@ class ReportController extends Controller implements HasMiddleware
                 } elseif ($isBranchCoordinator) {
                     $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
                     $rootUsers = User::with(['level', 'branch'])
-                        ->where('user_type', 'hierarchy')
+                        ->where('user_type', '=', 'hierarchy', 'and')
                         ->whereIn('branch_id', $assignedBranchIds)
                         ->whereNull('parent_user_id')
                         ->get();
@@ -786,10 +781,10 @@ class ReportController extends Controller implements HasMiddleware
             }
 
             // 5. Total Summary
-            $allHierarchyIds = User::where('user_type', 'hierarchy')->pluck('id')->toArray();
+            $allHierarchyIds = User::where('user_type', '=', 'hierarchy', 'and')->pluck('id')->toArray();
             $totalInvestments = Investment::whereIn('unit_head_id', $allHierarchyIds)
                 ->whereBetween('reservation_date', [$from, $to])
-                ->where('status', 'approved')
+                ->where('status', '=', 'approved', 'and')
                 ->get();
 
             return response()->json([
@@ -807,7 +802,6 @@ class ReportController extends Controller implements HasMiddleware
                     ]
                 ]
             ], 200);
-
         } catch (\Throwable $th) {
             Log::error('Hierarchy tree report failed', [
                 'error' => $th->getMessage(),
@@ -832,7 +826,7 @@ class ReportController extends Controller implements HasMiddleware
 
         $branchInvestments = Investment::whereIn('unit_head_id', $allBranchIds)
             ->whereBetween('reservation_date', [$from, $to])
-            ->where('status', 'approved')
+            ->where('status', '=', 'approved', 'and')
             ->get();
 
         $branchBusinessTotal = $branchInvestments->sum('investment_amount');
@@ -842,11 +836,11 @@ class ReportController extends Controller implements HasMiddleware
         $personalInvestments = Investment::with(['customer', 'investmentProduct'])
             ->where('unit_head_id', $user->id)
             ->whereBetween('reservation_date', [$from, $to])
-            ->where('status', 'approved')
+            ->where('status', '=', 'approved', 'and')
             ->get();
 
         // 3. Target and Achievement
-        $target = Target::where('user_id', $user->id)->where('period_key', $periodKey)->first();
+        $target = Target::where('user_id', '=', $user->id, 'and')->where('period_key', '=', $periodKey, 'and')->first();
         $targetAmount = $target ? (float)$target->target_amount : 0;
         $achievementPercentage = $targetAmount > 0 ? ($branchBusinessTotal / $targetAmount) * 100 : ($branchBusinessTotal > 0 ? 100 : 0);
 
@@ -858,9 +852,9 @@ class ReportController extends Controller implements HasMiddleware
 
         // 5. Recursive Children
         $children = User::with(['level', 'branch'])
-            ->where('parent_user_id', $user->id)
+            ->where('parent_user_id', '=', $user->id, 'and')
             ->get();
-        
+
         $childrenNodes = [];
         foreach ($children as $child) {
             $childrenNodes[] = $this->buildHierarchyNode($child, $from, $to, $periodKey);
@@ -894,7 +888,6 @@ class ReportController extends Controller implements HasMiddleware
             }),
             'subordinates' => $childrenNodes
         ];
-
     }
 
     /**
@@ -922,32 +915,32 @@ class ReportController extends Controller implements HasMiddleware
 
             // 2. Filters
             if ($request->has('investment_product_id')) {
-                $query->where('investment_product_id', $request->investment_product_id);
+                $query->where('investment_product_id', '=', $request->investment_product_id, 'and');
             }
 
             if ($request->has('period_key')) {
-                $query->where('target_period_key', $request->period_key);
+                $query->where('target_period_key', '=', $request->period_key, 'and');
             }
 
             if ($request->has('branch_id')) {
-                $query->where('branch_id', $request->branch_id);
+                $query->where('branch_id', '=', $request->branch_id, 'and');
             }
 
             if ($request->has('search')) {
                 $search = $request->search;
                 $query->where(function ($q) use ($search) {
                     $q->whereHas('customer', function ($cq) use ($search) {
-                        $cq->where('full_name', 'like', "%{$search}%")
-                            ->orWhere('id_number', 'like', "%{$search}%")
-                            ->orWhere('customer_code', 'like', "%{$search}%");
-                    })->orWhere('policy_number', 'like', "%{$search}%")
-                      ->orWhere('application_number', 'like', "%{$search}%");
+                        $cq->where('full_name', 'like', "%{$search}%", 'and')
+                            ->orWhere('id_number', 'like', "%{$search}%", 'and')
+                            ->orWhere('customer_code', 'like', "%{$search}%", 'and');
+                    })->orWhere('policy_number', 'like', "%{$search}%", 'and')
+                        ->orWhere('application_number', 'like', "%{$search}%", 'and');
                 });
             }
 
             // 3. Status Filter (Default to approved for maturity analysis)
             $status = $request->get('status', 'approved');
-            $query->where('status', $status);
+            $query->where('status', '=', $status, 'and');
 
             // 4. Execution & Pagination
             $investments = $query->orderBy('created_at', 'desc')->paginate($perPage);
@@ -989,7 +982,6 @@ class ReportController extends Controller implements HasMiddleware
                 'message' => 'Investor maturity report retrieved successfully',
                 'data' => $investments
             ], 200);
-
         } catch (\Throwable $th) {
             Log::error('Investor maturity report failed', [
                 'error' => $th->getMessage(),

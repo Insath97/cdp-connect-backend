@@ -60,13 +60,13 @@ class InvestmentController extends Controller implements HasMiddleware
             // Hierarchy Visibility Logic
             if ($user->hasRole('Branch Coordinator')) {
                 $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
-                $query->whereIn('investments.branch_id', $assignedBranchIds);
+                $query->whereIn('investments.branch_id', $assignedBranchIds, 'and', false);
             } elseif (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
                 // Hierarchical users (GM, AGM, etc.) see their own and descendants
                 $descendantIds = $user->getAllDescendantIds();
                 $accessibleUserIds = array_merge([$user->id], $descendantIds);
 
-                $query->whereIn('created_by', $accessibleUserIds);
+                $query->whereIn('created_by', $accessibleUserIds, 'and', false);
             }
 
             // Branch Filter (Admins can filter by branch)
@@ -80,25 +80,25 @@ class InvestmentController extends Controller implements HasMiddleware
                         ], 403);
                     }
                 }
-                $query->where('investments.branch_id', $request->branch_id);
+                $query->where('investments.branch_id', '=', $request->branch_id, 'and');
             }
 
             // Search by Policy, Application, Sales Code, or Customer Name
             if ($request->has('search')) {
                 $search = $request->search;
                 $query->where(function ($q) use ($search) {
-                    $q->where('policy_number', 'like', "%{$search}%")
-                        ->orWhere('application_number', 'like', "%{$search}%")
-                        ->orWhere('sales_code', 'like', "%{$search}%")
+                    $q->where('policy_number', 'like', "%{$search}%", 'and')
+                        ->orWhere('application_number', 'like', "%{$search}%", 'and')
+                        ->orWhere('sales_code', 'like', "%{$search}%", 'and')
                         ->orWhereHas('customer', function ($cq) use ($search) {
-                            $cq->where('full_name', 'like', "%{$search}%");
+                            $cq->where('full_name', 'like', "%{$search}%", 'and');
                         });
                 });
             }
 
             // Status Filter
             if ($request->has('status')) {
-                $query->where('status', $request->status);
+                $query->where('status', '=', $request->status, 'and');
             }
 
             // Ordering: Newest first, then GM -> AGM -> Branch
@@ -156,8 +156,8 @@ class InvestmentController extends Controller implements HasMiddleware
 
             // 2.1 Validate Target existence for the selected Unit Head
             $unitHeadId = $data['unit_head_id'];
-            $targetExists = Target::where('user_id', $unitHeadId)
-                ->where('period_key', $targetPeriodKey)
+            $targetExists = Target::where('user_id', '=', $unitHeadId, 'and')
+                ->where('period_key', '=', $targetPeriodKey, 'and')
                 ->exists();
 
             if (!$targetExists) {
@@ -171,21 +171,21 @@ class InvestmentController extends Controller implements HasMiddleware
             $yymm = $reservationDate->format('ym');
             $appPrefix = 'APP-' . $branch->code . '-' . $yymm;
 
-            $lastApp = Investment::where('application_number', 'like', $appPrefix . '%')
+            $lastApp = Investment::where('application_number', 'like', $appPrefix . '%', 'and')
                 ->orderBy('application_number', 'desc')
                 ->first();
 
             $appSequence = $lastApp ? (int) substr($lastApp->application_number, -4) + 1 : 1;
-            $data['application_number'] = $appPrefix . str_pad($appSequence, 4, '0', STR_PAD_LEFT);
+            $data['application_number'] = $appPrefix . str_pad((string)$appSequence, 4, '0', STR_PAD_LEFT);
 
             // 4. Auto-generate Sales Code: {BranchCode}-{Sequence}
             $salesPrefix = $branch->code . '-';
-            $lastSales = Investment::where('sales_code', 'like', $salesPrefix . '%')
+            $lastSales = Investment::where('sales_code', 'like', $salesPrefix . '%', 'and')
                 ->orderBy('sales_code', 'desc')
                 ->first();
 
             $salesSequence = $lastSales ? (int) substr($lastSales->sales_code, -4) + 1 : 1;
-            $data['sales_code'] = $salesPrefix . str_pad($salesSequence, 4, '0', STR_PAD_LEFT);
+            $data['sales_code'] = $salesPrefix . str_pad((string)$salesSequence, 4, '0', STR_PAD_LEFT);
 
             // 5. Handle Nested Beneficiary Creation
             if ($request->has('beneficiary')) {
@@ -405,12 +405,12 @@ class InvestmentController extends Controller implements HasMiddleware
             $yymm = date('ym');
             $prefix = 'CDP-' . $branch->code . '-';
 
-            $lastPolicy = Investment::where('policy_number', 'like', $prefix . '%')
+            $lastPolicy = Investment::where('policy_number', 'like', $prefix . '%', 'and')
                 ->orderBy('policy_number', 'desc')
                 ->first();
 
             $sequence = $lastPolicy ? (int) substr($lastPolicy->policy_number, -4) + 1 : 1;
-            $policyNumber = $prefix . str_pad($sequence, 8, '0', STR_PAD_LEFT);
+            $policyNumber = $prefix . str_pad((string)$sequence, 8, '0', STR_PAD_LEFT);
 
             // 2. Update Investment Status
             $investment->update([
@@ -424,7 +424,8 @@ class InvestmentController extends Controller implements HasMiddleware
             Target::syncAchievement(
                 $investment->unit_head_id,
                 $investment->target_period_key,
-                $investment->investment_amount
+                $investment->investment_amount,
+                false
             );
 
             // 4. Calculate and Store Commissions
@@ -468,7 +469,7 @@ class InvestmentController extends Controller implements HasMiddleware
                 // Send SMS
 
                 if ($sendSms && $recipientPhone) {
-                    $amount = number_format($investment->investment_amount, 0);
+                    $amount = number_format((float)$investment->investment_amount, 0);
                     $duration = $investment->investmentProduct->duration_months ?? 0;
                     $welcomeSms = "Dear {$investment->customer->full_name},\n\n" .
                         "Welcome to CDP Empire!\n\n" .
@@ -579,21 +580,21 @@ class InvestmentController extends Controller implements HasMiddleware
             // 1. Hierarchy Visibility Logic
             if ($user->hasRole('Branch Coordinator')) {
                 $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
-                $query->whereIn('investments.branch_id', $assignedBranchIds);
+                $query->whereIn('investments.branch_id', $assignedBranchIds, 'and', false);
             } elseif (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
                 // Hierarchical users see their own and descendants' investments
                 $descendantIds = $user->getAllDescendantIds();
                 $accessibleUserIds = array_merge([$user->id], $descendantIds);
-                $query->whereIn('created_by', $accessibleUserIds);
+                $query->whereIn('created_by', $accessibleUserIds, 'and', false);
             }
 
             // 2. Filters
             if ($request->has('investment_product_id')) {
-                $query->where('investment_product_id', $request->investment_product_id);
+                $query->where('investment_product_id', '=', $request->investment_product_id, 'and');
             }
 
             if ($request->has('period_key')) {
-                $query->where('target_period_key', $request->period_key);
+                $query->where('target_period_key', '=', $request->period_key, 'and');
             }
 
             if ($request->has('branch_id')) {
@@ -606,25 +607,25 @@ class InvestmentController extends Controller implements HasMiddleware
                         ], 403);
                     }
                 }
-                $query->where('investments.branch_id', $request->branch_id);
+                $query->where('investments.branch_id', '=', $request->branch_id, 'and');
             }
 
             if ($request->has('search')) {
                 $search = $request->search;
                 $query->where(function ($q) use ($search) {
                     $q->whereHas('customer', function ($cq) use ($search) {
-                        $cq->where('full_name', 'like', "%{$search}%")
-                            ->orWhere('id_number', 'like', "%{$search}%")
-                            ->orWhere('customer_code', 'like', "%{$search}%");
-                    })->orWhere('policy_number', 'like', "%{$search}%")
-                        ->orWhere('application_number', 'like', "%{$search}%")
-                        ->orWhere('sales_code', 'like', "%{$search}%");
+                        $cq->where('full_name', 'like', "%{$search}%", 'and')
+                            ->orWhere('id_number', 'like', "%{$search}%", 'and')
+                            ->orWhere('customer_code', 'like', "%{$search}%", 'and');
+                    })->orWhere('policy_number', 'like', "%{$search}%", 'and')
+                        ->orWhere('application_number', 'like', "%{$search}%", 'and')
+                        ->orWhere('sales_code', 'like', "%{$search}%", 'and');
                 });
             }
 
             // 3. Status Filter (Default to approved for maturity analysis)
             $status = $request->get('status', 'approved');
-            $query->where('status', $status);
+            $query->where('status', '=', $status, 'and');
 
             // 4. Execution & Pagination
             $investments = $query->orderBy('created_at', 'desc')->paginate($perPage);
