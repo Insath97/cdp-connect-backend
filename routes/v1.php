@@ -130,8 +130,9 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::get('reports/hierarchy-detailed', [ReportController::class, 'hierarchyDetailedReport']);
     Route::get('reports/hierarchy-date-wise', [ReportController::class, 'hierarchyDateWiseReport']);
     Route::get('reports/investor-maturity', [ReportController::class, 'investorMaturity']);
-
+    Route::get('reports/plan-wise-hierarchy', [ReportController::class, 'planWiseHierarchyReport']);
     Route::get('reports/hierarchy/{id}', [ReportController::class, 'show']);
+    Route::get('reports/aa',[ReportController::class, 'buildPlanWiseHierarchyNode']);
 
     Route::get('imports/tables/list', [ImportController::class, 'listTables']);
     Route::get('imports', [ImportController::class, 'index']);

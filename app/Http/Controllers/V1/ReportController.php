@@ -31,6 +31,7 @@ class ReportController extends Controller implements HasMiddleware
             new Middleware('permission:Report Hierarchy Detailed', only: ['hierarchyDetailedReport']),
             new Middleware('permission:Report Hierarchy Date Wise', only: ['hierarchyDateWiseReport']),
             new Middleware('permission:Report Investor Maturity', only: ['investorMaturity']),
+            new Middleware('permission:Report Plan Wise Hierarchy', only: ['planWiseHierarchyReport']),
         ];
     }
 
@@ -995,5 +996,222 @@ class ReportController extends Controller implements HasMiddleware
                 'error' => $th->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Search for a hierarchy user and get detailed performance metrics for them and their entire branch.
+     * Includes personal metrics, total branch business, and plan-wise breakdowns.
+     * Supports both date range and period key filtering.
+     */
+    public function planWiseHierarchyReport(Request $request): JsonResponse
+    {
+        try {
+            $currentUser = Auth::guard('api')->user();
+            $search = $request->get('search');
+            $fromDate = $request->get('from_date');
+            $toDate = $request->get('to_date');
+            $periodKeyInput = $request->get('period_key');
+
+            // 1. Determine Date Range & Period Key
+            if ($fromDate && $toDate) {
+                $from = Carbon::parse($fromDate)->startOfDay();
+                $to = Carbon::parse($toDate)->endOfDay();
+                $periodKey = $from->format('Y-m');
+            } elseif ($periodKeyInput) {
+                $periodKey = $periodKeyInput;
+                $from = Carbon::parse($periodKey . '-01')->startOfMonth();
+                $to = Carbon::parse($periodKey . '-01')->endOfMonth();
+            } else {
+                $periodKey = Carbon::now()->format('Y-m');
+                $from = Carbon::now()->startOfMonth();
+                $to = Carbon::now()->endOfMonth();
+            }
+
+            // 2. Accessibility & Roles
+            $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
+            $isBranchCoordinator = $currentUser->hasRole('Branch Coordinator');
+
+            // 3. Determine Root Users for the Tree
+            $rootUsers = [];
+            if ($search) {
+                // Search for specific user
+                $searchQuery = User::where('user_type', '=', 'hierarchy', 'and');
+                if ($isBranchCoordinator) {
+                    $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                    $searchQuery->whereIn('branch_id', $assignedBranchIds);
+                } elseif (!$isAdmin) {
+                    $myDescendantIds = $currentUser->getAllDescendantIds();
+                    $accessibleIds = array_merge([$currentUser->id], $myDescendantIds);
+                    $searchQuery->whereIn('id', $accessibleIds);
+                }
+
+                $targetUser = $searchQuery->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%", 'and')
+                        ->orWhere('id_number', '=', $search, 'and')
+                        ->orWhere('username', '=', $search, 'and');
+                })->first();
+
+                if (!$targetUser) {
+                    return response()->json(['status' => 'error', 'message' => 'User not found.'], 404);
+                }
+                $rootUsers = [$targetUser];
+            } else {
+                // No search: Determine roots based on role
+                if ($isAdmin) {
+                    // Admins see all top-level hierarchy users (those without a parent)
+                    $rootUsers = User::with(['level', 'branch'])
+                        ->where('user_type', '=', 'hierarchy', 'and')
+                        ->whereNull('parent_user_id')
+                        ->join('levels', 'users.level_id', '=', 'levels.id')
+                        ->orderBy('levels.tire_level', 'asc')
+                        ->select('users.*')
+                        ->get();
+
+                    // If no top-level users found (orphans), just get all GMs or high level tiers
+                    if ($rootUsers->isEmpty()) {
+                        $rootUsers = User::with(['level', 'branch'])
+                            ->where('user_type', '=', 'hierarchy', 'and')
+                            ->join('levels', 'users.level_id', '=', 'levels.id')
+                            ->orderBy('levels.tire_level', 'asc')
+                            ->select('users.*')
+                            ->limit(10)
+                            ->get();
+                    }
+                } elseif ($isBranchCoordinator) {
+                    $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                    $rootUsers = User::with(['level', 'branch'])
+                        ->where('user_type', '=', 'hierarchy', 'and')
+                        ->whereIn('branch_id', $assignedBranchIds)
+                        ->whereNull('parent_user_id')
+                        ->get();
+                } else {
+                    // Hierarchy user sees themselves as root
+                    $rootUsers = [User::with(['level', 'branch'])->find($currentUser->id)];
+                }
+            }
+
+            // 4. Build Recursive Tree
+            $tree = [];
+            foreach ($rootUsers as $root) {
+                $tree[] = $this->buildPlanWiseHierarchyNode($root, $from, $to, $periodKey);
+            }
+
+            // 5. Total Summary
+            $allHierarchyIds = User::where('user_type', '=', 'hierarchy', 'and')->pluck('id')->toArray();
+            $totalInvestments = Investment::whereIn('unit_head_id', $allHierarchyIds)
+                ->whereBetween('reservation_date', [$from, $to])
+                ->where('status', '=', 'approved', 'and')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Plan-wise hierarchy report retrieved successfully',
+                'data' => [
+                    'hierarchy_tree' => $tree,
+                    'overall_summary' => [
+                        'total_business' => (float)$totalInvestments->sum('investment_amount'),
+                        'total_business_count' => $totalInvestments->count(),
+                        'period' => [
+                            'from' => $from->toDateString(),
+                            'to' => $to->toDateString()
+                        ]
+                    ]
+                ]
+            ], 200);
+        } catch (\Throwable $th) {
+            Log::error('Plan-wise hierarchy report failed', [
+                'error' => $th->getMessage(),
+                'trace' => $th->getTraceAsString()
+            ]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve plan-wise hierarchy report',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Recursive helper to build a plan-wise hierarchy node.
+     */
+    private function buildPlanWiseHierarchyNode($user, $from, $to, $periodKey)
+    {
+        $descendantIds = $user->getAllDescendantIds();
+        $allBranchIds = array_merge([$user->id], $descendantIds);
+
+        $branchInvestments = Investment::with('investmentProduct')->whereIn('unit_head_id', $allBranchIds, 'and', false)
+            ->whereBetween('reservation_date', [$from, $to])
+            ->where('status', '=', 'approved', 'and')
+            ->get();
+
+        $branchBusinessTotal = $branchInvestments->sum('investment_amount');
+        $branchBusinessCount = $branchInvestments->count();
+
+        $personalInvestments = Investment::with(['customer', 'investmentProduct'])
+            ->where('unit_head_id', '=', $user->id, 'and')
+            ->whereBetween('reservation_date', [$from, $to])
+            ->where('status', '=', 'approved', 'and')
+            ->get();
+
+        $target = Target::where('user_id', '=', $user->id, 'and')->where('period_key', '=', $periodKey, 'and')->first();
+        $targetAmount = $target ? (float)$target->target_amount : 0;
+        $achievementPercentage = $targetAmount > 0 ? ($branchBusinessTotal / $targetAmount) * 100 : ($branchBusinessTotal > 0 ? 100 : 0);
+
+        $personalCommission = Commission::join('investments', 'commissions.investment_id', '=', 'investments.id')
+            ->where('commissions.user_id', '=', $user->id, 'and')
+            ->whereBetween('investments.reservation_date', [$from, $to])
+            ->sum('commission_amount');
+
+        $children = User::with(['level', 'branch'])
+            ->where('parent_user_id', '=', $user->id, 'and')
+            ->get();
+
+        $childrenNodes = [];
+        foreach ($children as $child) {
+            $childrenNodes[] = $this->buildPlanWiseHierarchyNode($child, $from, $to, $periodKey);
+        }
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'username' => $user->username,
+            'employee_code' => $user->employee_code,
+            'level' => $user->level->level_name ?? 'N/A',
+            'branch' => $user->branch->name ?? 'N/A',
+            'metrics' => [
+                'target_amount' => $targetAmount,
+                'achieved_branch_business' => (float)$branchBusinessTotal,
+                'achievement_percentage' => (float)min($achievementPercentage, 999.99),
+                'branch_business_count' => $branchBusinessCount,
+                'personal_business_count' => $personalInvestments->count(),
+                'personal_commission' => (float)$personalCommission,
+                'plan_breakdown' => $branchInvestments->groupBy('investment_product_id')->map(function ($group) use ($allBranchIds) {
+                    $first = $group->first();
+                    $planName = $first->investmentProduct->name ?? 'N/A';
+
+                    $commissions = Commission::whereIn('investment_id', $group->pluck('id'))
+                        ->whereIn('user_id', $allBranchIds, 'and', false)
+                        ->sum('commission_amount');
+
+                    return [
+                        'plan_name' => $planName,
+                        'business_count' => $group->count(),
+                        'total_investment_amount' => (float)$group->sum('investment_amount'),
+                        'total_commissions' => (float)$commissions
+                    ];
+                })->values(),
+            ],
+            'business_details' => $personalInvestments->map(function ($inv) {
+                return [
+                    'customer' => $inv->customer->full_name ?? 'N/A',
+                    'policy' => $inv->policy_number ?? 'N/A',
+                    'amount' => (float)$inv->investment_amount,
+                    'plan' => $inv->investmentProduct->name ?? 'N/A',
+                    'date' => $inv->reservation_date ? $inv->reservation_date->format('Y-m-d') : 'N/A',
+                    'status' => $inv->status
+                ];
+            }),
+            'subordinates' => $childrenNodes
+        ];
     }
 }

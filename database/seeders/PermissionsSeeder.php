@@ -136,7 +136,9 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Report Hierarchy Performance', 'group_name' => 'Report Management Permissions'],
             ['name' => 'Report Hierarchy Detailed', 'group_name' => 'Report Management Permissions'],
             ['name' => 'Report Investor Maturity', 'group_name' => 'Report Management Permissions'],
-            ['name' => 'Report Hierarchy Date Wise', 'group_name' => 'Report Management Permissions' ],
+            ['name' => 'Report Hierarchy Date Wise', 'group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Plan Wise',  'group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Plan Wise Hierarchy','group_name' => 'Report Management Permissions'],
 
             /* Dashboard Management */
             ['name' => 'Dashboard View', 'group_name' => 'Dashboard Management Permissions'],
