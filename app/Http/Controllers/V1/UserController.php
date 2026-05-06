@@ -336,7 +336,7 @@ class UserController extends Controller implements HasMiddleware
 
             if ($currentUser->hasRole('Branch Coordinator')) {
                 $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
-                
+
                 if ($user->branch_id && !in_array($user->branch_id, $assignedBranchIds)) {
                     return response()->json([
                         'status' => 'error',
@@ -576,7 +576,7 @@ class UserController extends Controller implements HasMiddleware
             $perPage = $request->input('per_page', 15);
             $currentUser = Auth::guard('api')->user();
             // Level IDs from LevelSeeder: 8=SGL, 9=GL, 10=SC, 11=C
-            $hierarchyLevels = [9, 10, 11];
+            $hierarchyLevels = [15, 16, 17];
 
             $query = User::where('is_active', true)
                 ->whereIn('level_id', $hierarchyLevels);
@@ -593,7 +593,7 @@ class UserController extends Controller implements HasMiddleware
 
             $users = $query->select('id', 'name', 'username', 'employee_code', 'level_id', 'branch_id')
                 ->with(['level:id,level_name'])
-                ->orderByRaw('FIELD(level_id, 9, 10, 11)') 
+                ->orderByRaw('FIELD(level_id, 9, 10, 11)')
                 ->get();
 
             return response()->json([
