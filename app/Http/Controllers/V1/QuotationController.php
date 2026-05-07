@@ -54,6 +54,9 @@ class QuotationController extends Controller implements HasMiddleware
                 $accessibleUserIds = array_merge([$user->id], $descendantIds);
 
                 $query->whereIn('created_by', $accessibleUserIds);
+            } elseif ($user->hasRole('Temp BOC')){
+                $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+                $query->whereIn('quotations.branch_id', $assignedBranchIds);
             }
 
             // Branch Filter
@@ -89,7 +92,7 @@ class QuotationController extends Controller implements HasMiddleware
                 ->select('quotations.*')
                 /* ->orderByRaw('COALESCE(levels.tire_level, 999) ASC') */
                 /* ->orderBy('branches.name', 'asc') */
-                ->orderBy('quotations.created_at', 'desc')  
+                ->orderBy('quotations.created_at', 'desc')
                 ->paginate($perPage);
 
             return response()->json([
