@@ -1147,20 +1147,21 @@ class ReportController extends Controller implements HasMiddleware
         $branchBusinessTotal = $branchInvestments->sum('investment_amount');
         $branchBusinessCount = $branchInvestments->count();
 
-        $personalInvestments = Investment::with(['customer', 'investmentProduct'])
-            ->where('unit_head_id', '=', $user->id, 'and')
-            ->whereBetween('reservation_date', [$from, $to])
-            ->where('status', '=', 'approved', 'and')
+        $userCommissions = Commission::with(['investment.customer', 'investment.investmentProduct'])
+            ->where('user_id', $user->id)
+            ->whereHas('investment', function ($q) use ($from, $to) {
+                $q->whereBetween('reservation_date', [$from, $to])
+                    ->where('status', 'approved');
+            })
             ->get();
+
+        $personalUnitHeadCommission = $userCommissions->where('tier', 'unit_head')->sum('commission_amount');
+        $personalOverrideCommission = $userCommissions->where('tier', 'parent')->sum('commission_amount');
+        $personalCommission = $userCommissions->sum('commission_amount');
 
         $target = Target::where('user_id', '=', $user->id, 'and')->where('period_key', '=', $periodKey, 'and')->first();
         $targetAmount = $target ? (float)$target->target_amount : 0;
         $achievementPercentage = $targetAmount > 0 ? ($branchBusinessTotal / $targetAmount) * 100 : ($branchBusinessTotal > 0 ? 100 : 0);
-
-        $personalCommission = Commission::join('investments', 'commissions.investment_id', '=', 'investments.id')
-            ->where('commissions.user_id', '=', $user->id, 'and')
-            ->whereBetween('investments.reservation_date', [$from, $to])
-            ->sum('commission_amount');
 
         $children = User::with(['level', 'branch'])
             ->where('parent_user_id', '=', $user->id, 'and')
@@ -1183,32 +1184,48 @@ class ReportController extends Controller implements HasMiddleware
                 'achieved_branch_business' => (float)$branchBusinessTotal,
                 'achievement_percentage' => (float)min($achievementPercentage, 999.99),
                 'branch_business_count' => $branchBusinessCount,
-                'personal_business_count' => $personalInvestments->count(),
+                'personal_business_count' => $userCommissions->where('tier', 'unit_head')->count(),
                 'personal_commission' => (float)$personalCommission,
-                'plan_breakdown' => $branchInvestments->groupBy('investment_product_id')->map(function ($group) use ($allBranchIds) {
+                'personal_unit_head_commission' => (float)$personalUnitHeadCommission,
+                'personal_override_commission' => (float)$personalOverrideCommission,
+                'plan_breakdown' => $branchInvestments->groupBy('investment_product_id')->map(function ($group) use ($user, $allBranchIds) {
                     $first = $group->first();
                     $planName = $first->investmentProduct->name ?? 'N/A';
 
-                    $commissions = Commission::whereIn('investment_id', $group->pluck('id'))
-                        ->whereIn('user_id', $allBranchIds, 'and', false)
-                        ->sum('commission_amount');
+                    // All commissions for these specific investments
+                    $allComms = Commission::whereIn('investment_id', $group->pluck('id'))->get();
+
+                    // 1. Current User's Earnings
+                    $userUnitHead = $allComms->where('user_id', $user->id)->where('tier', 'unit_head')->sum('commission_amount');
+                    $userOverride = $allComms->where('user_id', $user->id)->where('tier', 'parent')->sum('commission_amount');
+
+                    // 2. Branch-wide Earnings (limited to users in this sub-tree)
+                    $branchUnitHead = $allComms->whereIn('user_id', $allBranchIds)->where('tier', 'unit_head')->sum('commission_amount');
+                    $branchOverride = $allComms->whereIn('user_id', $allBranchIds)->where('tier', 'parent')->sum('commission_amount');
 
                     return [
                         'plan_name' => $planName,
                         'business_count' => $group->count(),
                         'total_investment_amount' => (float)$group->sum('investment_amount'),
-                        'total_commissions' => (float)$commissions
+                        'user_unit_head_commission' => (float)$userUnitHead,
+                        'user_override_commission' => (float)$userOverride,
+                        'branch_unit_head_total' => (float)$branchUnitHead,
+                        'branch_override_total' => (float)$branchOverride,
+                        'total_commissions' => (float)$allComms->whereIn('user_id', $allBranchIds)->sum('commission_amount')
                     ];
                 })->values(),
             ],
-            'business_details' => $personalInvestments->map(function ($inv) {
+            'business_details' => $userCommissions->map(function ($comm) {
+                $inv = $comm->investment;
                 return [
                     'customer' => $inv->customer->full_name ?? 'N/A',
                     'policy' => $inv->policy_number ?? 'N/A',
                     'amount' => (float)$inv->investment_amount,
                     'plan' => $inv->investmentProduct->name ?? 'N/A',
                     'date' => $inv->reservation_date ? $inv->reservation_date->format('Y-m-d') : 'N/A',
-                    'status' => $inv->status
+                    'status' => $inv->status,
+                    'earned_commission' => (float)$comm->commission_amount,
+                    'commission_type' => $comm->tier === 'unit_head' ? 'Unit Head' : 'Override'
                 ];
             }),
             'subordinates' => $childrenNodes
