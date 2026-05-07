@@ -38,16 +38,21 @@ class InvestmentPayoutController extends Controller implements HasMiddleware
 
             $query = InvestmentPayout::with([
                 'investment' => function($q) {
-                    $q->select('id', 'policy_number', 'customer_id', 'branch_id', 'investment_product_id', 'target_period_key', 'created_by');
+                    $q->select('id', 'policy_number', 'customer_id', 'branch_id', 'investment_product_id', 'target_period_key', 'created_by', 'customer_bank_detail_id');
                 },
                 'investment.customer' => function($q) {
-                    $q->select('id', 'full_name', 'customer_code', 'id_number');
+                    $q->select('id', 'full_name', 'customer_code', 'id_number')->with(['bankDetails' => function($bq) {
+                        $bq->select('id', 'customer_id', 'bank_name', 'branch_name', 'account_number');
+                    }]);
                 },
                 'investment.branch' => function($q) {
                     $q->select('id', 'name', 'code');
                 },
                 'investment.investmentProduct' => function($q) {
                     $q->select('id', 'name', 'code', 'duration_months', 'roi_percentage');
+                },
+                'investment.bankDetail' => function($q) {
+                    $q->select('id', 'customer_id', 'bank_name', 'branch_name', 'account_number');
                 }
             ]);
 
@@ -98,6 +103,22 @@ class InvestmentPayoutController extends Controller implements HasMiddleware
 
             // 3. Execution & Pagination
             $payouts = $query->orderBy('scheduled_date', 'asc')->paginate($perPage);
+
+            // 4. Transform for Fallback Bank Details
+            $payouts->getCollection()->transform(function ($payout) {
+                $investment = $payout->investment;
+                if ($investment) {
+                    // If specific bank detail is missing, fallback to first customer bank detail
+                    if (!$investment->bankDetail && $investment->customer && $investment->customer->bankDetails->isNotEmpty()) {
+                        $investment->setRelation('bankDetail', $investment->customer->bankDetails->first());
+                    }
+                    // Clean up: hide the redundant bankDetails collection from customer
+                    if ($investment->customer) {
+                        $investment->customer->unsetRelation('bankDetails');
+                    }
+                }
+                return $payout;
+            });
 
             return response()->json([
                 'status' => 'success',
