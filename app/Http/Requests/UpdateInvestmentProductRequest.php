@@ -33,6 +33,7 @@ class UpdateInvestmentProductRequest extends FormRequest
             'unit_head_commission_pct' => 'sometimes|numeric|min:0|max:100',
             'parent_commission_pct' => 'sometimes|numeric|min:0|max:100',
             'is_active' => 'sometimes|boolean',
+            'plan_type' => 'sometimes|in:normal,special',
 
             // Rates validation
             'rates' => 'sometimes|nullable|array',

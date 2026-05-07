@@ -80,6 +80,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Investment Product Update', 'group_name' => 'Investment Product Permissions'],
             ['name' => 'Investment Product Delete', 'group_name' => 'Investment Product Permissions'],
             ['name' => 'Investment Product Toggle Status', 'group_name' => 'Investment Product Permissions'],
+            ['name' => 'View Special Investment Products', 'group_name' => 'Investment Product Permissions'],
 
             /* Target Management */
             ['name' => 'Target Index', 'group_name' => 'Target Management Permissions'],

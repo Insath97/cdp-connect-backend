@@ -18,6 +18,7 @@ class InvestmentProduct extends Model
         'unit_head_commission_pct',
         'parent_commission_pct',
         'is_active',
+        'plan_type',
     ];
 
     protected $casts = [
@@ -37,6 +38,18 @@ class InvestmentProduct extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeVisibleTo($query, $user = null)
+    {
+        $user = $user ?: auth()->user();
+
+        // If no user or user doesn't have permission to view special plans
+        if (!$user || !$user->can('View Special Investment Products')) {
+            return $query->where('plan_type', 'normal');
+        }
+
+        return $query;
     }
 
     public function scopeSearch($query, $search)

@@ -31,7 +31,7 @@ class InvestmentProductController extends Controller implements HasMiddleware
     {
         try {
             $perPage = $request->get('per_page', 15);
-            $query = InvestmentProduct::with('annualRates');
+            $query = InvestmentProduct::with('annualRates')->visibleTo();
 
             if ($request->has('search')) {
                 $query->search($request->search);
@@ -275,6 +275,7 @@ class InvestmentProductController extends Controller implements HasMiddleware
     {
         try {
             $products = InvestmentProduct::active()
+                ->visibleTo()
                 ->select('id', 'name', 'code', 'duration_months')
                 ->orderBy('id', 'asc')
                 ->get();
