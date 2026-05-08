@@ -1103,6 +1103,17 @@ class ReportController extends Controller implements HasMiddleware
                 ->where('status', '=', 'approved', 'and')
                 ->get();
 
+            $totalCancelled = Investment::whereIn('unit_head_id', $allHierarchyIds)
+                ->whereBetween('reservation_date', [$from, $to])
+                ->where('status', '=', 'cancelled', 'and')
+                ->get();
+
+            $totalRecovery = Commission::whereIn('user_id', $allHierarchyIds)
+                ->whereHas('investment', function ($q) use ($from, $to) {
+                    $q->whereBetween('reservation_date', [$from, $to])
+                        ->where('status', 'cancelled');
+                })->sum('recover_amount');
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Plan-wise hierarchy report retrieved successfully',
@@ -1111,6 +1122,9 @@ class ReportController extends Controller implements HasMiddleware
                     'overall_summary' => [
                         'total_business' => (float)$totalInvestments->sum('investment_amount'),
                         'total_business_count' => $totalInvestments->count(),
+                        'total_cancelled_business' => (float)$totalCancelled->sum('investment_amount'),
+                        'total_cancelled_count' => $totalCancelled->count(),
+                        'total_recovery_amount' => (float)$totalRecovery,
                         'period' => [
                             'from' => $from->toDateString(),
                             'to' => $to->toDateString()
@@ -1139,13 +1153,21 @@ class ReportController extends Controller implements HasMiddleware
         $descendantIds = $user->getAllDescendantIds();
         $allBranchIds = array_merge([$user->id], $descendantIds);
 
-        $branchInvestments = Investment::with('investmentProduct')->whereIn('unit_head_id', $allBranchIds, 'and', false)
+        $branchInvestments = Investment::with(['investmentProduct', 'customer'])->whereIn('unit_head_id', $allBranchIds, 'and', false)
             ->whereBetween('reservation_date', [$from, $to])
             ->where('status', '=', 'approved', 'and')
             ->get();
 
+        $cancelledInvestments = Investment::with(['investmentProduct', 'customer'])->whereIn('unit_head_id', $allBranchIds, 'and', false)
+            ->whereBetween('reservation_date', [$from, $to])
+            ->where('status', '=', 'cancelled', 'and')
+            ->get();
+
         $branchBusinessTotal = $branchInvestments->sum('investment_amount');
         $branchBusinessCount = $branchInvestments->count();
+
+        $cancelledBusinessTotal = $cancelledInvestments->sum('investment_amount');
+        $cancelledBusinessCount = $cancelledInvestments->count();
 
         $userCommissions = Commission::with(['investment.customer', 'investment.investmentProduct'])
             ->where('user_id', $user->id)
@@ -1158,6 +1180,25 @@ class ReportController extends Controller implements HasMiddleware
         $personalUnitHeadCommission = $userCommissions->where('tier', 'unit_head')->sum('commission_amount');
         $personalOverrideCommission = $userCommissions->where('tier', 'parent')->sum('commission_amount');
         $personalCommission = $userCommissions->sum('commission_amount');
+
+        // Commission Recoveries
+        $userRecoveries = Commission::where('user_id', $user->id)
+            ->whereHas('investment', function ($q) use ($from, $to) {
+                $q->whereBetween('reservation_date', [$from, $to])
+                    ->where('status', 'cancelled');
+            })
+            ->get();
+        
+        $personalRecovery = $userRecoveries->sum('recover_amount');
+
+        $branchRecoveries = Commission::whereIn('user_id', $allBranchIds)
+            ->whereHas('investment', function ($q) use ($from, $to) {
+                $q->whereBetween('reservation_date', [$from, $to])
+                    ->where('status', 'cancelled');
+            })
+            ->get();
+        
+        $branchRecoveryTotal = $branchRecoveries->sum('recover_amount');
 
         $target = Target::where('user_id', '=', $user->id, 'and')->where('period_key', '=', $periodKey, 'and')->first();
         $targetAmount = $target ? (float)$target->target_amount : 0;
@@ -1184,10 +1225,14 @@ class ReportController extends Controller implements HasMiddleware
                 'achieved_branch_business' => (float)$branchBusinessTotal,
                 'achievement_percentage' => (float)min($achievementPercentage, 999.99),
                 'branch_business_count' => $branchBusinessCount,
+                'cancelled_branch_business' => (float)$cancelledBusinessTotal,
+                'cancelled_branch_count' => $cancelledBusinessCount,
                 'personal_business_count' => $userCommissions->where('tier', 'unit_head')->count(),
                 'personal_commission' => (float)$personalCommission,
                 'personal_unit_head_commission' => (float)$personalUnitHeadCommission,
                 'personal_override_commission' => (float)$personalOverrideCommission,
+                'personal_recovery_amount' => (float)$personalRecovery,
+                'branch_recovery_total' => (float)$branchRecoveryTotal,
                 'plan_breakdown' => $branchInvestments->groupBy('investment_product_id')->map(function ($group) use ($user, $allBranchIds) {
                     $first = $group->first();
                     $planName = $first->investmentProduct->name ?? 'N/A';
@@ -1226,6 +1271,19 @@ class ReportController extends Controller implements HasMiddleware
                     'status' => $inv->status,
                     'earned_commission' => (float)$comm->commission_amount,
                     'commission_type' => $comm->tier === 'unit_head' ? 'Unit Head' : 'Override'
+                ];
+            }),
+            'cancelled_business_details' => $cancelledInvestments->map(function ($inv) use ($user) {
+                $comm = Commission::where('investment_id', $inv->id)->where('user_id', $user->id)->first();
+                return [
+                    'customer' => $inv->customer->full_name ?? 'N/A',
+                    'policy' => $inv->policy_number ?? 'N/A',
+                    'amount' => (float)$inv->investment_amount,
+                    'plan' => $inv->investmentProduct->name ?? 'N/A',
+                    'date' => $inv->reservation_date ? $inv->reservation_date->format('Y-m-d') : 'N/A',
+                    'status' => $inv->status,
+                    'recovery_amount' => $comm ? (float)$comm->recover_amount : 0,
+                    'commission_type' => $comm ? ($comm->tier === 'unit_head' ? 'Unit Head' : 'Override') : 'N/A'
                 ];
             }),
             'subordinates' => $childrenNodes
