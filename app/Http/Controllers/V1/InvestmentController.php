@@ -601,7 +601,13 @@ class InvestmentController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'success',
                 'message' => 'Investment cancelled successfully.',
-                'data' => $investment->load(['customer', 'unitHead', 'branch', 'bankDetail', 'investmentProduct'])
+                'data' => $investment->load([
+                    'customer:id,full_name,customer_code',
+                    'unitHead:id,name,employee_code',
+                    'branch:id,name,code',
+                    'bankDetail:id,bank_name,account_number',
+                    'investmentProduct:id,name,code'
+                ])
             ], 200);
 
         } catch (\Throwable $th) {
