@@ -394,6 +394,13 @@ class InvestmentController extends Controller implements HasMiddleware
             $user = Auth::guard('api')->user();
             $investment = Investment::with(['branch', 'unitHead'])->findOrFail($id);
 
+            if ($investment->status === 'cancelled') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Cancelled investments cannot be approved.'
+                ], 422);
+            }
+
             if ($investment->status !== 'pending') {
                 return response()->json([
                     'status' => 'error',
@@ -812,6 +819,13 @@ class InvestmentController extends Controller implements HasMiddleware
                     'status' => 'error',
                     'message' => 'Only Super Admin can update investment details.'
                 ], 403);
+            }
+
+            if ($investment->status === 'cancelled') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Cancelled investments cannot be modified.'
+                ], 422);
             }
 
             $data = $request->validated();
