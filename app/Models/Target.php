@@ -175,4 +175,17 @@ class Target extends Model
 
         return $target->save();
     }
+
+    /**
+     * Recursively recalculate targets for a user and all their superiors.
+     */
+    public static function recalculateHierarchyTargets($userId, $periodKey)
+    {
+        self::recalculateForUser($userId, $periodKey);
+
+        $user = User::find($userId);
+        if ($user && $user->parent_user_id) {
+            self::recalculateHierarchyTargets($user->parent_user_id, $periodKey);
+        }
+    }
 }

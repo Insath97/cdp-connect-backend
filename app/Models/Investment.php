@@ -37,7 +37,9 @@ class Investment extends Model
         'checked_at',
         'approved_by',
         'approved_at',
-        'notes'
+        'notes',
+        'cancelled_at',
+        'cancellation_reason'
     ];
 
     protected $casts = [
@@ -46,6 +48,7 @@ class Investment extends Model
         'monthly_payment_date' => 'date',
         'checked_at' => 'date',
         'approved_at' => 'date',
+        'cancelled_at' => 'datetime',
         'investment_amount' => 'decimal:2',
         'initial_payment' => 'decimal:2',
         'monthly_payment_amount' => 'decimal:2'

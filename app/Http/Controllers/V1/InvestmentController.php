@@ -40,6 +40,7 @@ class InvestmentController extends Controller implements HasMiddleware
             new Middleware('permission:Investment Update', only: ['update']),
             new Middleware('permission:Investment Delete', only: ['destroy']),
             new Middleware('permission:Investment Approve', only: ['approve']),
+            new Middleware('permission:Investment Cancel', only: ['cancel']),
             new Middleware('permission:Investment Certificate', only: ['printCertificate']),
             new Middleware('permission:Investment Maturity', only: ['investorMaturity']),
         ];
@@ -509,6 +510,103 @@ class InvestmentController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to approve investment',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Cancel the specified investment.
+     */
+    public function cancel(Request $request, string $id)
+    {
+        $request->validate([
+            'cancellation_reason' => 'required|string|max:1000',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $investment = Investment::with(['investmentProduct'])->findOrFail($id);
+
+            if ($investment->status === 'cancelled') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Investment is already cancelled.'
+                ], 422);
+            }
+
+            $oldStatus = $investment->status;
+
+            // 1. Update Investment Status
+            $investment->update([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+                'cancellation_reason' => $request->cancellation_reason,
+            ]);
+
+            // 2. Adjust Targets (Only if it was approved)
+            if ($oldStatus === 'approved') {
+                Target::recalculateHierarchyTargets($investment->unit_head_id, $investment->target_period_key);
+
+                // 3. Commission Recovery
+                $commissions = Commission::where('investment_id', $investment->id)->get();
+                $reservationDate = Carbon::parse($investment->reservation_date);
+                $cancellationDate = now();
+                
+                // Difference in months
+                $activeMonths = $reservationDate->diffInMonths($cancellationDate);
+                $totalMonths = $investment->investmentProduct->duration_months ?? 1; // Avoid division by zero
+
+                // If cancelled in the same month as reservation, 100% recovery
+                if ($reservationDate->format('Y-m') === $cancellationDate->format('Y-m')) {
+                    $activeMonths = 0;
+                }
+
+                foreach ($commissions as $commission) {
+                    $earnedAmount = 0;
+                    if ($activeMonths > 0) {
+                        $earnedAmount = ($commission->commission_amount * min($activeMonths, $totalMonths)) / $totalMonths;
+                    }
+                    $recoverAmount = $commission->commission_amount - $earnedAmount;
+
+                    $commission->update([
+                        'status' => 'cancelled',
+                        'earned_amount' => round($earnedAmount, 2),
+                        'recover_amount' => round($recoverAmount, 2),
+                    ]);
+                }
+
+                // 4. Payout Adjustment
+                InvestmentPayout::where('investment_id', $investment->id)
+                    ->where('scheduled_date', '>', now()->format('Y-m-d'))
+                    ->where('status', 'unpaid')
+                    ->update(['status' => 'cancelled']);
+            }
+
+            DB::commit();
+
+            Log::info('Investment cancelled', [
+                'investment_id' => $investment->id,
+                'cancelled_by' => Auth::id(),
+                'reason' => $request->cancellation_reason
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Investment cancelled successfully.',
+                'data' => $investment
+            ], 200);
+
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            Log::error('Investment cancellation failed', [
+                'error' => $th->getMessage(),
+                'investment_id' => $id
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to cancel investment.',
                 'error' => $th->getMessage()
             ], 500);
         }

@@ -15,6 +15,8 @@ class Commission extends Model
         'tier',
         'period_key',
         'status',
+        'earned_amount',
+        'recover_amount',
     ];
 
     /**
