@@ -39,7 +39,10 @@ class Investment extends Model
         'approved_at',
         'notes',
         'cancelled_at',
-        'cancellation_reason'
+        'cancellation_reason',
+        'refund_amount',
+        'rejected_at',
+        'rejection_reason',
     ];
 
     protected $casts = [

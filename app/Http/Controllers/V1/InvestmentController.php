@@ -525,105 +525,6 @@ class InvestmentController extends Controller implements HasMiddleware
     /**
      * Cancel the specified investment.
      */
-    public function cancel(Request $request, string $id)
-    {
-        $request->validate([
-            'cancellation_reason' => 'required|string|max:1000',
-        ]);
-
-        DB::beginTransaction();
-        try {
-            $investment = Investment::with(['investmentProduct'])->findOrFail($id);
-
-            if ($investment->status === 'cancelled') {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Investment is already cancelled.'
-                ], 422);
-            }
-
-            $oldStatus = $investment->status;
-
-            // 1. Update Investment Status
-            $investment->update([
-                'status' => 'cancelled',
-                'cancelled_at' => now(),
-                'cancellation_reason' => $request->cancellation_reason,
-            ]);
-
-            // 2. Adjust Targets (Only if it was approved)
-            if ($oldStatus === 'approved') {
-                Target::recalculateHierarchyTargets($investment->unit_head_id, $investment->target_period_key);
-
-                // 3. Commission Recovery
-                $commissions = Commission::where('investment_id', $investment->id)->get();
-                $reservationDate = Carbon::parse($investment->reservation_date);
-                $cancellationDate = now();
-                
-                // Difference in months
-                $activeMonths = $reservationDate->diffInMonths($cancellationDate);
-                $totalMonths = $investment->investmentProduct->duration_months ?? 1; // Avoid division by zero
-
-                // If cancelled in the same month as reservation, 100% recovery
-                if ($reservationDate->format('Y-m') === $cancellationDate->format('Y-m')) {
-                    $activeMonths = 0;
-                }
-
-                foreach ($commissions as $commission) {
-                    $earnedAmount = 0;
-                    if ($activeMonths > 0) {
-                        $earnedAmount = ($commission->commission_amount * min($activeMonths, $totalMonths)) / $totalMonths;
-                    }
-                    $recoverAmount = $commission->commission_amount - $earnedAmount;
-
-                    $commission->update([
-                        'status' => 'cancelled',
-                        'earned_amount' => round($earnedAmount, 2),
-                        'recover_amount' => round($recoverAmount, 2),
-                    ]);
-                }
-
-                // 4. Payout Adjustment
-                InvestmentPayout::where('investment_id', $investment->id)
-                    ->where('scheduled_date', '>', now()->format('Y-m-d'))
-                    ->where('status', 'unpaid')
-                    ->update(['status' => 'cancelled']);
-            }
-
-            DB::commit();
-
-            Log::info('Investment cancelled', [
-                'investment_id' => $investment->id,
-                'cancelled_by' => Auth::id(),
-                'reason' => $request->cancellation_reason
-            ]);
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Investment cancelled successfully.',
-                'data' => $investment->load([
-                    'customer:id,full_name,customer_code',
-                    'unitHead:id,name,employee_code',
-                    'branch:id,name,code',
-                    'bankDetail:id,bank_name,account_number',
-                    'investmentProduct:id,name,code'
-                ])
-            ], 200);
-
-        } catch (\Throwable $th) {
-            DB::rollBack();
-            Log::error('Investment cancellation failed', [
-                'error' => $th->getMessage(),
-                'investment_id' => $id
-            ]);
-
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Failed to cancel investment.',
-                'error' => $th->getMessage()
-            ], 500);
-        }
-    }
 
     /**
      * Calculate and store commissions for a newly approved investment.
@@ -1014,7 +915,7 @@ class InvestmentController extends Controller implements HasMiddleware
 
             // 5. Hierarchical Target Re-sync if it was 'approved'
             if ($status === 'approved') {
-                $this->recalculateHierarchyTargets($unitHeadId, $periodKey);
+                Target::recalculateHierarchyTargets($unitHeadId, $periodKey);
             }
 
             Log::info('Approved investment deleted by Super Admin', [
@@ -1036,15 +937,153 @@ class InvestmentController extends Controller implements HasMiddleware
     }
 
     /**
-     * Recursively recalculate targets up the hierarchy.
+     * Cancel or Reject the specified investment based on its current status.
+     * 
+     * @param \Illuminate\Http\Request $request
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
      */
-    protected function recalculateHierarchyTargets($userId, $periodKey)
+    public function cancel(Request $request, string $id)
     {
-        Target::recalculateForUser($userId, $periodKey);
+        DB::beginTransaction();
+        try {
+            $user = Auth::guard('api')->user();
+            $investment = Investment::with(['investmentProduct', 'payouts'])->findOrFail($id);
 
-        $user = \App\Models\User::find($userId);
-        if ($user && $user->parent_user_id) {
-            $this->recalculateHierarchyTargets($user->parent_user_id, $periodKey);
+            if (in_array($investment->status, ['cancelled', 'rejected'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Investment is already ' . $investment->status . '.'
+                ], 422);
+            }
+
+            $request->validate([
+                'cancellation_reason' => 'required|string|max:1000'
+            ]);
+
+            $reason = $request->cancellation_reason;
+            $oldStatus = $investment->status;
+
+            if ($oldStatus === 'pending') {
+                // Scenario A: Pending Investment (Rejection)
+                $investment->update([
+                    'status' => 'rejected',
+                    'rejected_at' => now(),
+                    'rejection_reason' => $reason
+                ]);
+
+                DB::commit();
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Investment rejected successfully',
+                    'data' => [
+                        'investment' => $investment->load(['customer:id,full_name', 'branch:id,name']),
+                        'status' => 'rejected'
+                    ]
+                ], 200);
+            }
+
+            // Scenario B: Approved Investment (Cancellation)
+            // 1. Calculate Principal Refund
+            $paidPayoutsTotal = $investment->payouts()->where('status', 'paid')->sum('amount');
+            $refundAmount = max(0, (float)$investment->investment_amount - (float)$paidPayoutsTotal);
+
+            // 2. Update Investment Status
+            $investment->update([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+                'cancellation_reason' => $reason,
+                'refund_amount' => $refundAmount
+            ]);
+
+            // 3. Hierarchical Target Achievement Recalculation
+            Target::recalculateHierarchyTargets($investment->unit_head_id, $investment->target_period_key);
+
+            // 4. Commission Recovery
+            $this->recoverCommissions($investment);
+
+            // 5. Payout Adjustment
+            $investment->payouts()->where('status', 'unpaid')->update(['status' => 'cancelled']);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Investment cancelled successfully',
+                'data' => [
+                    'investment' => $investment->load([
+                        'customer:id,full_name,customer_code,id_number',
+                        'branch:id,name,code',
+                        'unitHead:id,name,employee_code',
+                        'investmentProduct:id,name,code,duration_months'
+                    ]),
+                    'refund_amount' => $refundAmount,
+                    'commissions' => Commission::where('investment_id', $investment->id)
+                        ->with('user:id,name,employee_code')
+                        ->get()
+                        ->map(function ($comm) {
+                            return [
+                                'user' => $comm->user->name ?? 'N/A',
+                                'tier' => $comm->tier,
+                                'original_amount' => $comm->commission_amount,
+                                'earned_amount' => $comm->earned_amount,
+                                'recover_amount' => $comm->recover_amount,
+                                'status' => $comm->status
+                            ];
+                        })
+                ]
+            ], 200);
+
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            Log::error('Investment action failed', [
+                'error' => $th->getMessage(),
+                'investment_id' => $id
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to process investment action',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Process commission recovery for a cancelled investment.
+     * 
+     * @param \App\Models\Investment $investment
+     * @return void
+     */
+    protected function recoverCommissions(Investment $investment)
+    {
+        $commissions = Commission::where('investment_id', $investment->id)->get();
+        $reservationDate = Carbon::parse($investment->reservation_date);
+        $isSameMonth = $reservationDate->format('Y-m') === now()->format('Y-m');
+
+        foreach ($commissions as $commission) {
+            if ($isSameMonth) {
+                $commission->update([
+                    'status' => 'cancelled',
+                    'earned_amount' => 0,
+                    'recover_amount' => $commission->commission_amount
+                ]);
+            } else {
+                $totalMonths = (int) $investment->investmentProduct->duration_months;
+                $activeMonths = $reservationDate->diffInMonths(now());
+                $activeMonths = min($activeMonths, $totalMonths);
+                
+                if ($totalMonths > 0) {
+                    $earnedAmount = ((float)$commission->commission_amount / $totalMonths) * $activeMonths;
+                    $recoverAmount = (float)$commission->commission_amount - $earnedAmount;
+                    
+                    $commission->update([
+                        'status' => 'cancelled',
+                        'earned_amount' => round($earnedAmount, 2),
+                        'recover_amount' => round($recoverAmount, 2)
+                    ]);
+                }
+            }
         }
     }
 }
