@@ -499,13 +499,16 @@ class UserController extends Controller implements HasMiddleware
                 ], 422);
             }
 
-            $user->is_active = !$user->is_active;
+            $newStatus = !$user->is_active;
+            $user->is_active = $newStatus;
+            $user->can_login = $newStatus;
             $user->save();
 
-            Log::info('User status toggled', [
+            Log::info('User status and login toggled', [
                 'admin_id' => Auth::id(),
                 'target_user_id' => $user->id,
-                'new_status' => $user->is_active
+                'is_active' => $user->is_active,
+                'can_login' => $user->can_login
             ]);
 
             return response()->json([
@@ -513,7 +516,8 @@ class UserController extends Controller implements HasMiddleware
                 'message' => 'User status updated successfully',
                 'data' => [
                     'id' => $user->id,
-                    'is_active' => $user->is_active
+                    'is_active' => $user->is_active,
+                    'can_login' => $user->can_login
                 ]
             ], 200);
         } catch (\Throwable $th) {

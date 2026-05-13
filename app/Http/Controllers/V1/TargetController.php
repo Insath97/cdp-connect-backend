@@ -41,7 +41,7 @@ class TargetController extends Controller implements HasMiddleware
                 $query->whereHas('user', function($uq) use ($assignedBranchIds) {
                     $uq->whereIn('branch_id', $assignedBranchIds);
                 });
-            } elseif (!$user->hasRole('Super Admin')) {
+            } elseif (!$user->hasRole('Super Admin') && !$user->hasRole('Admin-IT')) {
                 $descendantIds = $user->getAllDescendantIds();
                 $accessibleUserIds = array_merge([$user->id], $descendantIds);
 

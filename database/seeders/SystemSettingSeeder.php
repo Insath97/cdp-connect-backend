@@ -18,6 +18,10 @@ class SystemSettingSeeder extends Seeder
                 'key' => 'investment_admin_notification_email',
                 'value' => 'i74074521@gmail.com',
             ],
+            [
+                'key' => 'admin_cost',
+                'value' => '0.15',
+            ],
         ];
 
         foreach ($settings as $setting) {
