@@ -1,0 +1,232 @@
+<?php
+
+namespace App\Http\Controllers\V1;
+
+use App\Http\Controllers\Controller;
+use App\Models\Investment;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+use Carbon\Carbon;
+
+class WelcomeCallController extends Controller implements HasMiddleware
+{
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:Welcome Call Index', only: ['index', 'show']),
+            new Middleware('permission:Welcome Call Update', only: ['updateStatus']),
+        ];
+    }
+
+    /**
+     * Display a listing of approved investments for welcome calls.
+     */
+    public function index(Request $request)
+    {
+        try {
+            $perPage = $request->get('per_page', 15);
+            $user = Auth::guard('api')->user();
+
+            $query = Investment::with(['customer', 'branch', 'investmentProduct', 'welcomeCallUser'])
+                ->where('status', 'approved');
+
+            // Hierarchy Visibility Logic (consistent with InvestmentController)
+            if ($user->hasRole('Branch Coordinator')) {
+                $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+                $query->whereIn('branch_id', $assignedBranchIds);
+            } elseif (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
+                $descendantIds = $user->getAllDescendantIds();
+                $accessibleUserIds = array_merge([$user->id], $descendantIds);
+                $query->whereIn('created_by', $accessibleUserIds);
+            }
+
+            // Filters
+            if ($request->has('welcome_call_status')) {
+                $query->where('welcome_call_status', $request->welcome_call_status);
+            }
+
+            // Date Range Filters
+            if ($request->filled('from_date') && $request->filled('end_date')) {
+                $query->whereBetween('approved_at', [$request->from_date, $request->end_date]);
+            } elseif ($request->filled('from_date')) {
+                $query->whereDate('approved_at', '>=', $request->from_date);
+            } elseif ($request->filled('end_date')) {
+                $query->whereDate('approved_at', '<=', $request->end_date);
+            } else {
+                // Default to current date approved investments
+                $query->whereDate('approved_at', Carbon::today());
+            }
+
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('policy_number', 'like', "%{$search}%")
+                        ->orWhere('application_number', 'like', "%{$search}%")
+                        ->orWhereHas('customer', function ($cq) use ($search) {
+                            $cq->where('full_name', 'like', "%{$search}%");
+                        });
+                });
+            }
+
+            $investments = $query->orderBy('approved_at', 'desc')->paginate($perPage);
+
+            // Clean response data
+            $investments->getCollection()->transform(function ($inv) {
+                return [
+                    'id' => $inv->id,
+                    'policy_number' => $inv->policy_number,
+                    'application_number' => $inv->application_number,
+                    'investment_amount' => (float)$inv->investment_amount,
+                    'approved_at' => $inv->approved_at ? $inv->approved_at->format('Y-m-d') : null,
+                    'welcome_call_status' => $inv->welcome_call_status,
+                    'welcome_call_at' => $inv->welcome_call_at ? $inv->welcome_call_at->format('Y-m-d H:i:s') : null,
+                    'welcome_call_notes' => $inv->welcome_call_notes,
+                    'customer' => [
+                        'id' => $inv->customer->id ?? null,
+                        'full_name' => $inv->customer->full_name ?? 'N/A',
+                        'customer_code' => $inv->customer->customer_code ?? 'N/A',
+                        'phone' => $inv->customer->phone_primary ?? 'N/A',
+                    ],
+                    'branch' => [
+                        'id' => $inv->branch->id ?? null,
+                        'name' => $inv->branch->name ?? 'N/A',
+                        'code' => $inv->branch->code ?? 'N/A',
+                    ],
+                    'plan' => [
+                        'id' => $inv->investmentProduct->id ?? null,
+                        'name' => $inv->investmentProduct->name ?? 'N/A',
+                        'duration_months' => $inv->investmentProduct->duration_months ?? 0,
+                    ],
+                    'welcome_call_by' => $inv->welcomeCallUser->name ?? 'N/A',
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Approved investments retrieved successfully',
+                'data' => $investments
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve investments',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Display the specified investment details for welcome call.
+     */
+    public function show($id)
+    {
+        try {
+            $investment = Investment::with(['customer', 'branch', 'investmentProduct', 'welcomeCallUser'])
+                ->where('status', 'approved')
+                ->find($id);
+
+            if (!$investment) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Approved investment not found'
+                ], 404);
+            }
+
+            $data = [
+                'id' => $investment->id,
+                'policy_number' => $investment->policy_number,
+                'application_number' => $investment->application_number,
+                'investment_amount' => (float)$investment->investment_amount,
+                'approved_at' => $investment->approved_at ? $investment->approved_at->format('Y-m-d') : null,
+                'welcome_call_status' => $investment->welcome_call_status,
+                'welcome_call_at' => $investment->welcome_call_at ? $investment->welcome_call_at->format('Y-m-d H:i:s') : null,
+                'welcome_call_notes' => $investment->welcome_call_notes,
+                'customer' => [
+                    'id' => $investment->customer->id ?? null,
+                    'full_name' => $investment->customer->full_name ?? 'N/A',
+                    'customer_code' => $investment->customer->customer_code ?? 'N/A',
+                    'phone' => $investment->customer->phone_primary ?? 'N/A',
+                    'address' => $investment->customer->address_line_1 ?? 'N/A',
+                ],
+                'branch' => [
+                    'id' => $investment->branch->id ?? null,
+                    'name' => $investment->branch->name ?? 'N/A',
+                    'code' => $investment->branch->code ?? 'N/A',
+                ],
+                'plan' => [
+                    'id' => $investment->investmentProduct->id ?? null,
+                    'name' => $investment->investmentProduct->name ?? 'N/A',
+                    'duration_months' => $investment->investmentProduct->duration_months ?? 0,
+                    'roi_percentage' => $investment->investmentProduct->roi_percentage ?? 0,
+                ],
+                'welcome_call_by' => $investment->welcomeCallUser->name ?? 'N/A',
+            ];
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Investment details retrieved successfully',
+                'data' => $data
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve investment details',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update the welcome call status of an investment.
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $request->validate([
+            'status' => 'required|in:pending,completed,not_reachable',
+            'notes' => 'nullable|string'
+        ]);
+
+        try {
+            $investment = Investment::query()->where('status', 'approved')->findOrFail($id);
+            $user = Auth::guard('api')->user();
+
+            $investment->update([
+                'welcome_call_status' => $request->status,
+                'welcome_call_notes' => $request->notes,
+                'welcome_call_by' => $user->id,
+                'welcome_call_at' => now(),
+            ]);
+
+            Log::info('Welcome call status updated', [
+                'investment_id' => $investment->id,
+                'status' => $request->status,
+                'updated_by' => $user->id
+            ]);
+
+            $investment->load('welcomeCallUser');
+
+            $data = [
+                'id' => $investment->id,
+                'welcome_call_status' => $investment->welcome_call_status,
+                'welcome_call_at' => $investment->welcome_call_at ? $investment->welcome_call_at->format('Y-m-d H:i:s') : null,
+                'welcome_call_notes' => $investment->welcome_call_notes,
+                'welcome_call_by' => $investment->welcomeCallUser->name ?? 'N/A',
+            ];
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Welcome call status updated successfully',
+                'data' => $data
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to update welcome call status',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+}

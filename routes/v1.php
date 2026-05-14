@@ -25,6 +25,7 @@ use App\Http\Controllers\V1\DatabaseController;
 use App\Http\Controllers\V1\SmsController;
 use App\Http\Controllers\V1\MaintenanceController;
 use App\Http\Controllers\V1\InvestmentPayoutController;
+use App\Http\Controllers\V1\WelcomeCallController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -114,6 +115,12 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::post('investments/{id}/terminate', [InvestmentController::class, 'terminate']);
     Route::delete('investments/{id}/approved-delete', [InvestmentController::class, 'destroyApprovedInvestement']);
     Route::get('investments/{id}/certificate', [InvestmentController::class, 'printCertificate']);
+
+    // Welcome Call Routes
+    Route::get('welcome-calls', [WelcomeCallController::class, 'index']);
+    Route::get('welcome-calls/{id}', [WelcomeCallController::class, 'show']);
+    // Alias for 'upgrade' or 'update status'
+    Route::patch('welcome-calls/{id}/status', [WelcomeCallController::class, 'updateStatus']);
 
     // Investment Payouts
     Route::get('investment-payouts', [InvestmentPayoutController::class, 'index']);

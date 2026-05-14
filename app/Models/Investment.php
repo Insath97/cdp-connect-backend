@@ -45,6 +45,10 @@ class Investment extends Model
         'rejection_reason',
         'terminated_at',
         'termination_reason',
+        'welcome_call_status',
+        'welcome_call_by',
+        'welcome_call_at',
+        'welcome_call_notes',
     ];
 
     protected $casts = [
@@ -55,6 +59,7 @@ class Investment extends Model
         'approved_at' => 'date',
         'cancelled_at' => 'datetime',
         'terminated_at' => 'datetime',
+        'welcome_call_at' => 'datetime',
         'investment_amount' => 'decimal:2',
         'initial_payment' => 'decimal:2',
         'monthly_payment_amount' => 'decimal:2'
@@ -113,5 +118,10 @@ class Investment extends Model
     public function payouts()
     {
         return $this->hasMany(InvestmentPayout::class);
+    }
+
+    public function welcomeCallUser()
+    {
+        return $this->belongsTo(User::class, 'welcome_call_by');
     }
 }
