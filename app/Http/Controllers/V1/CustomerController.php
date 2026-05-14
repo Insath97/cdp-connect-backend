@@ -32,8 +32,29 @@ class CustomerController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
-            $query = Customer::with(['user']);
+            $user = Auth::guard('api')->user();
+
+            // Hierarchy Visibility Logic
+            if (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
+                $accessibleBranchIds = [];
+                
+                if ($user->hasRole('Branch Coordinator') || $user->hasRole('Temp BOC')) {
+                    $accessibleBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+                } else {
+                    // Fallback to primary branch
+                    $accessibleBranchIds = [$user->branch_id];
+                }
+
+                // If user is hierarchical (GM, AGM, etc.), they might see more, but usually branch is the unit of isolation
+                // For now, filter by branches they have access to.
+                $query->where(function ($q) use ($accessibleBranchIds) {
+                    $q->whereHas('investments', function ($iq) use ($accessibleBranchIds) {
+                        $iq->whereIn('branch_id', $accessibleBranchIds);
+                    })->orWhereHas('quotations', function ($qq) use ($accessibleBranchIds) {
+                        $qq->whereIn('branch_id', $accessibleBranchIds);
+                    });
+                });
+            }
 
             if ($request->has('search')) {
                 $search = $request->search;
@@ -331,13 +352,39 @@ class CustomerController extends Controller implements HasMiddleware
 
             // If no customer_code, return all
             $perPage = request()->get('per_page', 15);
-            $customers = Customer::with([
+            $user = Auth::guard('api')->user();
+            $query = Customer::with([
                 'bankDetails:id,customer_id,bank_name,branch_name,account_number,payment_method',
                 'beneficiaries:id,customer_id,full_name,id_type,id_number,phone_primary,relationship,share_percentage'
             ])
                 ->select('id', 'customer_code', 'full_name', 'email', 'phone_primary', 'id_type', 'id_number')
-                ->orderBy('id', 'asc')
-                ->paginate($perPage);
+                ->orderBy('id', 'asc');
+
+            // Visibility Logic (Consistency)
+            if ($user && !$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
+                if ($user->hasRole('Branch Coordinator') || $user->hasRole('Temp BOC')) {
+                    $accessibleBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+                    $query->where(function ($q) use ($accessibleBranchIds) {
+                        $q->whereHas('investments', function ($iq) use ($accessibleBranchIds) {
+                            $iq->whereIn('branch_id', $accessibleBranchIds);
+                        })->orWhereHas('quotations', function ($qq) use ($accessibleBranchIds) {
+                            $qq->whereIn('branch_id', $accessibleBranchIds);
+                        });
+                    });
+                } else {
+                    $descendantIds = $user->getAllDescendantIds();
+                    $accessibleUserIds = array_merge([$user->id], $descendantIds);
+                    $query->where(function ($q) use ($accessibleUserIds) {
+                        $q->whereHas('investments', function ($iq) use ($accessibleUserIds) {
+                            $iq->whereIn('created_by', $accessibleUserIds);
+                        })->orWhereHas('quotations', function ($qq) use ($accessibleUserIds) {
+                            $qq->whereIn('created_by', $accessibleUserIds);
+                        });
+                    });
+                }
+            }
+
+            $customers = $query->paginate($perPage);
 
             return response()->json([
                 'status' => 'success',

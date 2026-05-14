@@ -33,7 +33,7 @@ class CreateQuotationRequest extends FormRequest
             'phone_primary' => 'required_without:customer_id|string|max:20',
             'email' => 'nullable|email|max:255',
             'address' => 'nullable|string|max:500',
-            'branch_id' => 'required|exists:branches,id',
+            'branch_id' => 'sometimes|nullable|exists:branches,id',
             'investment_product_id' => 'required|exists:investment_products,id',
             'investment_amount' => 'required|numeric|min:0',
             'notes' => 'nullable|string',

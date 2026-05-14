@@ -45,18 +45,15 @@ class QuotationController extends Controller implements HasMiddleware
             $query = Quotation::with(['customer', 'branch', 'investmentProduct', 'creator', 'marketingUser']);
 
             // Hierarchy Visibility Logic
-            if ($user->hasRole('Branch Coordinator')) {
+            if ($user->hasRole('Branch Coordinator') || $user->hasRole('Temp BOC')) {
                 $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
                 $query->whereIn('quotations.branch_id', $assignedBranchIds);
-            } elseif ($user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
+            } elseif (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
                 // Hierarchical users (GM, AGM, etc.) see their own and descendants
                 $descendantIds = $user->getAllDescendantIds();
                 $accessibleUserIds = array_merge([$user->id], $descendantIds);
 
-                $query->whereIn('created_by', $accessibleUserIds);
-            } elseif ($user->hasRole('Temp BOC')){
-                $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
-                $query->whereIn('quotations.branch_id', $assignedBranchIds);
+                $query->whereIn('quotations.created_by', $accessibleUserIds);
             }
 
             // Branch Filter
