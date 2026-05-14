@@ -519,7 +519,7 @@ class InvestmentController extends Controller implements HasMiddleware
             ], 500);
         }
     }
-    
+
     /**
      * Cancel the specified investment.
      */
@@ -542,7 +542,7 @@ class InvestmentController extends Controller implements HasMiddleware
             if (!$product) return;
 
             $calculations = $this->calculateInvestmentROI((float)$investment->investment_amount, $product);
-            
+
             $startDate = $investment->reservation_date ?? $investment->created_at;
             $payoutDate = Carbon::parse($startDate);
 
@@ -567,7 +567,6 @@ class InvestmentController extends Controller implements HasMiddleware
             if (!empty($payouts)) {
                 InvestmentPayout::insert($payouts);
             }
-
         } catch (\Throwable $th) {
             Log::error('Failed to generate payout schedule', [
                 'investment_id' => $investment->id,
@@ -941,12 +940,12 @@ class InvestmentController extends Controller implements HasMiddleware
      * @param string $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function cancel(Request $request, string $id)
+    public function cancel(Request $request, SmsService $smsService, string $id)
     {
         DB::beginTransaction();
         try {
             $user = Auth::guard('api')->user();
-            $investment = Investment::with(['investmentProduct', 'payouts'])->findOrFail($id);
+            $investment = Investment::with(['investmentProduct', 'payouts', 'customer'])->findOrFail($id);
 
             if (in_array($investment->status, ['cancelled', 'rejected'])) {
                 return response()->json([
@@ -971,6 +970,28 @@ class InvestmentController extends Controller implements HasMiddleware
                 ]);
 
                 DB::commit();
+
+                // Send SMS for Rejection
+                try {
+                    $sendSms = $request->boolean('send_sms', false);
+                    $recipientPhone = $investment->customer->phone_primary ?? null;
+
+                    if ($sendSms && $recipientPhone) {
+                        $rejectionSms = "Dear {$investment->customer->full_name},\n\n" .
+                            "Your Investment application has been rejected.\n" .
+                            "Application No: {$investment->application_number}\n" .
+                            "Reason: {$reason}\n\n" .
+                            "Thank you for choosing CDP Empire (Pvt) Ltd.\n\n" .
+                            "For any inquiries:\n" .
+                            "Hotline: +94 114 007 007\n" .
+                            "Website: https://cdp.lk/";
+
+                        $smsService->sendSms($recipientPhone, $rejectionSms);
+                    }
+                } catch (\Throwable $smsError) {
+                    Log::error('Failed to send rejection SMS', ['error' => $smsError->getMessage()]);
+                }
+
                 return response()->json([
                     'status' => 'success',
                     'message' => 'Investment rejected successfully',
@@ -985,16 +1006,16 @@ class InvestmentController extends Controller implements HasMiddleware
             // 1. Calculate Payout Deduction based on complete months completed
             $reservationDate = Carbon::parse($investment->reservation_date);
             $completeMonthsActive = (int) $reservationDate->diffInMonths(now());
-            
+
             // Get the monthly payout amount (assuming it's consistent across payouts)
             $firstPayout = $investment->payouts()->first();
             $monthlyPayoutAmount = $firstPayout ? (float) $firstPayout->amount : 0;
             $totalPayoutDeduction = $monthlyPayoutAmount * $completeMonthsActive;
-            
+
             // Check for 14-day rule for Admin Cost deduction
             $reservationDate = Carbon::parse($investment->reservation_date);
             $daysSinceReservation = $reservationDate->diffInDays(now());
-            
+
             $adminCostAmount = 0;
             if ($daysSinceReservation > 14) {
                 $adminCostPercentage = (float) SystemSetting::getSetting('admin_cost', 0);
@@ -1025,6 +1046,38 @@ class InvestmentController extends Controller implements HasMiddleware
 
             DB::commit();
 
+            // Send SMS for Cancellation
+            try {
+                $sendSms = $request->boolean('send_sms', false);
+                $recipientPhone = $investment->customer->phone_primary ?? null;
+
+                if ($sendSms && $recipientPhone) {
+                    $invAmount = number_format((float)$investment->investment_amount, 2);
+                    $penalty = number_format((float)$adminCostAmount, 2);
+                    $reduction = number_format((float)$totalPayoutDeduction, 2);
+                    $refund = number_format((float)$refundAmount, 2);
+
+                    $cancelSms = "Dear {$investment->customer->full_name},\n\n" .
+                        "Your Investment [{$investment->policy_number}] has been cancelled.\n\n" .
+                        "━━━━━━━━━━━━━━━━━━━\n" .
+                        "DETAILS:\n" .
+                        "━━━━━━━━━━━━━━━━━━━\n" .
+                        "Inv. Amount: LKR {$invAmount}\n" .
+                        "Admin Cost: LKR {$penalty}\n" .
+                        "Paid Divider: LKR {$reduction}\n" .
+                        "Refund: LKR {$refund}\n" .
+                        "━━━━━━━━━━━━━━━━━━━\n" .
+                        "Thank you for choosing CDP Empire (Pvt) Ltd.\n\n" .
+                        "For any inquiries:\n" .
+                        "Hotline: +94 114 007 007\n" .
+                        "Website: https://cdp.lk/";
+
+                    $smsService->sendSms($recipientPhone, $cancelSms);
+                }
+            } catch (\Throwable $smsError) {
+                Log::error('Failed to send cancellation SMS', ['error' => $smsError->getMessage()]);
+            }
+
             $commissions = Commission::where('investment_id', $investment->id)
                 ->with('user:id,name,employee_code')
                 ->get();
@@ -1043,20 +1096,21 @@ class InvestmentController extends Controller implements HasMiddleware
                     ]),
                     'refund_amount' => $refundAmount,
                     'penalty_amount' => $adminCostAmount,
-                    'total_recover_amount' => $totalRecoverAmount,
+                    'payout_reduction_amount' => $totalPayoutDeduction,
+                    'reduced_payout_count' => $completeMonthsActive,
+                    'recover_commission_amount' => $totalRecoverAmount,
                     'commissions' => $commissions->map(function ($comm) {
-                            return [
-                                'user' => $comm->user->name ?? 'N/A',
-                                'tier' => $comm->tier,
-                                'original_amount' => $comm->commission_amount,
-                                'earned_amount' => $comm->earned_amount,
-                                'recover_amount' => $comm->recover_amount,
-                                'status' => $comm->status
-                            ];
-                        })
+                        return [
+                            'user' => $comm->user->name ?? 'N/A',
+                            'tier' => $comm->tier,
+                            'original_amount' => $comm->commission_amount,
+                            'earned_amount' => $comm->earned_amount,
+                            'recover_amount' => $comm->recover_amount,
+                            'status' => $comm->status
+                        ];
+                    })
                 ]
             ], 200);
-
         } catch (\Throwable $th) {
             DB::rollBack();
             Log::error('Investment action failed', [
@@ -1083,7 +1137,7 @@ class InvestmentController extends Controller implements HasMiddleware
         $commissions = Commission::where('investment_id', $investment->id)->get();
         $reservationDate = Carbon::parse($investment->reservation_date);
         $daysSinceReservation = $reservationDate->diffInDays(now());
-        
+
         // Use complete months only for calculation (ignore partial days/hours)
         $totalMonths = (int) ($investment->investmentProduct->duration_months ?? 12);
         $completeMonthsActive = (int) $reservationDate->diffInMonths(now());
@@ -1104,7 +1158,7 @@ class InvestmentController extends Controller implements HasMiddleware
             if ($totalMonths > 0) {
                 $earnedAmount = ((float)$commission->commission_amount / $totalMonths) * $completeMonthsActive;
                 $recoverAmount = (float)$commission->commission_amount - $earnedAmount;
-                
+
                 $commission->update([
                     'status' => 'cancelled',
                     'earned_amount' => round($earnedAmount, 2),
