@@ -45,15 +45,18 @@ class QuotationController extends Controller implements HasMiddleware
             $query = Quotation::with(['customer', 'branch', 'investmentProduct', 'creator', 'marketingUser']);
 
             // Hierarchy Visibility Logic
-            if ($user->hasRole('Branch Coordinator') || $user->hasRole('Temp BOC')) {
+            if ($user->hasRole('Branch Coordinator')) {
                 $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
                 $query->whereIn('quotations.branch_id', $assignedBranchIds);
-            } elseif (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
+            } elseif ($user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
                 // Hierarchical users (GM, AGM, etc.) see their own and descendants
                 $descendantIds = $user->getAllDescendantIds();
                 $accessibleUserIds = array_merge([$user->id], $descendantIds);
 
-                $query->whereIn('quotations.created_by', $accessibleUserIds);
+                $query->whereIn('created_by', $accessibleUserIds);
+            } elseif ($user->hasRole('Temp BOC')) {
+                $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+                $query->whereIn('quotations.branch_id', $assignedBranchIds);
             }
 
             // Branch Filter
@@ -228,7 +231,6 @@ class QuotationController extends Controller implements HasMiddleware
                     'yearly_breakdown' => $calculations['yearly_breakdown']
                 ])
             ], 201);
-
         } catch (\Throwable $th) {
             Log::error('Quotation creation failed', [
                 'error' => $th->getMessage(),
@@ -312,7 +314,6 @@ class QuotationController extends Controller implements HasMiddleware
                 'message' => 'Quotation updated successfully',
                 'data' => $quotation->load(['customer', 'branch', 'investmentProduct', 'creator', 'marketingUser'])
             ], 200);
-
         } catch (\Throwable $th) {
             Log::error('Quotation update failed', [
                 'error' => $th->getMessage(),
@@ -433,5 +434,4 @@ class QuotationController extends Controller implements HasMiddleware
             ], 500);
         }
     }
-
 }
