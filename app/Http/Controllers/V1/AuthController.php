@@ -17,8 +17,10 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         try {
+            $loginField = $request->has('login') ? 'login' : 'email';
+
             $validator = Validator::make($request->all(), [
-                'email' => 'required|string|email',
+                $loginField => 'required|string',
                 'password' => 'required|string'
             ]);
 
@@ -30,7 +32,25 @@ class AuthController extends Controller
                 ], 422);
             }
 
-            $credentials = $request->only('email', 'password');
+            $loginValue = $request->input($loginField);
+
+            $user = \App\Models\User::where(function ($query) use ($loginValue) {
+                $query->where('email', $loginValue)
+                      ->orWhere('username', $loginValue)
+                      ->orWhere('employee_code', $loginValue);
+            })->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Invalid credentials'
+                ], 401);
+            }
+
+            $credentials = [
+                'email' => $user->email,
+                'password' => $request->input('password')
+            ];
 
             if (!$token = Auth::guard('api')->attempt($credentials)) {
                 return response()->json([
