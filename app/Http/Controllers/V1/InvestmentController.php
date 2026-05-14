@@ -382,8 +382,6 @@ class InvestmentController extends Controller implements HasMiddleware
         //
     }
 
-
-
     /**
      * Approve the specified investment.
      */
@@ -984,16 +982,36 @@ class InvestmentController extends Controller implements HasMiddleware
             }
 
             // Scenario B: Approved Investment (Cancellation)
-            // 1. Calculate Principal Refund
-            $paidPayoutsTotal = $investment->payouts()->where('status', 'paid')->sum('amount');
-            $refundAmount = max(0, (float)$investment->investment_amount - (float)$paidPayoutsTotal);
+            // 1. Calculate Payout Deduction based on complete months completed
+            $reservationDate = Carbon::parse($investment->reservation_date);
+            $completeMonthsActive = (int) $reservationDate->diffInMonths(now());
+            
+            // Get the monthly payout amount (assuming it's consistent across payouts)
+            $firstPayout = $investment->payouts()->first();
+            $monthlyPayoutAmount = $firstPayout ? (float) $firstPayout->amount : 0;
+            $totalPayoutDeduction = $monthlyPayoutAmount * $completeMonthsActive;
+            
+            // Check for 14-day rule for Admin Cost deduction
+            $reservationDate = Carbon::parse($investment->reservation_date);
+            $daysSinceReservation = $reservationDate->diffInDays(now());
+            
+            $adminCostAmount = 0;
+            if ($daysSinceReservation > 14) {
+                $adminCostPercentage = (float) SystemSetting::getSetting('admin_cost', 0);
+                $adminCostAmount = (float) $investment->investment_amount * $adminCostPercentage;
+            }
+
+            $refundAmount = (float) $investment->investment_amount;
+            $refundAmount -= (float) $totalPayoutDeduction;
+            $refundAmount -= (float) $adminCostAmount;
+            $refundAmount = max(0, $refundAmount);
 
             // 2. Update Investment Status
             $investment->update([
                 'status' => 'cancelled',
                 'cancelled_at' => now(),
                 'cancellation_reason' => $reason,
-                'refund_amount' => $refundAmount
+                'refund_amount' => round($refundAmount, 2)
             ]);
 
             // 3. Hierarchical Target Achievement Recalculation
@@ -1007,6 +1025,12 @@ class InvestmentController extends Controller implements HasMiddleware
 
             DB::commit();
 
+            $commissions = Commission::where('investment_id', $investment->id)
+                ->with('user:id,name,employee_code')
+                ->get();
+
+            $totalRecoverAmount = $commissions->sum('recover_amount');
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Investment cancelled successfully',
@@ -1018,10 +1042,9 @@ class InvestmentController extends Controller implements HasMiddleware
                         'investmentProduct:id,name,code,duration_months'
                     ]),
                     'refund_amount' => $refundAmount,
-                    'commissions' => Commission::where('investment_id', $investment->id)
-                        ->with('user:id,name,employee_code')
-                        ->get()
-                        ->map(function ($comm) {
+                    'penalty_amount' => $adminCostAmount,
+                    'total_recover_amount' => $totalRecoverAmount,
+                    'commissions' => $commissions->map(function ($comm) {
                             return [
                                 'user' => $comm->user->name ?? 'N/A',
                                 'tier' => $comm->tier,
@@ -1059,30 +1082,34 @@ class InvestmentController extends Controller implements HasMiddleware
     {
         $commissions = Commission::where('investment_id', $investment->id)->get();
         $reservationDate = Carbon::parse($investment->reservation_date);
-        $isSameMonth = $reservationDate->format('Y-m') === now()->format('Y-m');
+        $daysSinceReservation = $reservationDate->diffInDays(now());
+        
+        // Use complete months only for calculation (ignore partial days/hours)
+        $totalMonths = (int) ($investment->investmentProduct->duration_months ?? 12);
+        $completeMonthsActive = (int) $reservationDate->diffInMonths(now());
+        $completeMonthsActive = min($completeMonthsActive, $totalMonths);
 
         foreach ($commissions as $commission) {
-            if ($isSameMonth) {
+            // Rule 1: If cancelled within 14 days, no commission is earned (full recovery)
+            if ($daysSinceReservation <= 14) {
                 $commission->update([
                     'status' => 'cancelled',
                     'earned_amount' => 0,
                     'recover_amount' => $commission->commission_amount
                 ]);
-            } else {
-                $totalMonths = (int) $investment->investmentProduct->duration_months;
-                $activeMonths = $reservationDate->diffInMonths(now());
-                $activeMonths = min($activeMonths, $totalMonths);
+                continue;
+            }
+
+            // Rule 2: Based on complete months active
+            if ($totalMonths > 0) {
+                $earnedAmount = ((float)$commission->commission_amount / $totalMonths) * $completeMonthsActive;
+                $recoverAmount = (float)$commission->commission_amount - $earnedAmount;
                 
-                if ($totalMonths > 0) {
-                    $earnedAmount = ((float)$commission->commission_amount / $totalMonths) * $activeMonths;
-                    $recoverAmount = (float)$commission->commission_amount - $earnedAmount;
-                    
-                    $commission->update([
-                        'status' => 'cancelled',
-                        'earned_amount' => round($earnedAmount, 2),
-                        'recover_amount' => round($recoverAmount, 2)
-                    ]);
-                }
+                $commission->update([
+                    'status' => 'cancelled',
+                    'earned_amount' => round($earnedAmount, 2),
+                    'recover_amount' => round($recoverAmount, 2)
+                ]);
             }
         }
     }
