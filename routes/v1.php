@@ -111,6 +111,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::apiResource('investments', InvestmentController::class);
     Route::patch('investments/{id}/approve', [InvestmentController::class, 'approve']);
     Route::post('investments/{id}/cancel', [InvestmentController::class, 'cancel']);
+    Route::post('investments/{id}/terminate', [InvestmentController::class, 'terminate']);
     Route::delete('investments/{id}/approved-delete', [InvestmentController::class, 'destroyApprovedInvestement']);
     Route::get('investments/{id}/certificate', [InvestmentController::class, 'printCertificate']);
 

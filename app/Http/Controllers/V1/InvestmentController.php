@@ -41,6 +41,7 @@ class InvestmentController extends Controller implements HasMiddleware
             new Middleware('permission:Investment Delete', only: ['destroy']),
             new Middleware('permission:Investment Approve', only: ['approve']),
             new Middleware('permission:Investment Cancel', only: ['cancel']),
+            new Middleware('permission:Investment Terminate', only: ['terminate']),
             new Middleware('permission:Investment Certificate', only: ['printCertificate']),
             new Middleware('permission:Investment Maturity', only: ['investorMaturity']),
         ];
@@ -1121,6 +1122,98 @@ class InvestmentController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to process investment action',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Terminate the specified investment (Clean cancellation).
+     * Only for approved investments. No deductions. Future payouts cancelled.
+     */
+    public function terminate(Request $request, SmsService $smsService, string $id)
+    {
+        DB::beginTransaction();
+        try {
+            $user = Auth::guard('api')->user();
+            $investment = Investment::with(['investmentProduct', 'payouts', 'customer'])->findOrFail($id);
+
+            if ($investment->status !== 'approved') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Only approved investments can be terminated.'
+                ], 422);
+            }
+
+            $request->validate([
+                'termination_reason' => 'required|string|max:1000'
+            ]);
+
+            $reason = $request->termination_reason;
+
+            // Update Investment Status to Terminated
+            // Full refund (no deductions)
+            $investment->update([
+                'status' => 'terminated',
+                'terminated_at' => now(),
+                'termination_reason' => $reason,
+                'refund_amount' => $investment->investment_amount
+            ]);
+
+            // Cancel future unpaid payouts
+            $investment->payouts()->where('status', 'unpaid')->update(['status' => 'cancelled']);
+
+            // Note: No commission recovery, no target recalculation as requested by user
+
+            DB::commit();
+
+            // Send SMS for Termination
+            try {
+                $sendSms = $request->boolean('send_sms', false);
+                $recipientPhone = $investment->customer->phone_primary ?? null;
+
+                if ($sendSms && $recipientPhone) {
+                    $invAmount = number_format((float)$investment->investment_amount, 2);
+                    $refund = number_format((float)$investment->investment_amount, 2);
+
+                    $terminateSms = "Dear {$investment->customer->full_name},\n\n" .
+                        "Your Investment [{$investment->policy_number}] has been terminated.\n\n" .
+                        "━━━━━━━━━━━━━━━━━━━\n" .
+                        "DETAILS:\n" .
+                        "━━━━━━━━━━━━━━━━━━━\n" .
+                        "Inv. Amount: LKR {$invAmount}\n" .
+                        "Refund: LKR {$refund}\n" .
+                        "━━━━━━━━━━━━━━━━━━━\n" .
+                        "Thank you for choosing CDP Empire (Pvt) Ltd.\n\n" .
+                        "For any inquiries:\n" .
+                        "Hotline: +94 114 007 007\n" .
+                        "Website: https://cdp.lk/";
+
+                    $smsService->sendSms($recipientPhone, $terminateSms);
+                }
+            } catch (\Throwable $smsError) {
+                Log::error('Failed to send termination SMS', ['error' => $smsError->getMessage()]);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Investment terminated successfully',
+                'data' => [
+                    'investment' => $investment->load(['customer:id,full_name,customer_code', 'branch:id,name'])->makeHidden('payouts'),
+                    'refund_amount' => $investment->investment_amount
+                ]
+            ], 200);
+
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            Log::error('Investment termination failed', [
+                'error' => $th->getMessage(),
+                'investment_id' => $id
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to terminate investment',
                 'error' => $th->getMessage()
             ], 500);
         }

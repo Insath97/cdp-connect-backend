@@ -43,6 +43,8 @@ class Investment extends Model
         'refund_amount',
         'rejected_at',
         'rejection_reason',
+        'terminated_at',
+        'termination_reason',
     ];
 
     protected $casts = [
@@ -52,6 +54,7 @@ class Investment extends Model
         'checked_at' => 'date',
         'approved_at' => 'date',
         'cancelled_at' => 'datetime',
+        'terminated_at' => 'datetime',
         'investment_amount' => 'decimal:2',
         'initial_payment' => 'decimal:2',
         'monthly_payment_amount' => 'decimal:2'
