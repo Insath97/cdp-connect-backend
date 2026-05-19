@@ -26,6 +26,7 @@ use App\Http\Controllers\V1\SmsController;
 use App\Http\Controllers\V1\MaintenanceController;
 use App\Http\Controllers\V1\InvestmentPayoutController;
 use App\Http\Controllers\V1\WelcomeCallController;
+use App\Http\Controllers\V1\LegalController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -115,6 +116,8 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::post('investments/{id}/terminate', [InvestmentController::class, 'terminate']);
     Route::delete('investments/{id}/approved-delete', [InvestmentController::class, 'destroyApprovedInvestement']);
     Route::get('investments/{id}/certificate', [InvestmentController::class, 'printCertificate']);
+
+    Route::apiResource('legals', LegalController::class);
 
     // Welcome Call Routes
     Route::get('welcome-calls', [WelcomeCallController::class, 'index']);

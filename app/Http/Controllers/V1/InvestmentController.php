@@ -1033,7 +1033,8 @@ class InvestmentController extends Controller implements HasMiddleware
                 'status' => 'cancelled',
                 'cancelled_at' => now(),
                 'cancellation_reason' => $reason,
-                'refund_amount' => round($refundAmount, 2)
+                'refund_amount' => round($refundAmount, 2),
+                'admin_cost_amount' => round($adminCostAmount, 2)
             ]);
 
             // 3. Hierarchical Target Achievement Recalculation

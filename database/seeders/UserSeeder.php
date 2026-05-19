@@ -18,7 +18,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Development Admin',
                 'profile_image' => '/image',
-                'password' => bcrypt('password'),
+                'password' => bcrypt('core@CDPE@2026#?'),
                 'user_type' => 'admin',
                 'is_active' => true,
                 'can_login' => true,
@@ -29,6 +29,6 @@ class UserSeeder extends Seeder
 
         $this->command->info('Development admin user created!');
         $this->command->info('Email: dev@localhost.com');
-        $this->command->info('Password: password');
+        $this->command->info('Password: core@CDPE@2026#?');
     }
 }

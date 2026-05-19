@@ -41,6 +41,7 @@ class Investment extends Model
         'cancelled_at',
         'cancellation_reason',
         'refund_amount',
+        'admin_cost_amount',
         'rejected_at',
         'rejection_reason',
         'terminated_at',
@@ -62,7 +63,8 @@ class Investment extends Model
         'welcome_call_at' => 'datetime',
         'investment_amount' => 'decimal:2',
         'initial_payment' => 'decimal:2',
-        'monthly_payment_amount' => 'decimal:2'
+        'monthly_payment_amount' => 'decimal:2',
+        'admin_cost_amount' => 'decimal:2'
     ];
 
     public function customer()
