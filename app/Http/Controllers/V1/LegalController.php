@@ -93,6 +93,15 @@ class LegalController extends Controller implements HasMiddleware
                     'witness_02_name' => $data['witness_02_name'] ?? $existingLegal->witness_02_name,
                     'witness_02_nic' => $data['witness_02_nic'] ?? $existingLegal->witness_02_nic,
                     'witness_02_address' => $data['witness_02_address'] ?? $existingLegal->witness_02_address,
+                    'bank_name' => $data['bank_name'] ?? $existingLegal->bank_name,
+                    'branch_name' => $data['branch_name'] ?? $existingLegal->branch_name,
+                    'account_number' => $data['account_number'] ?? $existingLegal->account_number,
+                    'beneficiary_full_name' => $data['beneficiary_full_name'] ?? $existingLegal->beneficiary_full_name,
+                    'beneficiary_id_type' => $data['beneficiary_id_type'] ?? $existingLegal->beneficiary_id_type,
+                    'beneficiary_id_number' => $data['beneficiary_id_number'] ?? $existingLegal->beneficiary_id_number,
+                    'beneficiary_phone_primary' => $data['beneficiary_phone_primary'] ?? $existingLegal->beneficiary_phone_primary,
+                    'beneficiary_relationship' => $data['beneficiary_relationship'] ?? $existingLegal->beneficiary_relationship,
+                    'beneficiary_share_percentage' => $data['beneficiary_share_percentage'] ?? $existingLegal->beneficiary_share_percentage,
                 ]);
 
                 DB::commit();
@@ -112,9 +121,11 @@ class LegalController extends Controller implements HasMiddleware
             }
 
             // Create a new legal agreement
-            $investment = Investment::with(['customer', 'branch'])->findOrFail($data['investment_id']);
+            $investment = Investment::with(['customer', 'branch', 'beneficiary', 'bankDetail'])->findOrFail($data['investment_id']);
             $customer = $investment->customer;
             $branch = $investment->branch;
+            $beneficiary = $investment->beneficiary;
+            $bankDetail = $investment->bankDetail;
 
             // Generate unique legal_number: LEG-{BranchCode}-{YYMM}{Sequence}
             $yymm = date('ym');
@@ -155,7 +166,16 @@ class LegalController extends Controller implements HasMiddleware
                 'witness_02_name' => $data['witness_02_name'] ?? null,
                 'witness_02_nic' => $data['witness_02_nic'] ?? null,
                 'witness_02_address' => $data['witness_02_address'] ?? null,
-                'created_by' => Auth::id()
+                'created_by' => Auth::id(),
+                'bank_name' => $data['bank_name'] ?? ($bankDetail->bank_name ?? null),
+                'branch_name' => $data['branch_name'] ?? ($bankDetail->branch_name ?? null),
+                'account_number' => $data['account_number'] ?? ($bankDetail->account_number ?? null),
+                'beneficiary_full_name' => $data['beneficiary_full_name'] ?? ($beneficiary->full_name ?? null),
+                'beneficiary_id_type' => $data['beneficiary_id_type'] ?? ($beneficiary->id_type ?? 'nic'),
+                'beneficiary_id_number' => $data['beneficiary_id_number'] ?? ($beneficiary->id_number ?? null),
+                'beneficiary_phone_primary' => $data['beneficiary_phone_primary'] ?? ($beneficiary->phone_primary ?? null),
+                'beneficiary_relationship' => $data['beneficiary_relationship'] ?? ($beneficiary->relationship ?? null),
+                'beneficiary_share_percentage' => $data['beneficiary_share_percentage'] ?? ($beneficiary->share_percentage ?? null),
             ]);
 
             DB::commit();

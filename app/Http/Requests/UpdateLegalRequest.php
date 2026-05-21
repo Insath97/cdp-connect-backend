@@ -29,6 +29,15 @@ class UpdateLegalRequest extends FormRequest
             'witness_02_name' => 'nullable|string|max:255',
             'witness_02_nic' => 'nullable|string|max:50',
             'witness_02_address' => 'nullable|string|max:500',
+            'bank_name' => 'nullable|string|max:255',
+            'branch_name' => 'nullable|string|max:255',
+            'account_number' => 'nullable|string|max:50',
+            'beneficiary_full_name' => 'nullable|string|max:255',
+            'beneficiary_id_type' => 'nullable|in:nic,passport,driving_license,other',
+            'beneficiary_id_number' => 'nullable|string|max:50',
+            'beneficiary_phone_primary' => 'nullable|string|max:20',
+            'beneficiary_relationship' => 'nullable|string|max:100',
+            'beneficiary_share_percentage' => 'nullable|numeric|between:0,100',
         ];
     }
 }

@@ -38,7 +38,16 @@ class Legal extends Model
         'witness_02_name',
         'witness_02_nic',
         'witness_02_address',
-        'created_by'
+        'created_by',
+        'bank_name',
+        'branch_name',
+        'account_number',
+        'beneficiary_full_name',
+        'beneficiary_id_type',
+        'beneficiary_id_number',
+        'beneficiary_phone_primary',
+        'beneficiary_relationship',
+        'beneficiary_share_percentage'
     ];
 
     protected $casts = [
