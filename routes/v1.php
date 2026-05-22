@@ -33,10 +33,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
-
-    // Customer Public Details
-    Route::get('customers/public-details/{customer_code?}', [CustomerController::class, 'getPublicDetails']);
-
 });
 
 /* protected routes */
