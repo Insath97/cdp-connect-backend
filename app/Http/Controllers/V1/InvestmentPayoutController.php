@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use App\Services\SmsService;
 
 class InvestmentPayoutController extends Controller implements HasMiddleware
 {
@@ -150,6 +151,7 @@ class InvestmentPayoutController extends Controller implements HasMiddleware
             'reference_number' => 'nullable|string',
             'remarks' => 'nullable|string',
             'paid_at' => 'nullable|date',
+            'send_sms' => 'required|boolean',
         ]);
 
         try {
@@ -168,6 +170,56 @@ class InvestmentPayoutController extends Controller implements HasMiddleware
             }
 
             $payout->update($updateData);
+
+            // Send SMS if status is paid and send_sms is true
+            if ($request->status === 'paid' && $request->send_sms) {
+                try {
+                    $payout->load(['investment.customer', 'investment.investmentProduct']);
+                    $investment = $payout->investment;
+                    $customer = $investment->customer;
+
+                    if ($customer) {
+                        $recipientPhone = $customer->phone_primary ?? $customer->phone_secondary;
+
+                        if ($recipientPhone) {
+                            $paidDate = Carbon::parse($payout->paid_at)->format('Y-m-d');
+                            $monthYear = Carbon::parse($payout->scheduled_date)->format('F Y');
+                            $payoutAmount = $payout->amount;
+
+                            $smsMessage = "Dear {$customer->full_name},\n\n" .
+                                "Policy No: {$investment->policy_number}\n" .
+                                "Month: {$monthYear}\n" .
+                                "Paid Date: {$paidDate}\n" .
+                                "Paid Amount: LKR " . number_format($payoutAmount, 2) . "\n\n" .
+                                "Your monthly return has been successfully paid.\n\n" .
+                                "Thank you for choosing CDP Empire (Pvt) Ltd.\n" .
+                                "Hotline: +94 114 007 007";
+
+                            $smsService = app(SmsService::class);
+                            $smsService->sendSms($recipientPhone, $smsMessage);
+
+                            Log::info("SMS notification sent for payout update", [
+                                'payout_id' => $payout->id,
+                                'phone' => $recipientPhone
+                            ]);
+                        } else {
+                            Log::warning("Could not send SMS for payout update: customer phone is missing", [
+                                'payout_id' => $payout->id,
+                                'customer_id' => $customer->id
+                            ]);
+                        }
+                    } else {
+                        Log::warning("Could not send SMS for payout update: customer relation is missing", [
+                            'payout_id' => $payout->id
+                        ]);
+                    }
+                } catch (\Throwable $smsTh) {
+                    Log::error("Failed to send payout SMS notification", [
+                        'payout_id' => $payout->id,
+                        'error' => $smsTh->getMessage()
+                    ]);
+                }
+            }
 
             return response()->json([
                 'status' => 'success',
