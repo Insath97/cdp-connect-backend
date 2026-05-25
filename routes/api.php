@@ -12,3 +12,7 @@ Route::get('/health-check', function () {
 /* version 1 routes */
 require __DIR__ . '/v1.php';
 
+/* external routes */
+require __DIR__ . '/external.php';
+
+

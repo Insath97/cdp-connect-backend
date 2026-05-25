@@ -41,4 +41,8 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'external_api' => [
+        'key' => env('EXTERNAL_API_KEY'),
+    ],
+
 ];
