@@ -48,11 +48,14 @@ class CreateInvestmentRequest extends FormRequest
             // Nested Beneficiary Data
             'beneficiary' => 'nullable|array',
             'beneficiary.full_name' => 'required_with:beneficiary|string|max:255',
+            'beneficiary.type' => 'required_with:beneficiary|in:adult,child',
             'beneficiary.id_type' => 'required_with:beneficiary|in:nic,passport,driving_license,other',
             'beneficiary.id_number' => 'required_with:beneficiary|string|max:50',
             'beneficiary.phone_primary' => 'required_with:beneficiary|string|max:20',
             'beneficiary.relationship' => 'required_with:beneficiary|string|max:100',
             'beneficiary.share_percentage' => 'required_with:beneficiary|numeric|min:0|max:100',
+            'beneficiary.id_image' => 'required_if:beneficiary.type,adult|nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'beneficiary.child_file' => 'required_if:beneficiary.type,child|nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
 
             // Nested Bank Detail Data
             'bank_detail' => 'nullable|array',

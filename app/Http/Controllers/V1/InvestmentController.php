@@ -191,7 +191,19 @@ class InvestmentController extends Controller implements HasMiddleware
 
             // 5. Handle Nested Beneficiary Creation
             if ($request->has('beneficiary')) {
-                $beneficiary = Beneficiary::create(array_merge($request->beneficiary, [
+                $beneficiaryData = $request->beneficiary;
+
+                if ($request->hasFile('beneficiary.id_image')) {
+                    $idImagePath = $this->handleFileUpload($request, 'beneficiary.id_image', null, 'beneficiaries/id_images');
+                    $beneficiaryData['id_image'] = $idImagePath;
+                }
+
+                if ($request->hasFile('beneficiary.child_file')) {
+                    $childFilePath = $this->handleFileUpload($request, 'beneficiary.child_file', null, 'beneficiaries/child_files');
+                    $beneficiaryData['child_file'] = $childFilePath;
+                }
+
+                $beneficiary = Beneficiary::create(array_merge($beneficiaryData, [
                     'customer_id' => $data['customer_id']
                 ]));
                 $data['beneficiary_id'] = $beneficiary->id;
@@ -754,9 +766,33 @@ class InvestmentController extends Controller implements HasMiddleware
             // 4. Handle Nested Beneficiary Update/Creation
             if ($request->has('beneficiary')) {
                 if ($investment->beneficiary_id && $investment->beneficiary) {
-                    $investment->beneficiary->update($request->beneficiary);
+                    $beneficiaryData = $request->beneficiary;
+
+                    if ($request->hasFile('beneficiary.id_image')) {
+                        $idImagePath = $this->handleFileUpload($request, 'beneficiary.id_image', $investment->beneficiary->id_image, 'beneficiaries/id_images');
+                        $beneficiaryData['id_image'] = $idImagePath;
+                    }
+
+                    if ($request->hasFile('beneficiary.child_file')) {
+                        $childFilePath = $this->handleFileUpload($request, 'beneficiary.child_file', $investment->beneficiary->child_file, 'beneficiaries/child_files');
+                        $beneficiaryData['child_file'] = $childFilePath;
+                    }
+
+                    $investment->beneficiary->update($beneficiaryData);
                 } else {
-                    $beneficiary = Beneficiary::create(array_merge($request->beneficiary, [
+                    $beneficiaryData = $request->beneficiary;
+
+                    if ($request->hasFile('beneficiary.id_image')) {
+                        $idImagePath = $this->handleFileUpload($request, 'beneficiary.id_image', null, 'beneficiaries/id_images');
+                        $beneficiaryData['id_image'] = $idImagePath;
+                    }
+
+                    if ($request->hasFile('beneficiary.child_file')) {
+                        $childFilePath = $this->handleFileUpload($request, 'beneficiary.child_file', null, 'beneficiaries/child_files');
+                        $beneficiaryData['child_file'] = $childFilePath;
+                    }
+
+                    $beneficiary = Beneficiary::create(array_merge($beneficiaryData, [
                         'customer_id' => $investment->customer_id
                     ]));
                     $data['beneficiary_id'] = $beneficiary->id;
