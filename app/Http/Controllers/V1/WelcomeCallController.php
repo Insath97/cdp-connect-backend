@@ -117,6 +117,7 @@ class WelcomeCallController extends Controller implements HasMiddleware
                         'share_percentage' => $inv->beneficiary->share_percentage ? (float)$inv->beneficiary->share_percentage : 0,
                     ],
                     'agent_name' => $inv->unitHead->name ?? 'N/A',
+                    'agent_employee_code' => $inv->unitHead->employee_code ?? 'N/A',
                     'welcome_call_by' => $inv->welcomeCallUser->name ?? 'N/A',
                 ];
             });
@@ -196,6 +197,7 @@ class WelcomeCallController extends Controller implements HasMiddleware
                     'share_percentage' => $investment->beneficiary->share_percentage ? (float)$investment->beneficiary->share_percentage : 0,
                 ],
                 'agent_name' => $investment->unitHead->name ?? 'N/A',
+                'agent_employee_code' => $investment->unitHead->employee_code ?? 'N/A',
                 'welcome_call_by' => $investment->welcomeCallUser->name ?? 'N/A',
             ];
 
