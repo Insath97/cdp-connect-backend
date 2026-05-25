@@ -30,7 +30,7 @@ class WelcomeCallController extends Controller implements HasMiddleware
             $perPage = $request->get('per_page', 15);
             $user = Auth::guard('api')->user();
 
-            $query = Investment::with(['customer', 'branch', 'investmentProduct', 'welcomeCallUser'])
+            $query = Investment::with(['customer', 'branch', 'investmentProduct', 'welcomeCallUser', 'bankDetail', 'beneficiary'])
                 ->where('status', 'approved');
 
             // Hierarchy Visibility Logic (consistent with InvestmentController)
@@ -100,6 +100,22 @@ class WelcomeCallController extends Controller implements HasMiddleware
                         'name' => $inv->investmentProduct->name ?? 'N/A',
                         'duration_months' => $inv->investmentProduct->duration_months ?? 0,
                     ],
+                    'bank_detail' => [
+                        'id' => $inv->bankDetail->id ?? null,
+                        'bank_name' => $inv->bankDetail->bank_name ?? 'N/A',
+                        'branch_name' => $inv->bankDetail->branch_name ?? 'N/A',
+                        'account_number' => $inv->bankDetail->account_number ?? 'N/A',
+                        'payment_method' => $inv->bankDetail->payment_method ?? 'N/A',
+                    ],
+                    'beneficiary' => [
+                        'id' => $inv->beneficiary->id ?? null,
+                        'full_name' => $inv->beneficiary->full_name ?? 'N/A',
+                        'id_type' => $inv->beneficiary->id_type ?? 'N/A',
+                        'id_number' => $inv->beneficiary->id_number ?? 'N/A',
+                        'phone_primary' => $inv->beneficiary->phone_primary ?? 'N/A',
+                        'relationship' => $inv->beneficiary->relationship ?? 'N/A',
+                        'share_percentage' => $inv->beneficiary->share_percentage ? (float)$inv->beneficiary->share_percentage : 0,
+                    ],
                     'welcome_call_by' => $inv->welcomeCallUser->name ?? 'N/A',
                 ];
             });
@@ -124,7 +140,7 @@ class WelcomeCallController extends Controller implements HasMiddleware
     public function show($id)
     {
         try {
-            $investment = Investment::with(['customer', 'branch', 'investmentProduct', 'welcomeCallUser'])
+            $investment = Investment::with(['customer', 'branch', 'investmentProduct', 'welcomeCallUser', 'bankDetail', 'beneficiary'])
                 ->where('status', 'approved')
                 ->find($id);
 
@@ -161,6 +177,22 @@ class WelcomeCallController extends Controller implements HasMiddleware
                     'name' => $investment->investmentProduct->name ?? 'N/A',
                     'duration_months' => $investment->investmentProduct->duration_months ?? 0,
                     'roi_percentage' => $investment->investmentProduct->roi_percentage ?? 0,
+                ],
+                'bank_detail' => [
+                    'id' => $investment->bankDetail->id ?? null,
+                    'bank_name' => $investment->bankDetail->bank_name ?? 'N/A',
+                    'branch_name' => $investment->bankDetail->branch_name ?? 'N/A',
+                    'account_number' => $investment->bankDetail->account_number ?? 'N/A',
+                    'payment_method' => $investment->bankDetail->payment_method ?? 'N/A',
+                ],
+                'beneficiary' => [
+                    'id' => $investment->beneficiary->id ?? null,
+                    'full_name' => $investment->beneficiary->full_name ?? 'N/A',
+                    'id_type' => $investment->beneficiary->id_type ?? 'N/A',
+                    'id_number' => $investment->beneficiary->id_number ?? 'N/A',
+                    'phone_primary' => $investment->beneficiary->phone_primary ?? 'N/A',
+                    'relationship' => $investment->beneficiary->relationship ?? 'N/A',
+                    'share_percentage' => $investment->beneficiary->share_percentage ? (float)$investment->beneficiary->share_percentage : 0,
                 ],
                 'welcome_call_by' => $investment->welcomeCallUser->name ?? 'N/A',
             ];
