@@ -77,7 +77,7 @@ class BeneficiaryClassificationTest extends TestCase
     }
 
     /** @test */
-    public function test_validation_requires_id_image_for_adult_beneficiary()
+    public function test_successful_investment_creation_with_adult_beneficiary_without_id_image()
     {
         $response = $this->actingAs($this->user, 'api')
             ->postJson('/api/v1/investments', [
@@ -101,8 +101,12 @@ class BeneficiaryClassificationTest extends TestCase
                 ]
             ]);
 
-        $response->assertStatus(422);
-        $response->assertJsonFragment(['field' => 'beneficiary.id_image']);
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('beneficiaries', [
+            'full_name' => 'Adult Beneficiary',
+            'type' => 'adult',
+            'id_image' => null,
+        ]);
     }
 
     /** @test */

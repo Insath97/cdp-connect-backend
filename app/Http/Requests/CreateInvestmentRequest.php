@@ -54,7 +54,7 @@ class CreateInvestmentRequest extends FormRequest
             'beneficiary.phone_primary' => 'required_with:beneficiary|string|max:20',
             'beneficiary.relationship' => 'required_with:beneficiary|string|max:100',
             'beneficiary.share_percentage' => 'required_with:beneficiary|numeric|min:0|max:100',
-            'beneficiary.id_image' => 'required_if:beneficiary.type,adult|nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'beneficiary.id_image' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'beneficiary.child_file' => 'required_if:beneficiary.type,child|nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
 
             // Nested Bank Detail Data
