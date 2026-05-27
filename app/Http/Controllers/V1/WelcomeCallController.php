@@ -55,8 +55,8 @@ class WelcomeCallController extends Controller implements HasMiddleware
                 $query->whereDate('approved_at', '>=', $request->from_date);
             } elseif ($request->filled('end_date')) {
                 $query->whereDate('approved_at', '<=', $request->end_date);
-            } else {
-                // Default to current date approved investments
+            } elseif (!$request->has('welcome_call_status')) {
+                // Default to current date approved investments only if welcome_call_status is not filterable
                 $query->whereDate('approved_at', Carbon::today());
             }
 
@@ -227,12 +227,21 @@ class WelcomeCallController extends Controller implements HasMiddleware
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'status' => 'required|in:pending,completed,not_reachable',
+            'status' => 'required|in:pending,completed,not_reachable,no_answer,others',
             'notes' => 'nullable|string'
         ]);
 
         try {
             $investment = Investment::query()->where('status', 'approved')->findOrFail($id);
+
+            // Prevent changing status if it's already 'completed'
+            if ($investment->welcome_call_status === 'completed' && $request->status !== 'completed') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Completed welcome calls cannot be changed to another status'
+                ], 422);
+            }
+
             $user = Auth::guard('api')->user();
 
             $investment->update([

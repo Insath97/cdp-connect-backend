@@ -972,7 +972,7 @@ class InvestmentController extends Controller implements HasMiddleware
 
     /**
      * Cancel or Reject the specified investment based on its current status.
-     * 
+     *
      * @param \Illuminate\Http\Request $request
      * @param string $id
      * @return \Illuminate\Http\JsonResponse
@@ -1258,7 +1258,7 @@ class InvestmentController extends Controller implements HasMiddleware
 
     /**
      * Process commission recovery for a cancelled investment.
-     * 
+     *
      * @param \App\Models\Investment $investment
      * @return void
      */
