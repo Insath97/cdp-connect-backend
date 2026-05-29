@@ -110,6 +110,39 @@ class BillingController extends Controller implements HasMiddleware
 
             $billings = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
+            // Clean response data to show only important fields
+            $billings->getCollection()->transform(function ($billing) {
+                return [
+                    'id' => $billing->id,
+                    'billing_number' => $billing->billing_number,
+                    'investment_amount' => (float)$billing->investment_amount,
+                    'status' => $billing->status,
+                    'created_at' => $billing->created_at ? $billing->created_at->format('Y-m-d H:i:s') : null,
+                    'customer' => [
+                        'id' => $billing->customer->id ?? null,
+                        'full_name' => $billing->customer->full_name ?? 'N/A',
+                        'customer_code' => $billing->customer->customer_code ?? 'N/A',
+                        'phone' => $billing->customer->phone_primary ?? 'N/A',
+                    ],
+                    'branch' => [
+                        'id' => $billing->branch->id ?? null,
+                        'name' => $billing->branch->name ?? 'N/A',
+                        'code' => $billing->branch->code ?? 'N/A',
+                    ],
+                    'investment' => [
+                        'id' => $billing->investment->id ?? null,
+                        'policy_number' => $billing->investment->policy_number ?? 'N/A',
+                        'application_number' => $billing->investment->application_number ?? 'N/A',
+                        'agent_name' => $billing->investment->creator->name ?? 'N/A',
+                    ],
+                    'plan' => [
+                        'id' => $billing->investmentProduct->id ?? null,
+                        'name' => $billing->investmentProduct->name ?? 'N/A',
+                        'duration_months' => $billing->investmentProduct->duration_months ?? 0,
+                    ]
+                ];
+            });
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Billings retrieved successfully',
@@ -164,10 +197,40 @@ class BillingController extends Controller implements HasMiddleware
                 ], 404);
             }
 
+            $formattedBilling = [
+                'id' => $billing->id,
+                'billing_number' => $billing->billing_number,
+                'investment_amount' => (float)$billing->investment_amount,
+                'status' => $billing->status,
+                'created_at' => $billing->created_at ? $billing->created_at->format('Y-m-d H:i:s') : null,
+                'customer' => [
+                    'id' => $billing->customer->id ?? null,
+                    'full_name' => $billing->customer->full_name ?? 'N/A',
+                    'customer_code' => $billing->customer->customer_code ?? 'N/A',
+                    'phone' => $billing->customer->phone_primary ?? 'N/A',
+                ],
+                'branch' => [
+                    'id' => $billing->branch->id ?? null,
+                    'name' => $billing->branch->name ?? 'N/A',
+                    'code' => $billing->branch->code ?? 'N/A',
+                ],
+                'investment' => [
+                    'id' => $billing->investment->id ?? null,
+                    'policy_number' => $billing->investment->policy_number ?? 'N/A',
+                    'application_number' => $billing->investment->application_number ?? 'N/A',
+                    'agent_name' => $billing->investment->creator->name ?? 'N/A',
+                ],
+                'plan' => [
+                    'id' => $billing->investmentProduct->id ?? null,
+                    'name' => $billing->investmentProduct->name ?? 'N/A',
+                    'duration_months' => $billing->investmentProduct->duration_months ?? 0,
+                ]
+            ];
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Billing details retrieved successfully',
-                'data' => $billing
+                'data' => $formattedBilling
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
