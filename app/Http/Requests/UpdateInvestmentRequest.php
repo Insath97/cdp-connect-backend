@@ -52,11 +52,12 @@ class UpdateInvestmentRequest extends FormRequest
             'bank_detail.account_number' => 'required_with:bank_detail|string|max:50',
             'bank_detail.payment_method' => 'required_with:bank_detail|in:bank_transfer,cheque,cash',
 
+            'business_type' => 'sometimes|in:counter_business,bank_deposit',
             'investment_amount' => 'sometimes|numeric|min:0',
             'bank' => 'sometimes|in:HNB,Sampath,Commercial Bank,Peoples Bank,NSB,Other',
             'payment_type' => 'sometimes|in:full_payment,monthly',
             'payment_description' => 'nullable|string',
-            'payment_proof' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'payment_proof' => 'required_if:business_type,bank_deposit|nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'initial_payment' => 'sometimes|numeric|min:0',
             'initial_payment_date' => 'nullable|date',
             'monthly_payment_amount' => 'nullable|numeric|min:0',

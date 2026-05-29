@@ -221,13 +221,32 @@ class InvestmentController extends Controller implements HasMiddleware
             $data['created_by'] = $currentUser->id;
 
             $imagePath = $this->handleFileUpload($request, 'payment_proof', null, 'investments/payment', $data['application_number'] ?? '');
-            if ($imagePath) {
-                $data['payment_proof'] = $imagePath ?? null;
-            }
+            $data['payment_proof'] = $imagePath;
 
             $data['status'] = 'pending';
 
             $investment = Investment::create($data);
+
+            if ($investment->business_type === 'counter_business') {
+                $billingPrefix = 'BIL-' . $branch->code . '-' . $yymm;
+
+                $lastBilling = \App\Models\Billing::where('billing_number', 'like', $billingPrefix . '%')
+                    ->orderBy('billing_number', 'desc')
+                    ->first();
+
+                $billingSequence = $lastBilling ? (int) substr($lastBilling->billing_number, -4) + 1 : 1;
+                $billingNumber = $billingPrefix . str_pad((string)$billingSequence, 4, '0', STR_PAD_LEFT);
+
+                \App\Models\Billing::create([
+                    'billing_number' => $billingNumber,
+                    'customer_id' => $investment->customer_id,
+                    'investment_id' => $investment->id,
+                    'investment_product_id' => $investment->investment_product_id,
+                    'investment_amount' => $investment->investment_amount,
+                    'branch_id' => $investment->branch_id,
+                    'status' => 'pending',
+                ]);
+            }
 
             try {
                 $recipientEmail = SystemSetting::getSetting('investment_admin_notification_email', 'admin@cdpconnect.com');
@@ -417,6 +436,16 @@ class InvestmentController extends Controller implements HasMiddleware
                     'status' => 'error',
                     'message' => 'Only pending investments can be approved.'
                 ], 422);
+            }
+
+            if ($investment->business_type === 'counter_business') {
+                $billing = \App\Models\Billing::where('investment_id', $investment->id)->first();
+                if (!$billing || $billing->status !== 'received') {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'This investment cannot be approved before the billing status is received.'
+                    ], 422);
+                }
             }
 
             // 1. Generate Policy Number: {BranchCode}-{YYMM}{Sequence}
@@ -808,6 +837,53 @@ class InvestmentController extends Controller implements HasMiddleware
                         'customer_id' => $investment->customer_id
                     ]));
                     $data['customer_bank_detail_id'] = $bankDetail->id;
+                }
+            }
+
+            // Create, delete, or update billing if business_type or associated fields changed
+            if (isset($data['business_type']) && $data['business_type'] !== $investment->business_type) {
+                if ($data['business_type'] === 'counter_business') {
+                    $billingExists = \App\Models\Billing::where('investment_id', $investment->id)->exists();
+                    if (!$billingExists) {
+                        $branch = \App\Models\Branch::findOrFail($data['branch_id'] ?? $investment->branch_id);
+                        $reservationDate = Carbon::parse($data['reservation_date'] ?? $investment->reservation_date);
+                        $yymm = $reservationDate->format('ym');
+                        $billingPrefix = 'BIL-' . $branch->code . '-' . $yymm;
+
+                        $lastBilling = \App\Models\Billing::where('billing_number', 'like', $billingPrefix . '%')
+                            ->orderBy('billing_number', 'desc')
+                            ->first();
+
+                        $billingSequence = $lastBilling ? (int) substr($lastBilling->billing_number, -4) + 1 : 1;
+                        $billingNumber = $billingPrefix . str_pad((string)$billingSequence, 4, '0', STR_PAD_LEFT);
+
+                        \App\Models\Billing::create([
+                            'billing_number' => $billingNumber,
+                            'customer_id' => $data['customer_id'] ?? $investment->customer_id,
+                            'investment_id' => $investment->id,
+                            'investment_product_id' => $data['investment_product_id'] ?? $investment->investment_product_id,
+                            'investment_amount' => $data['investment_amount'] ?? $investment->investment_amount,
+                            'branch_id' => $data['branch_id'] ?? $investment->branch_id,
+                            'status' => 'pending',
+                        ]);
+                    }
+                } elseif ($data['business_type'] === 'bank_deposit') {
+                    \App\Models\Billing::where('investment_id', $investment->id)->delete();
+                }
+            }
+
+            // Sync updates to billing if it exists
+            if (($investment->business_type === 'counter_business' || (isset($data['business_type']) && $data['business_type'] === 'counter_business'))) {
+                $billing = \App\Models\Billing::where('investment_id', $investment->id)->first();
+                if ($billing) {
+                    $billingUpdateData = [];
+                    if (isset($data['customer_id'])) $billingUpdateData['customer_id'] = $data['customer_id'];
+                    if (isset($data['investment_product_id'])) $billingUpdateData['investment_product_id'] = $data['investment_product_id'];
+                    if (isset($data['investment_amount'])) $billingUpdateData['investment_amount'] = $data['investment_amount'];
+                    if (isset($data['branch_id'])) $billingUpdateData['branch_id'] = $data['branch_id'];
+                    if (!empty($billingUpdateData)) {
+                        $billing->update($billingUpdateData);
+                    }
                 }
             }
 

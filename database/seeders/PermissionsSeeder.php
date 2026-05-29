@@ -123,6 +123,10 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Welcome Call Index', 'group_name' => 'Welcome Call Management Permissions'],
             ['name' => 'Welcome Call Update', 'group_name' => 'Welcome Call Management Permissions'],
 
+            /* Billing Management */
+            ['name' => 'Billing Index', 'group_name' => 'Billing Management Permissions'],
+            ['name' => 'Billing Update Status', 'group_name' => 'Billing Management Permissions'],
+
             /* Legal Management */
             ['name' => 'Legal Index', 'group_name' => 'Legal Management Permissions'],
             ['name' => 'Legal Create', 'group_name' => 'Legal Management Permissions'],

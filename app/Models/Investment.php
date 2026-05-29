@@ -30,6 +30,7 @@ class Investment extends Model
         'monthly_payment_amount',
         'monthly_payment_date',
         'payment_proof',
+        'business_type',
         'status',
         'created_by',
         'unit_head_id',
@@ -66,6 +67,11 @@ class Investment extends Model
         'monthly_payment_amount' => 'decimal:2',
         'admin_cost_amount' => 'decimal:2'
     ];
+
+    public function billing()
+    {
+        return $this->hasOne(Billing::class);
+    }
 
     public function customer()
     {

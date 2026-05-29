@@ -78,4 +78,9 @@ class Customer extends Model
     {
         return $this->hasMany(CustomerBankDetail::class);
     }
+
+    public function billings()
+    {
+        return $this->hasMany(Billing::class);
+    }
 }

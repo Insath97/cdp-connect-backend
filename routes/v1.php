@@ -27,6 +27,7 @@ use App\Http\Controllers\V1\MaintenanceController;
 use App\Http\Controllers\V1\InvestmentPayoutController;
 use App\Http\Controllers\V1\WelcomeCallController;
 use App\Http\Controllers\V1\LegalController;
+use App\Http\Controllers\V1\BillingController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -118,8 +119,12 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     // Welcome Call Routes
     Route::get('welcome-calls', [WelcomeCallController::class, 'index']);
     Route::get('welcome-calls/{id}', [WelcomeCallController::class, 'show']);
-    // Alias for 'upgrade' or 'update status'
     Route::patch('welcome-calls/{id}/status', [WelcomeCallController::class, 'updateStatus']);
+
+    // Billing Routes
+    Route::get('billings', [BillingController::class, 'index']);
+    Route::get('billings/{id}', [BillingController::class, 'show']);
+    Route::patch('billings/{id}/status', [BillingController::class, 'updateStatus']);
 
     // Investment Payouts
     Route::get('investment-payouts', [InvestmentPayoutController::class, 'index']);
