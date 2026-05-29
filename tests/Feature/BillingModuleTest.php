@@ -41,6 +41,9 @@ class BillingModuleTest extends TestCase
             'can_login' => true,
         ]);
 
+        $role = \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'api']);
+        $this->user->assignRole($role);
+
         // Create a branch
         $this->branch = Branch::create([
             'name' => 'Colombo Branch',
@@ -255,5 +258,37 @@ class BillingModuleTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonPath('stats.total_amount_pending', 100000.00);
         $response->assertJsonPath('stats.total_amount_received', 200000.00);
+    }
+
+    /** @test */
+    public function test_it_does_not_require_payment_proof_when_updating_if_already_exists()
+    {
+        // Create a bank deposit investment
+        $investment = Investment::create([
+            'customer_id' => $this->customer->id,
+            'branch_id' => $this->branch->id,
+            'investment_product_id' => $this->product->id,
+            'investment_amount' => 500000.00,
+            'payment_type' => 'full_payment',
+            'status' => 'pending',
+            'business_type' => 'bank_deposit',
+            'created_by' => $this->user->id,
+            'unit_head_id' => $this->user->id,
+            'target_period_key' => now()->format('Y-m'),
+            'reservation_date' => now(),
+            'application_number' => 'APP-COL-10',
+            'sales_code' => 'COL-10',
+            'payment_proof' => 'existing_proof.jpg',
+        ]);
+
+        // Attempting to update notes (without re-uploading file) should succeed
+        $response = $this->actingAs($this->user, 'api')
+            ->putJson("/api/v1/investments/{$investment->id}", [
+                'notes' => 'Updated notes',
+                'business_type' => 'bank_deposit',
+            ]);
+
+        $response->assertStatus(200);
+        $this->assertEquals('Updated notes', $investment->fresh()->notes);
     }
 }

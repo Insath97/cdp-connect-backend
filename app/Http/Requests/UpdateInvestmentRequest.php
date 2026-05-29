@@ -22,6 +22,8 @@ class UpdateInvestmentRequest extends FormRequest
     public function rules(): array
     {
         $id = $this->route('investment');
+        $investment = \App\Models\Investment::find($id);
+        $hasExistingProof = $investment && !empty($investment->payment_proof);
 
         return [
             'application_number' => 'sometimes|string|unique:investments,application_number,' . $id,
@@ -57,7 +59,7 @@ class UpdateInvestmentRequest extends FormRequest
             'bank' => 'sometimes|in:HNB,Sampath,Commercial Bank,Peoples Bank,NSB,Other',
             'payment_type' => 'sometimes|in:full_payment,monthly',
             'payment_description' => 'nullable|string',
-            'payment_proof' => 'required_if:business_type,bank_deposit|nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'payment_proof' => ($hasExistingProof ? 'nullable' : 'required_if:business_type,bank_deposit') . '|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'initial_payment' => 'sometimes|numeric|min:0',
             'initial_payment_date' => 'nullable|date',
             'monthly_payment_amount' => 'nullable|numeric|min:0',
