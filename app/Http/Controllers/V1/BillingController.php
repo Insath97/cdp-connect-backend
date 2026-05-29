@@ -117,6 +117,7 @@ class BillingController extends Controller implements HasMiddleware
                     'billing_number' => $billing->billing_number,
                     'investment_amount' => (float)$billing->investment_amount,
                     'status' => $billing->status,
+                    'status_updated_at' => $billing->status_updated_at ? $billing->status_updated_at->format('Y-m-d H:i:s') : null,
                     'created_at' => $billing->created_at ? $billing->created_at->format('Y-m-d H:i:s') : null,
                     'customer' => [
                         'id' => $billing->customer->id ?? null,
@@ -202,6 +203,7 @@ class BillingController extends Controller implements HasMiddleware
                 'billing_number' => $billing->billing_number,
                 'investment_amount' => (float)$billing->investment_amount,
                 'status' => $billing->status,
+                'status_updated_at' => $billing->status_updated_at ? $billing->status_updated_at->format('Y-m-d H:i:s') : null,
                 'created_at' => $billing->created_at ? $billing->created_at->format('Y-m-d H:i:s') : null,
                 'customer' => [
                     'id' => $billing->customer->id ?? null,
@@ -263,7 +265,8 @@ class BillingController extends Controller implements HasMiddleware
             $billing = $query->findOrFail($id);
 
             $billing->update([
-                'status' => 'received'
+                'status' => 'received',
+                'status_updated_at' => now(),
             ]);
 
             Log::info('Billing status updated', [

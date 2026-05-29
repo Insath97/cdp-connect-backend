@@ -17,10 +17,12 @@ class Billing extends Model
         'investment_amount',
         'branch_id',
         'status',
+        'status_updated_at',
     ];
 
     protected $casts = [
         'investment_amount' => 'decimal:2',
+        'status_updated_at' => 'datetime',
     ];
 
     public function customer()

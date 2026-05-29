@@ -6,30 +6,36 @@ use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
-return new class extends Migration {
+return new class extends Migration
+{
     /**
      * Run the migrations.
      */
     public function up(): void
     {
-        // 1. Alter investments table: add business_type and make payment_proof nullable
+        // 1. Alter investments table: add business_type and make payment_proof nullable if not already done
         Schema::table('investments', function (Blueprint $table) {
-            $table->string('business_type')->default('bank_deposit')->after('payment_type');
+            if (! Schema::hasColumn('investments', 'business_type')) {
+                $table->string('business_type')->default('bank_deposit')->after('payment_type');
+            }
             $table->string('payment_proof')->nullable()->change();
         });
 
-        // 2. Create billings table
-        Schema::create('billings', function (Blueprint $table) {
-            $table->id();
-            $table->string('billing_number')->unique();
-            $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
-            $table->foreignId('investment_id')->constrained('investments')->cascadeOnDelete();
-            $table->foreignId('investment_product_id')->constrained('investment_products')->cascadeOnDelete();
-            $table->decimal('investment_amount', 15, 2);
-            $table->foreignId('branch_id')->constrained('branches')->cascadeOnDelete();
-            $table->enum('status', ['pending', 'received'])->default('pending');
-            $table->timestamps();
-        });
+        // 2. Create billings table if not exists
+        if (! Schema::hasTable('billings')) {
+            Schema::create('billings', function (Blueprint $table) {
+                $table->id();
+                $table->string('billing_number')->unique();
+                $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
+                $table->foreignId('investment_id')->constrained('investments')->cascadeOnDelete();
+                $table->foreignId('investment_product_id')->constrained('investment_products')->cascadeOnDelete();
+                $table->decimal('investment_amount', 15, 2);
+                $table->foreignId('branch_id')->constrained('branches')->cascadeOnDelete();
+                $table->enum('status', ['pending', 'received'])->default('pending');
+                $table->dateTime('status_updated_at')->nullable();
+                $table->timestamps();
+            });
+        }
 
         // 3. Insert Permissions
         $permissions = [

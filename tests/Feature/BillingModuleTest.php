@@ -212,6 +212,8 @@ class BillingModuleTest extends TestCase
         $response = $this->actingAs($this->user, 'api')
             ->patchJson("/api/v1/billings/{$billing->id}/status");
         $response->assertStatus(200);
+        
+        $this->assertNotNull($billing->fresh()->status_updated_at);
 
         // Approve should now succeed
         $response = $this->actingAs($this->user, 'api')
