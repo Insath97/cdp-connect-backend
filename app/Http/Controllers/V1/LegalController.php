@@ -109,6 +109,26 @@ class LegalController extends Controller implements HasMiddleware
                 $query->where('customer_id', $request->customer_id);
             }
 
+            if ($request->has('investment_product_id')) {
+                $query->where('investment_product_id', $request->investment_product_id);
+            }
+
+            if ($request->has('investment_id')) {
+                $query->where('investment_id', $request->investment_id);
+            }
+
+            if ($request->has('start_date')) {
+                $query->whereDate('created_at', '>=', $request->start_date);
+            }
+
+            if ($request->has('end_date')) {
+                $query->whereDate('created_at', '<=', $request->end_date);
+            }
+
+            if ($request->boolean('today', false)) {
+                $query->whereDate('created_at', Carbon::today());
+            }
+
             $legals = $query->paginate($perPage);
 
             $investments = $legals->getCollection()->map(function ($legal) {
@@ -402,6 +422,39 @@ class LegalController extends Controller implements HasMiddleware
             // Filter by branch
             if ($request->has('branch_id')) {
                 $query->where('branch_id', $request->branch_id);
+            }
+
+            // Filter by customer_id
+            if ($request->has('customer_id')) {
+                $query->where('customer_id', $request->customer_id);
+            }
+
+            // Filter by investment_product_id
+            if ($request->has('investment_product_id')) {
+                $query->where('investment_product_id', $request->investment_product_id);
+            }
+
+            // Filter by business_type
+            if ($request->has('business_type')) {
+                $query->where('business_type', $request->business_type);
+            }
+
+            // Filter by payment_type
+            if ($request->has('payment_type')) {
+                $query->where('payment_type', $request->payment_type);
+            }
+
+            // Date filters
+            if ($request->has('start_date')) {
+                $query->whereDate('created_at', '>=', $request->start_date);
+            }
+
+            if ($request->has('end_date')) {
+                $query->whereDate('created_at', '<=', $request->end_date);
+            }
+
+            if ($request->boolean('today', false)) {
+                $query->whereDate('created_at', Carbon::today());
             }
 
             // Add search filtering
