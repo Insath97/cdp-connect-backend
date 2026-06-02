@@ -196,4 +196,144 @@ class LegalBankAndBeneficiaryTest extends TestCase
         $this->assertEquals('Updated Bank', $legal->bank_name);
         $this->assertEquals('Updated Beneficiary', $legal->beneficiary_full_name);
     }
+
+    /** @test */
+    public function test_it_creates_legal_agreement_with_sinhala_language()
+    {
+        $response = $this->actingAs($this->user, 'api')
+            ->postJson('/api/v1/legals', [
+                'investment_id' => $this->investment->id,
+                'language' => 'sinhala',
+            ]);
+
+        $response->assertStatus(201);
+
+        $legal = Legal::where('language', 'sinhala')->first();
+        $this->assertNotNull($legal);
+        $this->assertEquals('sinhala', $legal->language);
+    }
+
+    /** @test */
+    public function test_it_lists_legal_agreements_with_all_dynamic_details()
+    {
+        // Create a legal agreement
+        $legal = Legal::create([
+            'investment_id' => $this->investment->id,
+            'language' => 'english',
+            'legal_number' => 'LEG-COL-26050002',
+            'branch_id' => $this->investment->branch_id,
+            'customer_id' => $this->investment->customer_id,
+            'full_name' => 'Jane Doe',
+            'name_with_initials' => 'J. Doe',
+            'id_type' => 'nic',
+            'id_number' => '123456789V',
+            'investment_product_id' => $this->investment->investment_product_id,
+        ]);
+
+        $response = $this->actingAs($this->user, 'api')
+            ->getJson('/api/v1/legals');
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'status',
+            'message',
+            'data' => [
+                'data' => [
+                    '*' => [
+                        'id',
+                        'policy_number',
+                        'application_number',
+                        'investment_amount',
+                        'agent_name',
+                        'yearly_breakdown',
+                        'monthly_return',
+                        'annual_return',
+                        'maturity_amount',
+                        'month_6_breakdown',
+                        'year_1_breakdown',
+                        'year_2_breakdown',
+                        'year_3_breakdown',
+                        'year_4_breakdown',
+                        'year_5_breakdown',
+                        'customer',
+                        'branch',
+                        'bank_detail',
+                        'beneficiary',
+                        'investment_product'
+                    ]
+                ]
+            ]
+        ]);
+
+        $data = $response->json('data.data');
+        $item = collect($data)->firstWhere('id', $this->investment->id);
+        
+        $this->assertNotNull($item);
+        $this->assertEquals($this->user->name, $item['agent_name']);
+        $this->assertNotEmpty($item['yearly_breakdown']);
+    }
+
+    /** @test */
+    public function test_it_lists_investments_for_legals()
+    {
+        $response = $this->actingAs($this->user, 'api')
+            ->getJson('/api/v1/legals-investments');
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'status',
+            'message',
+            'data' => [
+                'data' => [
+                    '*' => [
+                        'id',
+                        'policy_number',
+                        'investment_amount',
+                        'status',
+                        'agent_name',
+                        'yearly_breakdown',
+                        'monthly_return',
+                        'annual_return',
+                        'maturity_amount',
+                        'customer',
+                        'branch',
+                        'beneficiary',
+                        'bank_detail',
+                        'investment_product',
+                        'unit_head'
+                    ]
+                ]
+            ]
+        ]);
+    }
+
+    /** @test */
+    public function test_it_shows_single_investment_for_legals()
+    {
+        $response = $this->actingAs($this->user, 'api')
+            ->getJson('/api/v1/legals-investments/' . $this->investment->id);
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'status',
+            'message',
+            'data' => [
+                'id',
+                'policy_number',
+                'investment_amount',
+                'status',
+                'agent_name',
+                'yearly_breakdown',
+                'monthly_return',
+                'annual_return',
+                'maturity_amount',
+                'customer',
+                'branch',
+                'beneficiary',
+                'bank_detail',
+                'investment_product',
+                'unit_head'
+            ]
+        ]);
+    }
 }

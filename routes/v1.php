@@ -114,6 +114,8 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::delete('investments/{id}/approved-delete', [InvestmentController::class, 'destroyApprovedInvestement']);
     Route::get('investments/{id}/certificate', [InvestmentController::class, 'printCertificate']);
 
+    Route::get('legals-investments', [LegalController::class, 'invesmentIndex']);
+    Route::get('legals-investments/{id}', [LegalController::class, 'invesmentShow']);
     Route::apiResource('legals', LegalController::class);
 
     // Welcome Call Routes

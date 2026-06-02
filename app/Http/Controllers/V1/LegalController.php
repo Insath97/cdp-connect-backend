@@ -5,40 +5,95 @@ namespace App\Http\Controllers\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateLegalRequest;
 use App\Http\Requests\UpdateLegalRequest;
-use App\Models\Legal;
 use App\Models\Investment;
+use App\Models\Legal;
+use App\Traits\InvestmentCalculationTrait;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class LegalController extends Controller implements HasMiddleware
 {
+    use InvestmentCalculationTrait;
+
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Legal Index', only: ['index', 'show']),
+            new Middleware('permission:Legal Index', only: ['index', 'show', 'invesmentIndex', 'invesmentShow']),
             new Middleware('permission:Legal Create', only: ['store']),
             new Middleware('permission:Legal Update', only: ['update']),
             new Middleware('permission:Legal Delete', only: ['destroy']),
         ];
     }
 
+    private function transformInvestment(Investment $investment)
+    {
+        $investment->loadMissing([
+            'creator' => function ($q) {
+                $q->select('id', 'name', 'email');
+            },
+            'investmentProduct' => function ($q) {
+                $q->select('id', 'name', 'code', 'duration_months', 'roi_percentage', 'is_variable_roi')->with('annualRates');
+            },
+            'bankDetail' => function ($q) {
+                $q->select('id', 'bank_name', 'branch_name', 'account_number');
+            },
+            'beneficiary' => function ($q) {
+                $q->select('id', 'full_name', 'relationship', 'share_percentage', 'phone_primary', 'type', 'id_type', 'id_number');
+            },
+            'branch' => function ($q) {
+                $q->select('id', 'name', 'code');
+            },
+            'customer',
+            'unitHead' => function ($q) {
+                $q->select('id', 'name', 'email', 'employee_code');
+            }
+        ]);
+
+        $calculations = [];
+        if ($investment->investmentProduct) {
+            $calculations = $this->calculateInvestmentROI(
+                (float) $investment->investment_amount,
+                $investment->investmentProduct
+            );
+        }
+
+        // Append calculated agent & breakdown values dynamically
+        $investment->agent_name = $investment->creator->name ?? 'N/A';
+        $investment->monthly_return = round($calculations['monthly_return'] ?? 0, 2);
+        $investment->annual_return = round($calculations['annual_return'] ?? 0, 2);
+        $investment->maturity_amount = round($calculations['maturity_amount'] ?? 0, 2);
+        $investment->month_6_breakdown = round($calculations['month_6_breakdown'] ?? 0, 2);
+        $investment->year_1_breakdown = round($calculations['year_1_breakdown'] ?? 0, 2);
+        $investment->year_2_breakdown = round($calculations['year_2_breakdown'] ?? 0, 2);
+        $investment->year_3_breakdown = round($calculations['year_3_breakdown'] ?? 0, 2);
+        $investment->year_4_breakdown = round($calculations['year_4_breakdown'] ?? 0, 2);
+        $investment->year_5_breakdown = round($calculations['year_5_breakdown'] ?? 0, 2);
+        $investment->yearly_breakdown = $calculations['yearly_breakdown'] ?? [];
+
+        // Clean up investment product serialization output as requested
+        if ($investment->investmentProduct) {
+            $investment->investmentProduct->makeHidden(['is_variable_roi', 'created_at', 'updated_at', 'annualRates']);
+        }
+
+        return $investment;
+    }
+
     public function index(Request $request)
     {
         try {
             $perPage = $request->get('per_page', 15);
-            $query = Legal::with(['branch', 'customer', 'investment', 'investmentProduct']);
+            $query = Legal::with(['investment']);
 
             if ($request->has('search')) {
                 $search = $request->search;
                 $query->where(function ($q) use ($search) {
                     $q->where('legal_number', 'like', "%{$search}%")
-                      ->orWhere('full_name', 'like', "%{$search}%")
-                      ->orWhere('id_number', 'like', "%{$search}%");
+                        ->orWhere('full_name', 'like', "%{$search}%")
+                        ->orWhere('id_number', 'like', "%{$search}%");
                 });
             }
 
@@ -56,16 +111,22 @@ class LegalController extends Controller implements HasMiddleware
 
             $legals = $query->paginate($perPage);
 
+            $investments = $legals->getCollection()->map(function ($legal) {
+                return $legal->investment ? $this->transformInvestment($legal->investment) : null;
+            })->filter()->values();
+
+            $legals->setCollection($investments);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Legals retrieved successfully',
-                'data' => $legals
+                'data' => $legals,
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to retrieve legals',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
@@ -75,7 +136,7 @@ class LegalController extends Controller implements HasMiddleware
         DB::beginTransaction();
         try {
             $data = $request->validated();
-            
+
             // Check if a Legal record already exists for the combination of investment_id and language
             $existingLegal = Legal::query()->where('investment_id', $data['investment_id'])
                 ->where('language', $data['language'])
@@ -110,13 +171,13 @@ class LegalController extends Controller implements HasMiddleware
                     'user_id' => Auth::id(),
                     'legal_id' => $existingLegal->id,
                     'investment_id' => $existingLegal->investment_id,
-                    'language' => $existingLegal->language
+                    'language' => $existingLegal->language,
                 ]);
 
                 return response()->json([
                     'status' => 'success',
                     'message' => 'Legal agreement updated successfully',
-                    'data' => $existingLegal->load(['branch', 'customer', 'investment', 'investmentProduct'])
+                    'data' => $this->transformInvestment($existingLegal->investment),
                 ], 200);
             }
 
@@ -129,14 +190,14 @@ class LegalController extends Controller implements HasMiddleware
 
             // Generate unique legal_number: LEG-{BranchCode}-{YYMM}{Sequence}
             $yymm = date('ym');
-            $prefix = 'LEG-' . ($branch->code ?? 'GEN') . '-' . $yymm;
+            $prefix = 'LEG-'.($branch->code ?? 'GEN').'-'.$yymm;
 
-            $lastLegal = Legal::query()->where('legal_number', 'like', $prefix . '%')
+            $lastLegal = Legal::query()->where('legal_number', 'like', $prefix.'%')
                 ->orderBy('legal_number', 'desc')
                 ->first();
 
             $sequence = $lastLegal ? (int) substr($lastLegal->legal_number, -4) + 1 : 1;
-            $legalNumber = $prefix . str_pad((string)$sequence, 4, '0', STR_PAD_LEFT);
+            $legalNumber = $prefix.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
 
             $legal = Legal::create([
                 'investment_id' => $investment->id,
@@ -183,26 +244,26 @@ class LegalController extends Controller implements HasMiddleware
             Log::info('Legal created', [
                 'user_id' => Auth::id(),
                 'legal_id' => $legal->id,
-                'legal_number' => $legal->legal_number
+                'legal_number' => $legal->legal_number,
             ]);
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Legal agreement created successfully',
-                'data' => $legal->load(['branch', 'customer', 'investment', 'investmentProduct'])
+                'data' => $this->transformInvestment($legal->investment),
             ], 201);
 
         } catch (\Throwable $th) {
             DB::rollBack();
             Log::error('Failed to store legal', [
                 'error' => $th->getMessage(),
-                'user_id' => Auth::id()
+                'user_id' => Auth::id(),
             ]);
 
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to process legal agreement',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
@@ -210,25 +271,32 @@ class LegalController extends Controller implements HasMiddleware
     public function show(string $id)
     {
         try {
-            $legal = Legal::with(['branch', 'customer', 'investment', 'investmentProduct'])->find($id);
+            $legal = Legal::find($id);
 
-            if (!$legal) {
+            if (! $legal) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Legal not found'
+                    'message' => 'Legal not found',
+                ], 404);
+            }
+
+            if (! $legal->investment) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Associated investment not found',
                 ], 404);
             }
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Legal retrieved successfully',
-                'data' => $legal
+                'data' => $this->transformInvestment($legal->investment),
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to retrieve legal',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
@@ -238,10 +306,10 @@ class LegalController extends Controller implements HasMiddleware
         try {
             $legal = Legal::query()->find($id);
 
-            if (!$legal) {
+            if (! $legal) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Legal not found'
+                    'message' => 'Legal not found',
                 ], 404);
             }
 
@@ -251,19 +319,19 @@ class LegalController extends Controller implements HasMiddleware
             Log::info('Legal updated', [
                 'user_id' => Auth::id(),
                 'legal_id' => $legal->id,
-                'updated_fields' => array_keys($data)
+                'updated_fields' => array_keys($data),
             ]);
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Legal agreement updated successfully',
-                'data' => $legal->load(['branch', 'customer', 'investment', 'investmentProduct'])
+                'data' => $this->transformInvestment($legal->investment),
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to update legal',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
@@ -273,10 +341,10 @@ class LegalController extends Controller implements HasMiddleware
         try {
             $legal = Legal::query()->find($id);
 
-            if (!$legal) {
+            if (! $legal) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Legal not found'
+                    'message' => 'Legal not found',
                 ], 404);
             }
 
@@ -284,18 +352,115 @@ class LegalController extends Controller implements HasMiddleware
 
             Log::info('Legal deleted', [
                 'user_id' => Auth::id(),
-                'legal_id' => $id
+                'legal_id' => $id,
             ]);
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Legal agreement deleted successfully'
+                'message' => 'Legal agreement deleted successfully',
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to delete legal',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function invesmentIndex(Request $request)
+    {
+        try {
+            $perPage = $request->get('per_page', 15);
+            $query = Investment::with([
+                'customer',
+                'branch' => function ($q) {
+                    $q->select('id', 'name', 'code');
+                },
+                'beneficiary' => function ($q) {
+                    $q->select('id', 'full_name', 'relationship', 'share_percentage', 'phone_primary', 'type', 'id_type', 'id_number');
+                },
+                'bankDetail' => function ($q) {
+                    $q->select('id', 'bank_name', 'branch_name', 'account_number');
+                },
+                'investmentProduct' => function ($q) {
+                    $q->select('id', 'name', 'code', 'duration_months', 'roi_percentage', 'is_variable_roi')->with('annualRates');
+                },
+                'unitHead' => function ($q) {
+                    $q->select('id', 'name', 'email', 'employee_code');
+                },
+                'creator' => function ($q) {
+                    $q->select('id', 'name', 'email');
+                }
+            ]);
+
+            // Filter by status if provided
+            if ($request->has('status')) {
+                $query->where('status', $request->status);
+            }
+
+            // Filter by branch
+            if ($request->has('branch_id')) {
+                $query->where('branch_id', $request->branch_id);
+            }
+
+            // Add search filtering
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->whereHas('customer', function ($cq) use ($search) {
+                        $cq->where('full_name', 'like', "%{$search}%")
+                            ->orWhere('id_number', 'like', "%{$search}%")
+                            ->orWhere('customer_code', 'like', "%{$search}%");
+                    })->orWhere('policy_number', 'like', "%{$search}%")
+                        ->orWhere('application_number', 'like', "%{$search}%")
+                        ->orWhere('sales_code', 'like', "%{$search}%");
+                });
+            }
+
+            $investments = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+            // Clean up serialized output columns and calculate breakdown details
+            $investments->getCollection()->transform(function ($inv) {
+                return $this->transformInvestment($inv);
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Investments retrieved successfully',
+                'data' => $investments,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve investments',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function invesmentShow(string $id)
+    {
+        try {
+            $investment = Investment::find($id);
+
+            if (!$investment) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Investment not found',
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Investment retrieved successfully',
+                'data' => $this->transformInvestment($investment),
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve investment',
+                'error' => $th->getMessage(),
             ], 500);
         }
     }

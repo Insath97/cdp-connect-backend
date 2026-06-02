@@ -21,7 +21,7 @@ class CreateLegalRequest extends FormRequest
     {
         return [
             'investment_id' => 'required|exists:investments,id',
-            'language' => 'required|in:english,tamil',
+            'language' => 'required|in:english,tamil,sinhala',
             'date_of_agreement' => 'nullable|date',
             'year_in_words' => 'nullable|string|max:255',
             'year' => 'nullable|string|max:4',

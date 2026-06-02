@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('legals', function (Blueprint $table) {
             $table->id();
 
-            $table->enum('language', ['english', 'tamil'])->default('english');
+            $table->enum('language', ['english', 'tamil', 'sinhala'])->default('english');
             $table->string('legal_number')->unique();
             $table->date('date_of_agreement')->nullable();
 

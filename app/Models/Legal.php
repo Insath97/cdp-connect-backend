@@ -47,7 +47,16 @@ class Legal extends Model
         'beneficiary_id_number',
         'beneficiary_phone_primary',
         'beneficiary_relationship',
-        'beneficiary_share_percentage'
+        'beneficiary_share_percentage',
+        'monthly_return',
+        'annual_return',
+        'maturity_amount',
+        'month_6_breakdown',
+        'year_1_breakdown',
+        'year_2_breakdown',
+        'year_3_breakdown',
+        'year_4_breakdown',
+        'year_5_breakdown'
     ];
 
     protected $casts = [
