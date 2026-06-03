@@ -14,6 +14,7 @@ use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class LegalController extends Controller implements HasMiddleware
 {
@@ -29,64 +30,104 @@ class LegalController extends Controller implements HasMiddleware
         ];
     }
 
-    private function transformInvestment(Investment $investment)
+    private function transformLegal(Legal $legal)
     {
-        $investment->loadMissing([
-            'creator' => function ($q) {
-                $q->select('id', 'name', 'email');
-            },
-            'investmentProduct' => function ($q) {
-                $q->select('id', 'name', 'code', 'duration_months', 'roi_percentage', 'is_variable_roi')->with('annualRates');
-            },
-            'bankDetail' => function ($q) {
-                $q->select('id', 'bank_name', 'branch_name', 'account_number');
-            },
-            'beneficiary' => function ($q) {
-                $q->select('id', 'full_name', 'relationship', 'share_percentage', 'phone_primary', 'type', 'id_type', 'id_number');
-            },
-            'branch' => function ($q) {
-                $q->select('id', 'name', 'code');
-            },
-            'customer',
-            'unitHead' => function ($q) {
-                $q->select('id', 'name', 'email', 'employee_code');
-            }
-        ]);
+        return [
+            'id' => $legal->id,
+            'legal_number' => $legal->legal_number,
+            'date_of_agreement' => $legal->date_of_agreement ? $legal->date_of_agreement->format('Y-m-d') : null,
+            'language' => $legal->language,
+            'full_name' => $legal->full_name,
+            'name_with_initials' => $legal->name_with_initials,
+            'id_type' => $legal->id_type,
+            'id_number' => $legal->id_number,
+            'email' => $legal->email,
+            'address_line_1' => $legal->address_line_1,
+            'address_line_2' => $legal->address_line_2,
+            'city' => $legal->city,
+            'state' => $legal->state,
+            'country' => $legal->country,
+            'postal_code' => $legal->postal_code,
+            
+            'monthly_return' => (float)$legal->monthly_return,
+            'annual_return' => (float)$legal->annual_return,
+            'maturity_amount' => (float)$legal->maturity_amount,
+            'month_6_breakdown' => (float)$legal->month_6_breakdown,
+            'year_1_breakdown' => (float)$legal->year_1_breakdown,
+            'year_2_breakdown' => (float)$legal->year_2_breakdown,
+            'year_3_breakdown' => (float)$legal->year_3_breakdown,
+            'year_4_breakdown' => (float)$legal->year_4_breakdown,
+            'year_5_breakdown' => (float)$legal->year_5_breakdown,
+            'yearly_breakdown' => $legal->yearly_breakdown,
 
-        $calculations = [];
-        if ($investment->investmentProduct) {
-            $calculations = $this->calculateInvestmentROI(
-                (float) $investment->investment_amount,
-                $investment->investmentProduct
-            );
-        }
+            'bank_name' => $legal->bank_name,
+            'branch_name' => $legal->branch_name,
+            'account_number' => $legal->account_number,
 
-        // Append calculated agent & breakdown values dynamically
-        $investment->agent_name = $investment->creator->name ?? 'N/A';
-        $investment->monthly_return = round($calculations['monthly_return'] ?? 0, 2);
-        $investment->annual_return = round($calculations['annual_return'] ?? 0, 2);
-        $investment->maturity_amount = round($calculations['maturity_amount'] ?? 0, 2);
-        $investment->month_6_breakdown = round($calculations['month_6_breakdown'] ?? 0, 2);
-        $investment->year_1_breakdown = round($calculations['year_1_breakdown'] ?? 0, 2);
-        $investment->year_2_breakdown = round($calculations['year_2_breakdown'] ?? 0, 2);
-        $investment->year_3_breakdown = round($calculations['year_3_breakdown'] ?? 0, 2);
-        $investment->year_4_breakdown = round($calculations['year_4_breakdown'] ?? 0, 2);
-        $investment->year_5_breakdown = round($calculations['year_5_breakdown'] ?? 0, 2);
-        $investment->yearly_breakdown = $calculations['yearly_breakdown'] ?? [];
+            'beneficiary_full_name' => $legal->beneficiary_full_name,
+            'beneficiary_id_type' => $legal->beneficiary_id_type,
+            'beneficiary_id_number' => $legal->beneficiary_id_number,
+            'beneficiary_phone_primary' => $legal->beneficiary_phone_primary,
+            'beneficiary_relationship' => $legal->beneficiary_relationship,
+            'beneficiary_share_percentage' => (float)$legal->beneficiary_share_percentage,
 
-        // Clean up investment product serialization output as requested
-        if ($investment->investmentProduct) {
-            $investment->investmentProduct->makeHidden(['is_variable_roi', 'created_at', 'updated_at', 'annualRates']);
-        }
+            'witness_01_name' => $legal->witness_01_name,
+            'witness_01_nic' => $legal->witness_01_nic,
+            'witness_01_address' => $legal->witness_01_address,
+            'witness_02_name' => $legal->witness_02_name,
+            'witness_02_nic' => $legal->witness_02_nic,
+            'witness_02_address' => $legal->witness_02_address,
 
-        return $investment;
+            'investment' => $legal->investment ? [
+                'id' => $legal->investment->id,
+                'policy_number' => $legal->investment->policy_number,
+                'application_number' => $legal->investment->application_number,
+                'sales_code' => $legal->investment->sales_code,
+                'investment_amount' => (float)$legal->investment->investment_amount,
+                'payment_type' => $legal->investment->payment_type,
+                'business_type' => $legal->investment->business_type,
+                'status' => $legal->investment->status,
+                'created_at' => $legal->investment->created_at ? $legal->investment->created_at->toIso8601String() : null,
+                'creator' => $legal->investment->creator ? [
+                    'id' => $legal->investment->creator->id,
+                    'name' => $legal->investment->creator->name,
+                    'email' => $legal->investment->creator->email,
+                ] : null,
+                'investment_product' => $legal->investment->investmentProduct ? [
+                    'id' => $legal->investment->investmentProduct->id,
+                    'name' => $legal->investment->investmentProduct->name,
+                    'code' => $legal->investment->investmentProduct->code,
+                    'duration_months' => $legal->investment->investmentProduct->duration_months,
+                    'roi_percentage' => (float)$legal->investment->investmentProduct->roi_percentage,
+                ] : null,
+                'branch' => $legal->investment->branch ? [
+                    'id' => $legal->investment->branch->id,
+                    'name' => $legal->investment->branch->name,
+                    'code' => $legal->investment->branch->code,
+                ] : null,
+                'unit_head' => $legal->investment->unitHead ? [
+                    'id' => $legal->investment->unitHead->id,
+                    'name' => $legal->investment->unitHead->name,
+                    'email' => $legal->investment->unitHead->email,
+                    'employee_code' => $legal->investment->unitHead->employee_code,
+                ] : null,
+            ] : null,
+        ];
     }
 
     public function index(Request $request)
     {
         try {
             $perPage = $request->get('per_page', 15);
-            $query = Legal::with(['investment']);
+            $query = Legal::with([
+                'investment.creator',
+                'investment.investmentProduct',
+                'investment.bankDetail',
+                'investment.beneficiary',
+                'investment.branch',
+                'investment.customer',
+                'investment.unitHead'
+            ]);
 
             if ($request->has('search')) {
                 $search = $request->search;
@@ -131,11 +172,11 @@ class LegalController extends Controller implements HasMiddleware
 
             $legals = $query->paginate($perPage);
 
-            $investments = $legals->getCollection()->map(function ($legal) {
-                return $legal->investment ? $this->transformInvestment($legal->investment) : null;
-            })->filter()->values();
+            $transformedLegals = $legals->getCollection()->map(function ($legal) {
+                return $this->transformLegal($legal);
+            });
 
-            $legals->setCollection($investments);
+            $legals->setCollection($transformedLegals);
 
             return response()->json([
                 'status' => 'success',
@@ -164,6 +205,15 @@ class LegalController extends Controller implements HasMiddleware
 
             if ($existingLegal) {
                 // If it exists, update it instead of creating a new one
+                $investment = Investment::with(['customer', 'branch', 'beneficiary', 'bankDetail'])->findOrFail($existingLegal->investment_id);
+                $calculations = [];
+                if ($investment->investmentProduct) {
+                    $calculations = $this->calculateInvestmentROI(
+                        (float) $investment->investment_amount,
+                        $investment->investmentProduct
+                    );
+                }
+
                 $existingLegal->update([
                     'date_of_agreement' => $data['date_of_agreement'] ?? $existingLegal->date_of_agreement,
                     'year_in_words' => $data['year_in_words'] ?? $existingLegal->year_in_words,
@@ -183,6 +233,17 @@ class LegalController extends Controller implements HasMiddleware
                     'beneficiary_phone_primary' => $data['beneficiary_phone_primary'] ?? $existingLegal->beneficiary_phone_primary,
                     'beneficiary_relationship' => $data['beneficiary_relationship'] ?? $existingLegal->beneficiary_relationship,
                     'beneficiary_share_percentage' => $data['beneficiary_share_percentage'] ?? $existingLegal->beneficiary_share_percentage,
+                    
+                    'monthly_return' => round($calculations['monthly_return'] ?? 0, 2),
+                    'annual_return' => round($calculations['annual_return'] ?? 0, 2),
+                    'maturity_amount' => round($calculations['maturity_amount'] ?? 0, 2),
+                    'month_6_breakdown' => round($calculations['month_6_breakdown'] ?? 0, 2),
+                    'year_1_breakdown' => round($calculations['year_1_breakdown'] ?? 0, 2),
+                    'year_2_breakdown' => round($calculations['year_2_breakdown'] ?? 0, 2),
+                    'year_3_breakdown' => round($calculations['year_3_breakdown'] ?? 0, 2),
+                    'year_4_breakdown' => round($calculations['year_4_breakdown'] ?? 0, 2),
+                    'year_5_breakdown' => round($calculations['year_5_breakdown'] ?? 0, 2),
+                    'yearly_breakdown' => $calculations['yearly_breakdown'] ?? null,
                 ]);
 
                 DB::commit();
@@ -197,7 +258,7 @@ class LegalController extends Controller implements HasMiddleware
                 return response()->json([
                     'status' => 'success',
                     'message' => 'Legal agreement updated successfully',
-                    'data' => $this->transformInvestment($existingLegal->investment),
+                    'data' => $this->transformLegal($existingLegal),
                 ], 200);
             }
 
@@ -218,6 +279,14 @@ class LegalController extends Controller implements HasMiddleware
 
             $sequence = $lastLegal ? (int) substr($lastLegal->legal_number, -4) + 1 : 1;
             $legalNumber = $prefix.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
+
+            $calculations = [];
+            if ($investment->investmentProduct) {
+                $calculations = $this->calculateInvestmentROI(
+                    (float) $investment->investment_amount,
+                    $investment->investmentProduct
+                );
+            }
 
             $legal = Legal::create([
                 'investment_id' => $investment->id,
@@ -257,6 +326,17 @@ class LegalController extends Controller implements HasMiddleware
                 'beneficiary_phone_primary' => $data['beneficiary_phone_primary'] ?? ($beneficiary->phone_primary ?? null),
                 'beneficiary_relationship' => $data['beneficiary_relationship'] ?? ($beneficiary->relationship ?? null),
                 'beneficiary_share_percentage' => $data['beneficiary_share_percentage'] ?? ($beneficiary->share_percentage ?? null),
+                
+                'monthly_return' => round($calculations['monthly_return'] ?? 0, 2),
+                'annual_return' => round($calculations['annual_return'] ?? 0, 2),
+                'maturity_amount' => round($calculations['maturity_amount'] ?? 0, 2),
+                'month_6_breakdown' => round($calculations['month_6_breakdown'] ?? 0, 2),
+                'year_1_breakdown' => round($calculations['year_1_breakdown'] ?? 0, 2),
+                'year_2_breakdown' => round($calculations['year_2_breakdown'] ?? 0, 2),
+                'year_3_breakdown' => round($calculations['year_3_breakdown'] ?? 0, 2),
+                'year_4_breakdown' => round($calculations['year_4_breakdown'] ?? 0, 2),
+                'year_5_breakdown' => round($calculations['year_5_breakdown'] ?? 0, 2),
+                'yearly_breakdown' => $calculations['yearly_breakdown'] ?? null,
             ]);
 
             DB::commit();
@@ -270,7 +350,7 @@ class LegalController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'success',
                 'message' => 'Legal agreement created successfully',
-                'data' => $this->transformInvestment($legal->investment),
+                'data' => $this->transformLegal($legal),
             ], 201);
 
         } catch (\Throwable $th) {
@@ -291,7 +371,15 @@ class LegalController extends Controller implements HasMiddleware
     public function show(string $id)
     {
         try {
-            $legal = Legal::find($id);
+            $legal = Legal::with([
+                'investment.creator',
+                'investment.investmentProduct',
+                'investment.bankDetail',
+                'investment.beneficiary',
+                'investment.branch',
+                'investment.customer',
+                'investment.unitHead'
+            ])->find($id);
 
             if (! $legal) {
                 return response()->json([
@@ -310,7 +398,7 @@ class LegalController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'success',
                 'message' => 'Legal retrieved successfully',
-                'data' => $this->transformInvestment($legal->investment),
+                'data' => $this->transformLegal($legal),
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
@@ -345,7 +433,7 @@ class LegalController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'success',
                 'message' => 'Legal agreement updated successfully',
-                'data' => $this->transformInvestment($legal->investment),
+                'data' => $this->transformLegal($legal),
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
@@ -386,6 +474,58 @@ class LegalController extends Controller implements HasMiddleware
                 'error' => $th->getMessage(),
             ], 500);
         }
+    }
+
+    private function transformInvestment(Investment $investment)
+    {
+        $investment->loadMissing([
+            'creator' => function ($q) {
+                $q->select('id', 'name', 'email');
+            },
+            'investmentProduct' => function ($q) {
+                $q->select('id', 'name', 'code', 'duration_months', 'roi_percentage', 'is_variable_roi')->with('annualRates');
+            },
+            'bankDetail' => function ($q) {
+                $q->select('id', 'bank_name', 'branch_name', 'account_number');
+            },
+            'beneficiary' => function ($q) {
+                $q->select('id', 'full_name', 'relationship', 'share_percentage', 'phone_primary', 'type', 'id_type', 'id_number');
+            },
+            'branch' => function ($q) {
+                $q->select('id', 'name', 'code');
+            },
+            'customer',
+            'unitHead' => function ($q) {
+                $q->select('id', 'name', 'email', 'employee_code');
+            }
+        ]);
+
+        $calculations = [];
+        if ($investment->investmentProduct) {
+            $calculations = $this->calculateInvestmentROI((float) $investment->investment_amount,
+                $investment->investmentProduct
+            );
+        }
+
+        // Append calculated agent & breakdown values dynamically
+        $investment->agent_name = $investment->creator->name ?? 'N/A';
+        $investment->monthly_return = round($calculations['monthly_return'] ?? 0, 2);
+        $investment->annual_return = round($calculations['annual_return'] ?? 0, 2);
+        $investment->maturity_amount = round($calculations['maturity_amount'] ?? 0, 2);
+        $investment->month_6_breakdown = round($calculations['month_6_breakdown'] ?? 0, 2);
+        $investment->year_1_breakdown = round($calculations['year_1_breakdown'] ?? 0, 2);
+        $investment->year_2_breakdown = round($calculations['year_2_breakdown'] ?? 0, 2);
+        $investment->year_3_breakdown = round($calculations['year_3_breakdown'] ?? 0, 2);
+        $investment->year_4_breakdown = round($calculations['year_4_breakdown'] ?? 0, 2);
+        $investment->year_5_breakdown = round($calculations['year_5_breakdown'] ?? 0, 2);
+        $investment->yearly_breakdown = $calculations['yearly_breakdown'] ?? [];
+
+        // Clean up investment product serialization output as requested
+        if ($investment->investmentProduct) {
+            $investment->investmentProduct->makeHidden(['is_variable_roi', 'created_at', 'updated_at', 'annualRates']);
+        }
+
+        return $investment;
     }
 
     public function invesmentIndex(Request $request)

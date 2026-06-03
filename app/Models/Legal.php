@@ -4,12 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-use Illuminate\Database\Eloquent\SoftDeletes;
-
 class Legal extends Model
 {
-    use SoftDeletes;
-
     protected $fillable = [
         'branch_id',
         'customer_id',
@@ -56,11 +52,13 @@ class Legal extends Model
         'year_2_breakdown',
         'year_3_breakdown',
         'year_4_breakdown',
-        'year_5_breakdown'
+        'year_5_breakdown',
+        'yearly_breakdown'
     ];
 
     protected $casts = [
         'date_of_agreement' => 'date',
+        'yearly_breakdown' => 'array',
     ];
 
     public function branch()
