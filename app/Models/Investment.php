@@ -51,6 +51,7 @@ class Investment extends Model
         'welcome_call_by',
         'welcome_call_at',
         'welcome_call_notes',
+        'signature_document',
     ];
 
     protected $casts = [

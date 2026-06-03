@@ -76,6 +76,7 @@ class CreateInvestmentRequest extends FormRequest
             'monthly_payment_date' => 'nullable|date',
             'unit_head_id' => 'required|exists:users,id',
             'notes' => 'nullable|string',
+            'signature_document' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
         ];
     }
 

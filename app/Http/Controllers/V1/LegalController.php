@@ -8,13 +8,13 @@ use App\Http\Requests\UpdateLegalRequest;
 use App\Models\Investment;
 use App\Models\Legal;
 use App\Traits\InvestmentCalculationTrait;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class LegalController extends Controller implements HasMiddleware
 {
@@ -48,16 +48,16 @@ class LegalController extends Controller implements HasMiddleware
             'state' => $legal->state,
             'country' => $legal->country,
             'postal_code' => $legal->postal_code,
-            
-            'monthly_return' => (float)$legal->monthly_return,
-            'annual_return' => (float)$legal->annual_return,
-            'maturity_amount' => (float)$legal->maturity_amount,
-            'month_6_breakdown' => (float)$legal->month_6_breakdown,
-            'year_1_breakdown' => (float)$legal->year_1_breakdown,
-            'year_2_breakdown' => (float)$legal->year_2_breakdown,
-            'year_3_breakdown' => (float)$legal->year_3_breakdown,
-            'year_4_breakdown' => (float)$legal->year_4_breakdown,
-            'year_5_breakdown' => (float)$legal->year_5_breakdown,
+
+            'monthly_return' => (float) $legal->monthly_return,
+            'annual_return' => (float) $legal->annual_return,
+            'maturity_amount' => (float) $legal->maturity_amount,
+            'month_6_breakdown' => (float) $legal->month_6_breakdown,
+            'year_1_breakdown' => (float) $legal->year_1_breakdown,
+            'year_2_breakdown' => (float) $legal->year_2_breakdown,
+            'year_3_breakdown' => (float) $legal->year_3_breakdown,
+            'year_4_breakdown' => (float) $legal->year_4_breakdown,
+            'year_5_breakdown' => (float) $legal->year_5_breakdown,
             'yearly_breakdown' => $legal->yearly_breakdown,
 
             'bank_name' => $legal->bank_name,
@@ -69,7 +69,7 @@ class LegalController extends Controller implements HasMiddleware
             'beneficiary_id_number' => $legal->beneficiary_id_number,
             'beneficiary_phone_primary' => $legal->beneficiary_phone_primary,
             'beneficiary_relationship' => $legal->beneficiary_relationship,
-            'beneficiary_share_percentage' => (float)$legal->beneficiary_share_percentage,
+            'beneficiary_share_percentage' => (float) $legal->beneficiary_share_percentage,
 
             'witness_01_name' => $legal->witness_01_name,
             'witness_01_nic' => $legal->witness_01_nic,
@@ -83,7 +83,7 @@ class LegalController extends Controller implements HasMiddleware
                 'policy_number' => $legal->investment->policy_number,
                 'application_number' => $legal->investment->application_number,
                 'sales_code' => $legal->investment->sales_code,
-                'investment_amount' => (float)$legal->investment->investment_amount,
+                'investment_amount' => (float) $legal->investment->investment_amount,
                 'payment_type' => $legal->investment->payment_type,
                 'business_type' => $legal->investment->business_type,
                 'status' => $legal->investment->status,
@@ -98,7 +98,7 @@ class LegalController extends Controller implements HasMiddleware
                     'name' => $legal->investment->investmentProduct->name,
                     'code' => $legal->investment->investmentProduct->code,
                     'duration_months' => $legal->investment->investmentProduct->duration_months,
-                    'roi_percentage' => (float)$legal->investment->investmentProduct->roi_percentage,
+                    'roi_percentage' => (float) $legal->investment->investmentProduct->roi_percentage,
                 ] : null,
                 'branch' => $legal->investment->branch ? [
                     'id' => $legal->investment->branch->id,
@@ -126,7 +126,7 @@ class LegalController extends Controller implements HasMiddleware
                 'investment.beneficiary',
                 'investment.branch',
                 'investment.customer',
-                'investment.unitHead'
+                'investment.unitHead',
             ]);
 
             if ($request->has('search')) {
@@ -233,7 +233,7 @@ class LegalController extends Controller implements HasMiddleware
                     'beneficiary_phone_primary' => $data['beneficiary_phone_primary'] ?? $existingLegal->beneficiary_phone_primary,
                     'beneficiary_relationship' => $data['beneficiary_relationship'] ?? $existingLegal->beneficiary_relationship,
                     'beneficiary_share_percentage' => $data['beneficiary_share_percentage'] ?? $existingLegal->beneficiary_share_percentage,
-                    
+
                     'monthly_return' => round($calculations['monthly_return'] ?? 0, 2),
                     'annual_return' => round($calculations['annual_return'] ?? 0, 2),
                     'maturity_amount' => round($calculations['maturity_amount'] ?? 0, 2),
@@ -326,7 +326,7 @@ class LegalController extends Controller implements HasMiddleware
                 'beneficiary_phone_primary' => $data['beneficiary_phone_primary'] ?? ($beneficiary->phone_primary ?? null),
                 'beneficiary_relationship' => $data['beneficiary_relationship'] ?? ($beneficiary->relationship ?? null),
                 'beneficiary_share_percentage' => $data['beneficiary_share_percentage'] ?? ($beneficiary->share_percentage ?? null),
-                
+
                 'monthly_return' => round($calculations['monthly_return'] ?? 0, 2),
                 'annual_return' => round($calculations['annual_return'] ?? 0, 2),
                 'maturity_amount' => round($calculations['maturity_amount'] ?? 0, 2),
@@ -378,7 +378,7 @@ class LegalController extends Controller implements HasMiddleware
                 'investment.beneficiary',
                 'investment.branch',
                 'investment.customer',
-                'investment.unitHead'
+                'investment.unitHead',
             ])->find($id);
 
             if (! $legal) {
@@ -497,7 +497,7 @@ class LegalController extends Controller implements HasMiddleware
             'customer',
             'unitHead' => function ($q) {
                 $q->select('id', 'name', 'email', 'employee_code');
-            }
+            },
         ]);
 
         $calculations = [];
@@ -551,7 +551,7 @@ class LegalController extends Controller implements HasMiddleware
                 },
                 'creator' => function ($q) {
                     $q->select('id', 'name', 'email');
-                }
+                },
             ]);
 
             // Filter by status if provided
@@ -637,7 +637,7 @@ class LegalController extends Controller implements HasMiddleware
         try {
             $investment = Investment::find($id);
 
-            if (!$investment) {
+            if (! $investment) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Investment not found',

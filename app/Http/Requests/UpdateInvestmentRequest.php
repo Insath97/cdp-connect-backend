@@ -67,6 +67,7 @@ class UpdateInvestmentRequest extends FormRequest
             'unit_head_id' => 'sometimes|exists:users,id',
             'notes' => 'nullable|string',
             'status' => 'sometimes|in:pending,approved,rejected',
+            'signature_document' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
         ];
     }
 

@@ -9,6 +9,7 @@ use App\Models\Investment;
 use App\Models\Branch;
 use App\Models\Target;
 use App\Models\Beneficiary;
+use App\Models\InvestmentProduct;
 use App\Models\CustomerBankDetail;
 use App\Models\Commission;
 use App\Models\InvestmentPayout;
@@ -138,6 +139,23 @@ class InvestmentController extends Controller implements HasMiddleware
             $currentUser = Auth::guard('api')->user();
             $data = $request->validated();
 
+            $product = InvestmentProduct::findOrFail($data['investment_product_id']);
+            if ($product->plan_type === 'special') {
+                if (!$currentUser || (!$currentUser->hasPermissionTo('Special Investment Create') && !$currentUser->can('Special Investment Create'))) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'You cannot create this special investment because you do not have the required permission.'
+                    ], 403);
+                }
+
+                if (!$request->hasFile('signature_document')) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'The signature document is required for special investment plans.'
+                    ], 422);
+                }
+            }
+
             // 1. Intelligent Branch Selection
             $branchId = $data['branch_id'] ?? $currentUser->branch_id;
 
@@ -222,6 +240,11 @@ class InvestmentController extends Controller implements HasMiddleware
 
             $imagePath = $this->handleFileUpload($request, 'payment_proof', null, 'investments/payment', $data['application_number'] ?? '');
             $data['payment_proof'] = $imagePath;
+
+            if ($product->plan_type === 'special' && $request->hasFile('signature_document')) {
+                $signaturePath = $this->handleFileUpload($request, 'signature_document', null, 'investments/signatures', ($data['application_number'] ?? '') . '_sig');
+                $data['signature_document'] = $signaturePath;
+            }
 
             $data['status'] = 'pending';
 
@@ -775,6 +798,25 @@ class InvestmentController extends Controller implements HasMiddleware
             }
 
             $data = $request->validated();
+
+            $productId = $data['investment_product_id'] ?? $investment->investment_product_id;
+            $product = InvestmentProduct::findOrFail($productId);
+            if ($product->plan_type === 'special') {
+                if (!$user || (!$user->hasPermissionTo('Special Investment Create') && !$user->can('Special Investment Create'))) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'You cannot update this special investment because you do not have the required permission.'
+                    ], 403);
+                }
+
+                if (empty($investment->signature_document) && !$request->hasFile('signature_document')) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'The signature document is required for special investment plans.'
+                    ], 422);
+                }
+            }
+
             $oldAmount = (float) $investment->investment_amount;
             $oldUnitHeadId = $investment->unit_head_id;
             $oldPeriodKey = $investment->target_period_key;
@@ -790,6 +832,11 @@ class InvestmentController extends Controller implements HasMiddleware
             $imagePath = $this->handleFileUpload($request, 'payment_proof', $investment->payment_proof, 'investments/payment', $investment->application_number);
             if ($imagePath) {
                 $data['payment_proof'] = $imagePath;
+            }
+
+            $signaturePath = $this->handleFileUpload($request, 'signature_document', $investment->signature_document, 'investments/signatures', $investment->application_number . '_sig');
+            if ($signaturePath) {
+                $data['signature_document'] = $signaturePath;
             }
 
             // 4. Handle Nested Beneficiary Update/Creation
