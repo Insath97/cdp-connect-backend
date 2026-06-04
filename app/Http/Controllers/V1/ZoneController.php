@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateZoneRequest;
 use App\Http\Requests\UpdateZoneRequest;
@@ -15,6 +17,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class ZoneController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -46,7 +50,7 @@ class ZoneController extends Controller implements HasMiddleware
 
             $zones = $query->paginate($perPage);
 
-            Log::info('Zones index accessed', [
+            $this->logActivity('Index', 'Zone', 'Zones index accessed', [
                 'user_id' => Auth::id(),
                 'filters' => $request->only(['search', 'is_active', 'per_page', 'province_id']),
                 'count' => $zones->count()
@@ -72,7 +76,7 @@ class ZoneController extends Controller implements HasMiddleware
             $data = $request->validated();
             $zone = Zone::create($data);
 
-            Log::info('Zone created', [
+            $this->logActivity('Create', 'Zone', 'Zone created', [
                 'user_id' => Auth::id(),
                 'zone_id' => $zone->id,
                 'zone_name' => $zone->name
@@ -104,7 +108,7 @@ class ZoneController extends Controller implements HasMiddleware
                 ], 404);
             }
 
-            Log::info('Zone viewed', [
+            $this->logActivity('View', 'Zone', 'Zone viewed', [
                 'user_id' => Auth::id(),
                 'zone_id' => $zone->id
             ]);
@@ -138,7 +142,7 @@ class ZoneController extends Controller implements HasMiddleware
             $data = $request->validated();
             $zone->update($data);
 
-            Log::info('Zone updated', [
+            $this->logActivity('Update', 'Zone', 'Zone updated', [
                 'user_id' => Auth::id(),
                 'zone_id' => $zone->id,
                 'updated_fields' => array_keys($data)
@@ -172,7 +176,7 @@ class ZoneController extends Controller implements HasMiddleware
 
             // Check if user is Super Admin
             if (!Auth::user()->hasRole('Super Admin')) {
-                Log::warning('Unauthorized zone deletion attempt', [
+                $this->logActivity('Warning', 'Zone', 'Unauthorized zone deletion attempt', [
                     'user_id' => Auth::id(),
                     'zone_id' => $id
                 ]);
@@ -184,7 +188,7 @@ class ZoneController extends Controller implements HasMiddleware
 
             $zone->delete();
 
-            Log::info('Zone deleted', [
+            $this->logActivity('Delete', 'Zone', 'Zone deleted', [
                 'user_id' => Auth::id(),
                 'zone_id' => $id,
                 'zone_name' => $zone->name
@@ -218,7 +222,7 @@ class ZoneController extends Controller implements HasMiddleware
             $zone->is_active = !$zone->is_active;
             $zone->save();
 
-            Log::info('Zone status toggled', [
+            $this->logActivity('Toggle Status', 'Zone', 'Zone status toggled', [
                 'user_id' => Auth::id(),
                 'zone_id' => $zone->id,
                 'new_status' => $zone->is_active

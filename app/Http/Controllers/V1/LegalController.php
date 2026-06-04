@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateLegalRequest;
 use App\Http\Requests\UpdateLegalRequest;
@@ -18,6 +20,8 @@ use Illuminate\Support\Facades\Log;
 
 class LegalController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     use InvestmentCalculationTrait;
 
     public static function middleware(): array
@@ -248,7 +252,7 @@ class LegalController extends Controller implements HasMiddleware
 
                 DB::commit();
 
-                Log::info('Legal updated automatically on duplicate request', [
+                $this->logActivity('Update', 'Legal', 'Legal updated automatically on duplicate request', [
                     'user_id' => Auth::id(),
                     'legal_id' => $existingLegal->id,
                     'investment_id' => $existingLegal->investment_id,
@@ -341,7 +345,7 @@ class LegalController extends Controller implements HasMiddleware
 
             DB::commit();
 
-            Log::info('Legal created', [
+            $this->logActivity('Create', 'Legal', 'Legal created', [
                 'user_id' => Auth::id(),
                 'legal_id' => $legal->id,
                 'legal_number' => $legal->legal_number,
@@ -355,7 +359,7 @@ class LegalController extends Controller implements HasMiddleware
 
         } catch (\Throwable $th) {
             DB::rollBack();
-            Log::error('Failed to store legal', [
+            $this->logActivity('Error', 'Legal', 'Failed to store legal', [
                 'error' => $th->getMessage(),
                 'user_id' => Auth::id(),
             ]);
@@ -424,7 +428,7 @@ class LegalController extends Controller implements HasMiddleware
             $data = $request->validated();
             $legal->update($data);
 
-            Log::info('Legal updated', [
+            $this->logActivity('Update', 'Legal', 'Legal updated', [
                 'user_id' => Auth::id(),
                 'legal_id' => $legal->id,
                 'updated_fields' => array_keys($data),
@@ -458,7 +462,7 @@ class LegalController extends Controller implements HasMiddleware
 
             $legal->delete($id);
 
-            Log::info('Legal deleted', [
+            $this->logActivity('Delete', 'Legal', 'Legal deleted', [
                 'user_id' => Auth::id(),
                 'legal_id' => $id,
             ]);

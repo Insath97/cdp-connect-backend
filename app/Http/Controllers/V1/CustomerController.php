@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateCustomerRequest;
 use App\Http\Requests\StoreCustomerRequest;
@@ -16,6 +18,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class CustomerController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -53,7 +57,7 @@ class CustomerController extends Controller implements HasMiddleware
 
             $customers = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
-            Log::info('Customers index accessed', [
+            $this->logActivity('Index', 'Customer', 'Customers index accessed', [
                 'user_id' => Auth::id(),
                 'filters' => $request->only(['search', 'customer_id']),
                 'count' => $customers->count()
@@ -89,7 +93,7 @@ class CustomerController extends Controller implements HasMiddleware
 
             $customer = Customer::create($data);
 
-            Log::info('Customer created', [
+            $this->logActivity('Create', 'Customer', 'Customer created', [
                 'creator_id' => $currentUser->id,
                 'customer_code' => $customer->customer_code
             ]);
@@ -149,7 +153,7 @@ class CustomerController extends Controller implements HasMiddleware
             $data = $request->validated();
             $customer->update($data);
 
-            Log::info('Customer updated', [
+            $this->logActivity('Update', 'Customer', 'Customer updated', [
                 'updater_id' => Auth::id(),
                 'customer_id' => $customer->id
             ]);
@@ -182,7 +186,7 @@ class CustomerController extends Controller implements HasMiddleware
 
             $customer->delete();
 
-            Log::info('Customer deleted (soft)', [
+            $this->logActivity('Delete', 'Customer', 'Customer deleted (soft)', [
                 'deleter_id' => Auth::id(),
                 'customer_id' => $id
             ]);
@@ -214,7 +218,7 @@ class CustomerController extends Controller implements HasMiddleware
 
             $customer->restore();
 
-            Log::info('Customer restored', [
+            $this->logActivity('Info', 'Customer', 'Customer restored', [
                 'restorer_id' => Auth::id(),
                 'customer_id' => $id
             ]);
@@ -247,7 +251,7 @@ class CustomerController extends Controller implements HasMiddleware
 
             $customer->forceDelete();
 
-            Log::info('Customer permanently deleted', [
+            $this->logActivity('Delete', 'Customer', 'Customer permanently deleted', [
                 'deleter_id' => Auth::id(),
                 'customer_id' => $id
             ]);
@@ -280,7 +284,7 @@ class CustomerController extends Controller implements HasMiddleware
             $customer->is_active = !$customer->is_active;
             $customer->save();
 
-            Log::info('Customer status toggled', [
+            $this->logActivity('Toggle Status', 'Customer', 'Customer status toggled', [
                 'user_id' => Auth::id(),
                 'customer_id' => $customer->id,
                 'new_status' => $customer->is_active

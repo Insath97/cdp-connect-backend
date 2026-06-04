@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Models\Investment;
 use Illuminate\Http\Request;
@@ -13,6 +15,8 @@ use Carbon\Carbon;
 
 class WelcomeCallController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -251,7 +255,7 @@ class WelcomeCallController extends Controller implements HasMiddleware
                 'welcome_call_at' => now(),
             ]);
 
-            Log::info('Welcome call status updated', [
+            $this->logActivity('Update', 'WelcomeCall', 'Welcome call status updated', [
                 'investment_id' => $investment->id,
                 'status' => $request->status,
                 'updated_by' => $user->id

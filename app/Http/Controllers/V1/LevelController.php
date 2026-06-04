@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateLevelRequest;
 use App\Http\Requests\UpdateLevelRequest;
@@ -15,6 +17,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class LevelController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -41,7 +45,7 @@ class LevelController extends Controller implements HasMiddleware
 
             $levels = $query->paginate($perPage);
 
-            Log::info('Levels index accessed', [
+            $this->logActivity('Index', 'Level', 'Levels index accessed', [
                 'user_id' => Auth::id(),
                 'filters' => $request->only(['search', 'is_active', 'per_page']),
                 'count' => $levels->count()
@@ -72,7 +76,7 @@ class LevelController extends Controller implements HasMiddleware
 
             $level = Level::create($data);
 
-            Log::info('Level created', [
+            $this->logActivity('Create', 'Level', 'Level created', [
                 'user_id' => Auth::id(),
                 'level_id' => $level->id,
                 'level_name' => $level->level_name
@@ -104,7 +108,7 @@ class LevelController extends Controller implements HasMiddleware
                 ], 404);
             }
 
-            Log::info('Level viewed', [
+            $this->logActivity('View', 'Level', 'Level viewed', [
                 'user_id' => Auth::id(),
                 'level_id' => $level->id
             ]);
@@ -143,7 +147,7 @@ class LevelController extends Controller implements HasMiddleware
 
             $level->update($data);
 
-            Log::info('Level updated', [
+            $this->logActivity('Update', 'Level', 'Level updated', [
                 'user_id' => Auth::id(),
                 'level_id' => $level->id,
                 'updated_fields' => array_keys($data)
@@ -177,7 +181,7 @@ class LevelController extends Controller implements HasMiddleware
 
             // Check if user is Super Admin
             if (!Auth::user()->hasRole('Super Admin')) {
-                Log::warning('Unauthorized level deletion attempt', [
+                $this->logActivity('Warning', 'Level', 'Unauthorized level deletion attempt', [
                     'user_id' => Auth::id(),
                     'level_id' => $id
                 ]);
@@ -189,7 +193,7 @@ class LevelController extends Controller implements HasMiddleware
 
             $level->delete();
 
-            Log::info('Level deleted', [
+            $this->logActivity('Delete', 'Level', 'Level deleted', [
                 'user_id' => Auth::id(),
                 'level_id' => $id,
                 'level_name' => $level->level_name

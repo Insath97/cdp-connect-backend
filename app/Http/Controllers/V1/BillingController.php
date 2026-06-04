@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Models\Billing;
 use Illuminate\Http\Request;
@@ -13,6 +15,8 @@ use Carbon\Carbon;
 
 class BillingController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -269,7 +273,7 @@ class BillingController extends Controller implements HasMiddleware
                 'status_updated_at' => now(),
             ]);
 
-            Log::info('Billing status updated', [
+            $this->logActivity('Update', 'Billing', 'Billing status updated', [
                 'billing_id' => $billing->id,
                 'billing_number' => $billing->billing_number,
                 'status' => $billing->status,

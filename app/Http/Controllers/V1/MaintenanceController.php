@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Models\Target;
 use App\Models\Commission;
@@ -16,6 +18,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class MaintenanceController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -78,7 +82,7 @@ class MaintenanceController extends Controller implements HasMiddleware
 
             DB::commit();
 
-            Log::info('Manual target recalculation triggered', [
+            $this->logActivity('Info', 'Maintenance', 'Manual target recalculation triggered', [
                 'admin_id' => Auth::id(),
                 'params' => $request->all(),
                 'results' => $results
@@ -92,7 +96,7 @@ class MaintenanceController extends Controller implements HasMiddleware
 
         } catch (\Throwable $th) {
             DB::rollBack();
-            Log::error('Maintenance recalculation failed', [
+            $this->logActivity('Error', 'Maintenance', 'Maintenance recalculation failed', [
                 'error' => $th->getMessage(),
                 'trace' => $th->getTraceAsString()
             ]);

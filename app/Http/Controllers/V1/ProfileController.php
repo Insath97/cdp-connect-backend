@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateProfileRequest;
 use App\Http\Requests\ChangePasswordRequest;
@@ -13,6 +15,8 @@ use Illuminate\Support\Facades\Auth;
 
 class ProfileController extends Controller
 {
+    use ActivityLogTrait;
+
     use FileUploadTrait;
 
     /**
@@ -65,7 +69,7 @@ class ProfileController extends Controller
 
             $user->update($data);
 
-            Log::info('Profile updated', [
+            $this->logActivity('Update', 'Profile', 'Profile updated', [
                 'user_id' => $user->id,
                 'updated_fields' => array_keys($data)
             ]);
@@ -113,7 +117,7 @@ class ProfileController extends Controller
                 'password' => Hash::make($data['new_password'])
             ]);
 
-            Log::info('Password changed', [
+            $this->logActivity('Info', 'Profile', 'Password changed', [
                 'user_id' => $user->id
             ]);
 

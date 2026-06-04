@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateBranchRequest;
 use App\Http\Requests\UpdateBranchRequest;
@@ -15,6 +17,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class BranchController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -50,7 +54,7 @@ class BranchController extends Controller implements HasMiddleware
 
             $branches = $query->paginate($perPage);
 
-            Log::info('Branches index accessed', [
+            $this->logActivity('Index', 'Branch', 'Branches index accessed', [
                 'user_id' => Auth::id(),
                 'filters' => $request->only(['search', 'is_active', 'per_page', 'zone_id', 'city']),
                 'count' => $branches->count()
@@ -76,7 +80,7 @@ class BranchController extends Controller implements HasMiddleware
             $data = $request->validated();
             $branch = Branch::create($data);
 
-            Log::info('Branch created', [
+            $this->logActivity('Create', 'Branch', 'Branch created', [
                 'user_id' => Auth::id(),
                 'branch_id' => $branch->id,
                 'branch_name' => $branch->name
@@ -108,7 +112,7 @@ class BranchController extends Controller implements HasMiddleware
                 ], 404);
             }
 
-            Log::info('Branch viewed', [
+            $this->logActivity('View', 'Branch', 'Branch viewed', [
                 'user_id' => Auth::id(),
                 'branch_id' => $branch->id
             ]);
@@ -142,7 +146,7 @@ class BranchController extends Controller implements HasMiddleware
             $data = $request->validated();
             $branch->update($data);
 
-            Log::info('Branch updated', [
+            $this->logActivity('Update', 'Branch', 'Branch updated', [
                 'user_id' => Auth::id(),
                 'branch_id' => $branch->id,
                 'updated_fields' => array_keys($data)
@@ -176,7 +180,7 @@ class BranchController extends Controller implements HasMiddleware
 
             // Check if user is Super Admin
             if (!Auth::user()->hasRole('Super Admin')) {
-                Log::warning('Unauthorized branch deletion attempt', [
+                $this->logActivity('Warning', 'Branch', 'Unauthorized branch deletion attempt', [
                     'user_id' => Auth::id(),
                     'branch_id' => $id
                 ]);
@@ -188,7 +192,7 @@ class BranchController extends Controller implements HasMiddleware
 
             $branch->delete();
 
-            Log::info('Branch deleted', [
+            $this->logActivity('Delete', 'Branch', 'Branch deleted', [
                 'user_id' => Auth::id(),
                 'branch_id' => $id,
                 'branch_name' => $branch->name
@@ -222,7 +226,7 @@ class BranchController extends Controller implements HasMiddleware
             $branch->is_active = !$branch->is_active;
             $branch->save();
 
-            Log::info('Branch status toggled', [
+            $this->logActivity('Toggle Status', 'Branch', 'Branch status toggled', [
                 'user_id' => Auth::id(),
                 'branch_id' => $branch->id,
                 'new_status' => $branch->is_active

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateReceiptRequest;
 use App\Models\Investment;
@@ -16,6 +18,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class ReceiptController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -65,7 +69,7 @@ class ReceiptController extends Controller implements HasMiddleware
 
             DB::commit();
 
-            Log::info('Receipt created', [
+            $this->logActivity('Create', 'Receipt', 'Receipt created', [
                 'user_id' => $user->id,
                 'receipt_id' => $receipt->id,
                 'receipt_number' => $receipt->receipt_number
@@ -82,7 +86,7 @@ class ReceiptController extends Controller implements HasMiddleware
 
         } catch (\Throwable $th) {
             DB::rollBack();
-            Log::error('Receipt creation failed', [
+            $this->logActivity('Error', 'Receipt', 'Receipt creation failed', [
                 'error' => $th->getMessage(),
                 'user_id' => Auth::guard('api')->id()
             ]);

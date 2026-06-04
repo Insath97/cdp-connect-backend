@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\V1\ActivityLogController;
 use App\Http\Controllers\V1\AuthController;
 use App\Http\Controllers\V1\CountryController;
 use App\Http\Controllers\V1\InvestmentController;
@@ -164,4 +165,8 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
 
     // Maintenance Routes
     Route::post('maintenance/recalculate-targets', [MaintenanceController::class, 'recalculateTargets']);
+
+    // Activity Log Routes
+    Route::get('activity-logs', [ActivityLogController::class, 'index']);
+    Route::get('activity-logs/{id}', [ActivityLogController::class, 'show']);
 });

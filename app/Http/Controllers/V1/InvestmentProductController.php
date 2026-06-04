@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateInvestmentProductRequest;
 use App\Http\Requests\UpdateInvestmentProductRequest;
@@ -16,6 +18,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class InvestmentProductController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -47,7 +51,7 @@ class InvestmentProductController extends Controller implements HasMiddleware
 
             $investmentProducts = $query->paginate($perPage);
 
-            Log::info('Investment products index accessed', [
+            $this->logActivity('Index', 'InvestmentProduct', 'Investment products index accessed', [
                 'user_id' => Auth::id(),
                 'filters' => $request->only(['search', 'is_active', 'per_page', 'duration_months']),
                 'count' => $investmentProducts->count()
@@ -84,7 +88,7 @@ class InvestmentProductController extends Controller implements HasMiddleware
                 return $product->load('annualRates');
             });
 
-            Log::info('Investment product created', [
+            $this->logActivity('Create', 'InvestmentProduct', 'Investment product created', [
                 'user_id' => Auth::id(),
                 'product_id' => $investmentProduct->id,
                 'product_name' => $investmentProduct->name
@@ -116,7 +120,7 @@ class InvestmentProductController extends Controller implements HasMiddleware
                 ], 404);
             }
 
-            Log::info('Investment product viewed', [
+            $this->logActivity('View', 'InvestmentProduct', 'Investment product viewed', [
                 'user_id' => Auth::id(),
                 'product_id' => $investmentProduct->id
             ]);
@@ -168,7 +172,7 @@ class InvestmentProductController extends Controller implements HasMiddleware
                 return $investmentProduct->load('annualRates');
             });
 
-            Log::info('Investment product updated', [
+            $this->logActivity('Update', 'InvestmentProduct', 'Investment product updated', [
                 'user_id' => Auth::id(),
                 'product_id' => $investmentProduct->id,
                 'updated_fields' => array_keys($data)
@@ -202,7 +206,7 @@ class InvestmentProductController extends Controller implements HasMiddleware
 
             // Check if user is Super Admin
             if (!Auth::user()->hasRole('Super Admin')) {
-                Log::warning('Unauthorized investment product deletion attempt', [
+                $this->logActivity('Warning', 'InvestmentProduct', 'Unauthorized investment product deletion attempt', [
                     'user_id' => Auth::id(),
                     'product_id' => $id
                 ]);
@@ -214,7 +218,7 @@ class InvestmentProductController extends Controller implements HasMiddleware
 
             $investmentProduct->delete();
 
-            Log::info('Investment product deleted', [
+            $this->logActivity('Delete', 'InvestmentProduct', 'Investment product deleted', [
                 'user_id' => Auth::id(),
                 'product_id' => $id,
                 'product_name' => $investmentProduct->name
@@ -248,7 +252,7 @@ class InvestmentProductController extends Controller implements HasMiddleware
             $investmentProduct->is_active = !$investmentProduct->is_active;
             $investmentProduct->save();
 
-            Log::info('Investment product status toggled', [
+            $this->logActivity('Toggle Status', 'InvestmentProduct', 'Investment product status toggled', [
                 'user_id' => Auth::id(),
                 'product_id' => $investmentProduct->id,
                 'new_status' => $investmentProduct->is_active

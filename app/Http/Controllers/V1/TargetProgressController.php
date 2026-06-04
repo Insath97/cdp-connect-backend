@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Models\Target;
 use Illuminate\Http\Request;
@@ -13,6 +15,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class TargetProgressController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [

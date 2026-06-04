@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Target;
@@ -20,6 +22,8 @@ use Illuminate\Http\JsonResponse;
 
 class ReportController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     use InvestmentCalculationTrait;
 
     public static function middleware(): array
@@ -108,7 +112,7 @@ class ReportController extends Controller implements HasMiddleware
                 ]
             ], 200);
         } catch (\Throwable $th) {
-            Log::error('Report generation failed', [
+            $this->logActivity('Error', 'Report', 'Report generation failed', [
                 'error' => $th->getMessage(),
                 'user_id' => Auth::id()
             ]);
@@ -188,7 +192,7 @@ class ReportController extends Controller implements HasMiddleware
                 ]
             ], 200);
         } catch (\Throwable $th) {
-            Log::error('Detailed report failed', [
+            $this->logActivity('Error', 'Report', 'Detailed report failed', [
                 'error' => $th->getMessage(),
                 'user_id' => Auth::id(),
                 'target_user_id' => $id
@@ -353,7 +357,7 @@ class ReportController extends Controller implements HasMiddleware
                 ]
             ], 200);
         } catch (\Throwable $th) {
-            Log::error('Agent performance search failed', [
+            $this->logActivity('Error', 'Report', 'Agent performance search failed', [
                 'error' => $th->getMessage(),
                 'user_id' => Auth::id(),
                 'search' => $request->get('search')
@@ -493,7 +497,7 @@ class ReportController extends Controller implements HasMiddleware
                 ]
             ], 200);
         } catch (\Throwable $th) {
-            Log::error('Hierarchy performance report failed', [
+            $this->logActivity('Error', 'Report', 'Hierarchy performance report failed', [
                 'error' => $th->getMessage(),
                 'user_id' => Auth::id(),
                 'search' => $request->get('search')
@@ -668,7 +672,7 @@ class ReportController extends Controller implements HasMiddleware
                 ]
             ], 200);
         } catch (\Throwable $th) {
-            Log::error('Hierarchy detailed report failed', [
+            $this->logActivity('Error', 'Report', 'Hierarchy detailed report failed', [
                 'error' => $th->getMessage(),
                 'user_id' => Auth::id(),
                 'search' => $request->get('search')
@@ -804,7 +808,7 @@ class ReportController extends Controller implements HasMiddleware
                 ]
             ], 200);
         } catch (\Throwable $th) {
-            Log::error('Hierarchy tree report failed', [
+            $this->logActivity('Error', 'Report', 'Hierarchy tree report failed', [
                 'error' => $th->getMessage(),
                 'trace' => $th->getTraceAsString()
             ]);
@@ -984,7 +988,7 @@ class ReportController extends Controller implements HasMiddleware
                 'data' => $investments
             ], 200);
         } catch (\Throwable $th) {
-            Log::error('Investor maturity report failed', [
+            $this->logActivity('Error', 'Report', 'Investor maturity report failed', [
                 'error' => $th->getMessage(),
                 'user_id' => Auth::id(),
                 'filters' => $request->only(['investment_product_id', 'period_key', 'branch_id', 'search'])
@@ -1133,7 +1137,7 @@ class ReportController extends Controller implements HasMiddleware
                 ]
             ], 200);
         } catch (\Throwable $th) {
-            Log::error('Plan-wise hierarchy report failed', [
+            $this->logActivity('Error', 'Report', 'Plan-wise hierarchy report failed', [
                 'error' => $th->getMessage(),
                 'trace' => $th->getTraceAsString()
             ]);

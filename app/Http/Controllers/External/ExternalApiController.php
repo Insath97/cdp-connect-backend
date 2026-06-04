@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\External;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Target;
@@ -14,6 +16,8 @@ use Illuminate\Support\Facades\Log;
 
 class ExternalApiController extends Controller
 {
+    use ActivityLogTrait;
+
     /**
      * Get employee metrics summary for a specific period/date range.
      */
@@ -137,7 +141,7 @@ class ExternalApiController extends Controller
             ], 200);
 
         } catch (\Throwable $th) {
-            Log::error('External employees summary failed', [
+            $this->logActivity('Error', 'ExternalApi', 'External employees summary failed', [
                 'error' => $th->getMessage(),
                 'trace' => $th->getTraceAsString()
             ]);

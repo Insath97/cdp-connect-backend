@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateProvinceRequest;
 use App\Http\Requests\UpdateProvinceRequest;
@@ -15,6 +17,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class ProvinceController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -46,7 +50,7 @@ class ProvinceController extends Controller implements HasMiddleware
 
             $provinces = $query->paginate($perPage);
 
-            Log::info('Provinces index accessed', [
+            $this->logActivity('Index', 'Province', 'Provinces index accessed', [
                 'user_id' => Auth::id(),
                 'filters' => $request->only(['search', 'is_active', 'per_page', 'country_id']),
                 'count' => $provinces->count()
@@ -72,7 +76,7 @@ class ProvinceController extends Controller implements HasMiddleware
             $data = $request->validated();
             $province = Province::create($data);
 
-            Log::info('Province created', [
+            $this->logActivity('Create', 'Province', 'Province created', [
                 'user_id' => Auth::id(),
                 'province_id' => $province->id,
                 'province_name' => $province->name
@@ -104,7 +108,7 @@ class ProvinceController extends Controller implements HasMiddleware
                 ], 404);
             }
 
-            Log::info('Province viewed', [
+            $this->logActivity('View', 'Province', 'Province viewed', [
                 'user_id' => Auth::id(),
                 'province_id' => $province->id
             ]);
@@ -138,7 +142,7 @@ class ProvinceController extends Controller implements HasMiddleware
             $data = $request->validated();
             $province->update($data);
 
-            Log::info('Province updated', [
+            $this->logActivity('Update', 'Province', 'Province updated', [
                 'user_id' => Auth::id(),
                 'province_id' => $province->id,
                 'updated_fields' => array_keys($data)
@@ -172,7 +176,7 @@ class ProvinceController extends Controller implements HasMiddleware
 
             // Check if user is Super Admin
             if (!Auth::user()->hasRole('Super Admin')) {
-                Log::warning('Unauthorized province deletion attempt', [
+                $this->logActivity('Warning', 'Province', 'Unauthorized province deletion attempt', [
                     'user_id' => Auth::id(),
                     'province_id' => $id
                 ]);
@@ -184,7 +188,7 @@ class ProvinceController extends Controller implements HasMiddleware
 
             $province->delete();
 
-            Log::info('Province deleted', [
+            $this->logActivity('Delete', 'Province', 'Province deleted', [
                 'user_id' => Auth::id(),
                 'province_id' => $id,
                 'province_name' => $province->name
@@ -218,7 +222,7 @@ class ProvinceController extends Controller implements HasMiddleware
             $province->is_active = !$province->is_active;
             $province->save();
 
-            Log::info('Province status toggled', [
+            $this->logActivity('Toggle Status', 'Province', 'Province status toggled', [
                 'user_id' => Auth::id(),
                 'province_id' => $province->id,
                 'new_status' => $province->is_active

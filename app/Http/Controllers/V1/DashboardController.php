@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Models\Target;
 use App\Models\Investment;
@@ -17,6 +19,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class DashboardController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -246,7 +250,7 @@ class DashboardController extends Controller implements HasMiddleware
                 ]
             ], 200);
         } catch (\Throwable $th) {
-            Log::error('Dashboard data retrieval failed', [
+            $this->logActivity('Error', 'Dashboard', 'Dashboard data retrieval failed', [
                 'error' => $th->getMessage(),
                 'user_id' => Auth::id()
             ]);

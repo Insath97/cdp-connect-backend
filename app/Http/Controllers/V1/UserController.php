@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateUserRequest;
 use App\Http\Requests\UpdateUserRequest;
@@ -20,6 +22,8 @@ use Spatie\Permission\Models\Role;
 
 class UserController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     use FileUploadTrait;
 
     public static function middleware(): array
@@ -96,7 +100,7 @@ class UserController extends Controller implements HasMiddleware
                 return $userData;
             });
 
-            Log::info('Users index accessed', [
+            $this->logActivity('Index', 'User', 'Users index accessed', [
                 'user_id' => Auth::id(),
                 'filters' => $request->only(['search', 'user_type', 'level_id', 'branch_id', 'is_active', 'role']),
                 'count' => $users->count()
@@ -214,12 +218,12 @@ class UserController extends Controller implements HasMiddleware
 
                 Mail::to($user->email)->send(new UserCreateMail($emailData));
 
-                Log::info('User creation email sent', [
+                $this->logActivity('Info', 'User', 'User creation email sent', [
                     'user_id' => $user->id,
                     'user_type' => $user->user_type
                 ]);
             } catch (\Throwable $th) {
-                Log::error('Failed to send user creation email: ' . $th->getMessage());
+                $this->logActivity('Error', 'User', 'Failed to send user creation email: ' . $th->getMessage());
             }
 
             $user->load([
@@ -229,7 +233,7 @@ class UserController extends Controller implements HasMiddleware
                 'assignedBranches:id,name,code'
             ]);
 
-            Log::info('User created', [
+            $this->logActivity('Create', 'User', 'User created', [
                 'admin_id' => Auth::id(),
                 'created_user_id' => $user->id,
                 'user_type' => $user->user_type
@@ -288,7 +292,7 @@ class UserController extends Controller implements HasMiddleware
                 }
             }
 
-            Log::info('User viewed', [
+            $this->logActivity('View', 'User', 'User viewed', [
                 'viewer_id' => Auth::id(),
                 'viewed_user_id' => $user->id
             ]);
@@ -394,7 +398,7 @@ class UserController extends Controller implements HasMiddleware
                 'assignedBranches:id,name,code'
             ]);
 
-            Log::info('User updated', [
+            $this->logActivity('Update', 'User', 'User updated', [
                 'admin_id' => Auth::id(),
                 'updated_user_id' => $user->id,
                 'updated_fields' => array_keys($data)
@@ -440,7 +444,7 @@ class UserController extends Controller implements HasMiddleware
 
             // Check if user is Super Admin
             if (!Auth::user()->hasRole('Super Admin')) {
-                Log::warning('Unauthorized user deletion attempt', [
+                $this->logActivity('Warning', 'User', 'Unauthorized user deletion attempt', [
                     'user_id' => Auth::id(),
                     'target_user_id' => $id
                 ]);
@@ -461,7 +465,7 @@ class UserController extends Controller implements HasMiddleware
             $this->deleteFile($user->profile_image);
             $user->delete();
 
-            Log::info('User deleted', [
+            $this->logActivity('Delete', 'User', 'User deleted', [
                 'admin_id' => Auth::id(),
                 'deleted_user_id' => $id
             ]);
@@ -504,7 +508,7 @@ class UserController extends Controller implements HasMiddleware
             $user->can_login = $newStatus;
             $user->save();
 
-            Log::info('User status and login toggled', [
+            $this->logActivity('Toggle Status', 'User', 'User status and login toggled', [
                 'admin_id' => Auth::id(),
                 'target_user_id' => $user->id,
                 'is_active' => $user->is_active,

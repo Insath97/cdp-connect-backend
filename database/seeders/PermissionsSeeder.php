@@ -167,6 +167,10 @@ class PermissionsSeeder extends Seeder
 
             /* Maintenance Management */
             ['name' => 'Maintenance Access', 'group_name' => 'Maintenance Management Permissions'],
+
+            /* Activity Log Management */
+            ['name' => 'ActivityLog Index', 'group_name' => 'Activity Log Management Permissions'],
+            ['name' => 'ActivityLog Show', 'group_name' => 'Activity Log Management Permissions'],
         ];
 
         foreach ($permissions as $permission) {

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -10,6 +12,8 @@ use Illuminate\Support\Facades\Cookie;
 
 class AuthController extends Controller
 {
+    use ActivityLogTrait;
+
       /**
      * Admin Login
      * Only users with user_type = 'admin' can login here

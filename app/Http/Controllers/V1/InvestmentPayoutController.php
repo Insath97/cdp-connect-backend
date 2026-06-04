@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Models\InvestmentPayout;
 use App\Models\Investment;
@@ -17,6 +19,8 @@ use App\Services\SmsService;
 
 class InvestmentPayoutController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     use InvestmentCalculationTrait;
 
     public static function middleware(): array
@@ -128,7 +132,7 @@ class InvestmentPayoutController extends Controller implements HasMiddleware
             ], 200);
 
         } catch (\Throwable $th) {
-            Log::error('Failed to retrieve investment payouts', [
+            $this->logActivity('Error', 'InvestmentPayout', 'Failed to retrieve investment payouts', [
                 'error' => $th->getMessage(),
                 'user_id' => Auth::id()
             ]);
@@ -198,23 +202,23 @@ class InvestmentPayoutController extends Controller implements HasMiddleware
                             $smsService = app(SmsService::class);
                             $smsService->sendSms($recipientPhone, $smsMessage);
 
-                            Log::info("SMS notification sent for payout update", [
+                            $this->logActivity('Info', 'InvestmentPayout', "SMS notification sent for payout update", [
                                 'payout_id' => $payout->id,
                                 'phone' => $recipientPhone
                             ]);
                         } else {
-                            Log::warning("Could not send SMS for payout update: customer phone is missing", [
+                            $this->logActivity('Warning', 'InvestmentPayout', "Could not send SMS for payout update: customer phone is missing", [
                                 'payout_id' => $payout->id,
                                 'customer_id' => $customer->id
                             ]);
                         }
                     } else {
-                        Log::warning("Could not send SMS for payout update: customer relation is missing", [
+                        $this->logActivity('Warning', 'InvestmentPayout', "Could not send SMS for payout update: customer relation is missing", [
                             'payout_id' => $payout->id
                         ]);
                     }
                 } catch (\Throwable $smsTh) {
-                    Log::error("Failed to send payout SMS notification", [
+                    $this->logActivity('Error', 'InvestmentPayout', "Failed to send payout SMS notification", [
                         'payout_id' => $payout->id,
                         'error' => $smsTh->getMessage()
                     ]);
@@ -228,7 +232,7 @@ class InvestmentPayoutController extends Controller implements HasMiddleware
             ], 200);
 
         } catch (\Throwable $th) {
-            Log::error('Failed to update payout status', [
+            $this->logActivity('Error', 'InvestmentPayout', 'Failed to update payout status', [
                 'payout_id' => $id,
                 'error' => $th->getMessage()
             ]);
@@ -271,7 +275,7 @@ class InvestmentPayoutController extends Controller implements HasMiddleware
             ], 200);
 
         } catch (\Throwable $th) {
-            Log::error('Legacy payout generation via controller failed', [
+            $this->logActivity('Error', 'InvestmentPayout', 'Legacy payout generation via controller failed', [
                 'error' => $th->getMessage()
             ]);
 

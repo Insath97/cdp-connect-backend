@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Services\DatabaseService;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +16,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class DatabaseController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     protected $databaseService;
 
     public function __construct(DatabaseService $databaseService)
@@ -60,7 +64,7 @@ class DatabaseController extends Controller implements HasMiddleware
             ])->deleteFileAfterSend(true);
 
         } catch (\Throwable $th) {
-            Log::error("Database export failure: " . $th->getMessage());
+            $this->logActivity('Error', 'Database', "Database export failure: " . $th->getMessage());
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to export database.',
@@ -89,7 +93,7 @@ class DatabaseController extends Controller implements HasMiddleware
                 ], 422);
             }
 
-            Log::info("Database import started by Admin ID: " . Auth::id());
+            $this->logActivity('Info', 'Database', "Database import started by Admin ID: " . Auth::id());
 
             // Store temporarily
             $filePath = $file->storeAs('temp', 'import.sql');
@@ -100,7 +104,7 @@ class DatabaseController extends Controller implements HasMiddleware
             // Clean up
             @unlink($fullPath);
 
-            Log::info("Database imported successfully.");
+            $this->logActivity('Info', 'Database', "Database imported successfully.");
 
             return response()->json([
                 'status' => 'success',
@@ -108,7 +112,7 @@ class DatabaseController extends Controller implements HasMiddleware
             ], 200);
 
         } catch (\Throwable $th) {
-            Log::error("Database import failure: " . $th->getMessage());
+            $this->logActivity('Error', 'Database', "Database import failure: " . $th->getMessage());
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to import database.',

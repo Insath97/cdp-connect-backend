@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateCountryRequest;
 use App\Http\Requests\UpdateCountryRequest;
@@ -15,6 +17,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class CountryController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -42,7 +46,7 @@ class CountryController extends Controller implements HasMiddleware
 
             $countries = $query->paginate($perPage);
 
-            Log::info('Countries index accessed', [
+            $this->logActivity('Index', 'Country', 'Countries index accessed', [
                 'user_id' => Auth::id(),
                 'filters' => $request->only(['search', 'is_active', 'per_page']),
                 'count' => $countries->count()
@@ -67,7 +71,7 @@ class CountryController extends Controller implements HasMiddleware
             $data = $request->validated();
             $country = Country::create($data);
 
-            Log::info('Country created', [
+            $this->logActivity('Create', 'Country', 'Country created', [
                 'user_id' => Auth::id(),
                 'country_id' => $country->id,
                 'country_name' => $country->name
@@ -99,7 +103,7 @@ class CountryController extends Controller implements HasMiddleware
                 ], 404);
             }
 
-            Log::info('Country viewed', [
+            $this->logActivity('View', 'Country', 'Country viewed', [
                 'user_id' => Auth::id(),
                 'country_id' => $country->id
             ]);
@@ -132,7 +136,7 @@ class CountryController extends Controller implements HasMiddleware
             $data = $request->validated();
             $country->update($data);
 
-            Log::info('Country updated', [
+            $this->logActivity('Update', 'Country', 'Country updated', [
                 'user_id' => Auth::id(),
                 'country_id' => $country->id,
                 'updated_fields' => array_keys($data)
@@ -165,7 +169,7 @@ class CountryController extends Controller implements HasMiddleware
 
             // Check if user is Super Admin
             if (!Auth::user()->hasRole('Super Admin')) {
-                Log::warning('Unauthorized country deletion attempt', [
+                $this->logActivity('Warning', 'Country', 'Unauthorized country deletion attempt', [
                     'user_id' => Auth::id(),
                     'country_id' => $id
                 ]);
@@ -177,7 +181,7 @@ class CountryController extends Controller implements HasMiddleware
 
             $country->delete();
 
-            Log::info('Country deleted', [
+            $this->logActivity('Delete', 'Country', 'Country deleted', [
                 'user_id' => Auth::id(),
                 'country_id' => $id,
                 'country_name' => $country->name
@@ -210,7 +214,7 @@ class CountryController extends Controller implements HasMiddleware
             $country->is_active = !$country->is_active;
             $country->save();
 
-            Log::info('Country status toggled', [
+            $this->logActivity('Toggle Status', 'Country', 'Country status toggled', [
                 'user_id' => Auth::id(),
                 'country_id' => $country->id,
                 'new_status' => $country->is_active

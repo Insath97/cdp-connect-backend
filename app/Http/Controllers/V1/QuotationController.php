@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateQuotationRequest;
 use App\Models\Quotation;
@@ -21,6 +23,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class QuotationController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -218,7 +222,7 @@ class QuotationController extends Controller implements HasMiddleware
 
             $quotation = Quotation::create($quotationData);
 
-            Log::info('Quotation created', [
+            $this->logActivity('Create', 'Quotation', 'Quotation created', [
                 'user_id' => $user->id,
                 'quotation_id' => $quotation->id,
                 'quotation_number' => $quotation->quotation_number
@@ -232,7 +236,7 @@ class QuotationController extends Controller implements HasMiddleware
                 ])
             ], 201);
         } catch (\Throwable $th) {
-            Log::error('Quotation creation failed', [
+            $this->logActivity('Error', 'Quotation', 'Quotation creation failed', [
                 'error' => $th->getMessage(),
                 'line' => $th->getLine(),
                 'user_id' => Auth::guard('api')->id()
@@ -315,7 +319,7 @@ class QuotationController extends Controller implements HasMiddleware
                 'data' => $quotation->load(['customer', 'branch', 'investmentProduct', 'creator', 'marketingUser'])
             ], 200);
         } catch (\Throwable $th) {
-            Log::error('Quotation update failed', [
+            $this->logActivity('Error', 'Quotation', 'Quotation update failed', [
                 'error' => $th->getMessage(),
                 'line' => $th->getLine(),
                 'user_id' => Auth::guard('api')->id(),

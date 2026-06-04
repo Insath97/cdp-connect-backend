@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Services\SmsService;
@@ -14,6 +16,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class SmsController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -100,7 +104,7 @@ class SmsController extends Controller implements HasMiddleware
             }
             fclose($handle);
         } catch (\Throwable $th) {
-            Log::error("Bulk SMS import failure: " . $th->getMessage());
+            $this->logActivity('Error', 'Sms', "Bulk SMS import failure: " . $th->getMessage());
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to read file.',
@@ -163,7 +167,7 @@ class SmsController extends Controller implements HasMiddleware
 
             $results = $this->smsService->sendBulkSms($numbers, $message);
 
-            Log::info('Bulk SMS sent to all customers', [
+            $this->logActivity('Info', 'Sms', 'Bulk SMS sent to all customers', [
                 'user_id' => $user->id,
                 'total_numbers' => count($numbers)
             ]);
@@ -177,7 +181,7 @@ class SmsController extends Controller implements HasMiddleware
                 ]
             ], 200);
         } catch (\Throwable $th) {
-            Log::error("Bulk SMS to all customers failure: " . $th->getMessage());
+            $this->logActivity('Error', 'Sms', "Bulk SMS to all customers failure: " . $th->getMessage());
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to send SMS to all customers.',

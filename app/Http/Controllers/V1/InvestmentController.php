@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateInvestmentRequest;
 use App\Mail\InvestmentSentMail;
@@ -33,6 +35,8 @@ use App\Traits\InvestmentCalculationTrait;
 
 class InvestmentController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -285,12 +289,12 @@ class InvestmentController extends Controller implements HasMiddleware
 
                 Mail::to($recipientEmail)->send(new InvestmentSentMail($emailData));
             } catch (\Throwable $th) {
-                Log::error('Failed to send investment creation email: ' . $th->getMessage());
+                $this->logActivity('Error', 'Investment', 'Failed to send investment creation email: ' . $th->getMessage());
             }
 
             DB::commit();
 
-            Log::info('Investment created', [
+            $this->logActivity('Create', 'Investment', 'Investment created', [
                 'user_id' => $currentUser->id,
                 'investment_id' => $investment->id,
                 'application_number' => $investment->application_number
@@ -303,7 +307,7 @@ class InvestmentController extends Controller implements HasMiddleware
             ], 201);
         } catch (\Throwable $th) {
             DB::rollBack();
-            Log::error('Investment creation failed', [
+            $this->logActivity('Error', 'Investment', 'Investment creation failed', [
                 'error' => $th->getMessage(),
                 'user_id' => Auth::guard('api')->id()
             ]);
@@ -507,7 +511,7 @@ class InvestmentController extends Controller implements HasMiddleware
 
             DB::commit();
 
-            Log::info('Investment approved', [
+            $this->logActivity('Info', 'Investment', 'Investment approved', [
                 'investment_id' => $investment->id,
                 'policy_number' => $investment->policy_number,
                 'approved_by' => $user->id
@@ -559,7 +563,7 @@ class InvestmentController extends Controller implements HasMiddleware
                     $smsService->sendSms($recipientPhone, $welcomeSms);
                 }
             } catch (\Throwable $notificationError) {
-                Log::error('Failed to send investment approval notifications', [
+                $this->logActivity('Error', 'Investment', 'Failed to send investment approval notifications', [
                     'investment_id' => $investment->id,
                     'error' => $notificationError->getMessage()
                 ]);
@@ -572,7 +576,7 @@ class InvestmentController extends Controller implements HasMiddleware
             ], 200);
         } catch (\Throwable $th) {
             DB::rollBack();
-            Log::error('Investment approval failed', [
+            $this->logActivity('Error', 'Investment', 'Investment approval failed', [
                 'error' => $th->getMessage(),
                 'investment_id' => $id
             ]);
@@ -633,7 +637,7 @@ class InvestmentController extends Controller implements HasMiddleware
                 InvestmentPayout::insert($payouts);
             }
         } catch (\Throwable $th) {
-            Log::error('Failed to generate payout schedule', [
+            $this->logActivity('Error', 'Investment', 'Failed to generate payout schedule', [
                 'investment_id' => $investment->id,
                 'error' => $th->getMessage()
             ]);
@@ -762,7 +766,7 @@ class InvestmentController extends Controller implements HasMiddleware
                 'data' => $investments
             ], 200);
         } catch (\Throwable $th) {
-            Log::error('Investment maturity report failed in InvestmentController', [
+            $this->logActivity('Error', 'Investment', 'Investment maturity report failed in InvestmentController', [
                 'error' => $th->getMessage(),
                 'user_id' => Auth::id()
             ]);
@@ -956,7 +960,7 @@ class InvestmentController extends Controller implements HasMiddleware
 
             DB::commit();
 
-            Log::info('Investment updated by Super Admin', [
+            $this->logActivity('Update', 'Investment', 'Investment updated by Super Admin', [
                 'admin_id' => $user->id,
                 'investment_id' => $investment->id,
                 'updated_fields' => array_keys($data)
@@ -969,7 +973,7 @@ class InvestmentController extends Controller implements HasMiddleware
             ], 200);
         } catch (\Throwable $th) {
             DB::rollBack();
-            Log::error('Investment update failed', [
+            $this->logActivity('Error', 'Investment', 'Investment update failed', [
                 'error' => $th->getMessage(),
                 'admin_id' => Auth::guard('api')->id(),
                 'investment_id' => $id
@@ -1026,7 +1030,7 @@ class InvestmentController extends Controller implements HasMiddleware
                 Target::recalculateForUser($unitHeadId, $periodKey);
             }
 
-            Log::info('Investment deleted by Super Admin', [
+            $this->logActivity('Delete', 'Investment', 'Investment deleted by Super Admin', [
                 'admin_id' => $user->id,
                 'investment_id' => $id
             ]);
@@ -1075,7 +1079,7 @@ class InvestmentController extends Controller implements HasMiddleware
                 Target::recalculateHierarchyTargets($unitHeadId, $periodKey);
             }
 
-            Log::info('Approved investment deleted by Super Admin', [
+            $this->logActivity('Delete', 'Investment', 'Approved investment deleted by Super Admin', [
                 'admin_id' => $user->id,
                 'investment_id' => $id
             ]);
@@ -1149,7 +1153,7 @@ class InvestmentController extends Controller implements HasMiddleware
                         $smsService->sendSms($recipientPhone, $rejectionSms);
                     }
                 } catch (\Throwable $smsError) {
-                    Log::error('Failed to send rejection SMS', ['error' => $smsError->getMessage()]);
+                    $this->logActivity('Error', 'Investment', 'Failed to send rejection SMS', ['error' => $smsError->getMessage()]);
                 }
 
                 return response()->json([
@@ -1236,7 +1240,7 @@ class InvestmentController extends Controller implements HasMiddleware
                     $smsService->sendSms($recipientPhone, $cancelSms);
                 }
             } catch (\Throwable $smsError) {
-                Log::error('Failed to send cancellation SMS', ['error' => $smsError->getMessage()]);
+                $this->logActivity('Error', 'Investment', 'Failed to send cancellation SMS', ['error' => $smsError->getMessage()]);
             }
 
             $commissions = Commission::where('investment_id', $investment->id)
@@ -1274,7 +1278,7 @@ class InvestmentController extends Controller implements HasMiddleware
             ], 200);
         } catch (\Throwable $th) {
             DB::rollBack();
-            Log::error('Investment action failed', [
+            $this->logActivity('Error', 'Investment', 'Investment action failed', [
                 'error' => $th->getMessage(),
                 'investment_id' => $id
             ]);
@@ -1352,7 +1356,7 @@ class InvestmentController extends Controller implements HasMiddleware
                     $smsService->sendSms($recipientPhone, $terminateSms);
                 }
             } catch (\Throwable $smsError) {
-                Log::error('Failed to send termination SMS', ['error' => $smsError->getMessage()]);
+                $this->logActivity('Error', 'Investment', 'Failed to send termination SMS', ['error' => $smsError->getMessage()]);
             }
 
             return response()->json([
@@ -1366,7 +1370,7 @@ class InvestmentController extends Controller implements HasMiddleware
 
         } catch (\Throwable $th) {
             DB::rollBack();
-            Log::error('Investment termination failed', [
+            $this->logActivity('Error', 'Investment', 'Investment termination failed', [
                 'error' => $th->getMessage(),
                 'investment_id' => $id
             ]);

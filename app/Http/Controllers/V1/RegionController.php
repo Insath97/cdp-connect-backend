@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateRegionRequest;
 use App\Http\Requests\UpdateRegionRequest;
@@ -15,6 +17,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class RegionController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -46,7 +50,7 @@ class RegionController extends Controller implements HasMiddleware
 
             $regions = $query->paginate($perPage);
 
-            Log::info('Regions index accessed', [
+            $this->logActivity('Index', 'Region', 'Regions index accessed', [
                 'user_id' => Auth::id(),
                 'filters' => $request->only(['search', 'is_active', 'per_page', 'zone_id']),
                 'count' => $regions->count()
@@ -72,7 +76,7 @@ class RegionController extends Controller implements HasMiddleware
             $data = $request->validated();
             $region = Region::create($data);
 
-            Log::info('Region created', [
+            $this->logActivity('Create', 'Region', 'Region created', [
                 'user_id' => Auth::id(),
                 'region_id' => $region->id,
                 'region_name' => $region->name
@@ -104,7 +108,7 @@ class RegionController extends Controller implements HasMiddleware
                 ], 404);
             }
 
-            Log::info('Region viewed', [
+            $this->logActivity('View', 'Region', 'Region viewed', [
                 'user_id' => Auth::id(),
                 'region_id' => $region->id
             ]);
@@ -138,7 +142,7 @@ class RegionController extends Controller implements HasMiddleware
             $data = $request->validated();
             $region->update($data);
 
-            Log::info('Region updated', [
+            $this->logActivity('Update', 'Region', 'Region updated', [
                 'user_id' => Auth::id(),
                 'region_id' => $region->id,
                 'updated_fields' => array_keys($data)
@@ -172,7 +176,7 @@ class RegionController extends Controller implements HasMiddleware
 
             // Check if user is Super Admin
             if (!Auth::user()->hasRole('Super Admin')) {
-                Log::warning('Unauthorized region deletion attempt', [
+                $this->logActivity('Warning', 'Region', 'Unauthorized region deletion attempt', [
                     'user_id' => Auth::id(),
                     'region_id' => $id
                 ]);
@@ -184,7 +188,7 @@ class RegionController extends Controller implements HasMiddleware
 
             $region->delete();
 
-            Log::info('Region deleted', [
+            $this->logActivity('Delete', 'Region', 'Region deleted', [
                 'user_id' => Auth::id(),
                 'region_id' => $id,
                 'region_name' => $region->name
@@ -218,7 +222,7 @@ class RegionController extends Controller implements HasMiddleware
             $region->is_active = !$region->is_active;
             $region->save();
 
-            Log::info('Region status toggled', [
+            $this->logActivity('Toggle Status', 'Region', 'Region status toggled', [
                 'user_id' => Auth::id(),
                 'region_id' => $region->id,
                 'new_status' => $region->is_active

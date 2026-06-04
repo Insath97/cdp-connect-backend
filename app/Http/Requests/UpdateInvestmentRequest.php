@@ -22,12 +22,12 @@ class UpdateInvestmentRequest extends FormRequest
     public function rules(): array
     {
         $id = $this->route('investment');
-        $investment = \App\Models\Investment::find($id);
+        $investment = \App\Models\Investment::findOrFail($id);
         $hasExistingProof = $investment && !empty($investment->payment_proof);
 
         return [
             'application_number' => 'sometimes|string|unique:investments,application_number,' . $id,
-            'sales_code' => 'sometimes|string|unique:investments,sales_code,' . $id,
+            'sales_code' => ['sometimes', 'string', 'unique:investments,sales_code,' . $id],
             'reservation_date' => 'sometimes|date',
             'customer_id' => 'sometimes|exists:customers,id',
             'branch_id' => 'sometimes|exists:branches,id',

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V1;
 
+use App\Traits\ActivityLogTrait;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateTargetRequest;
 use App\Http\Requests\UpdateTargetRequest;
@@ -16,6 +18,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class TargetController extends Controller implements HasMiddleware
 {
+    use ActivityLogTrait;
+
     public static function middleware(): array
     {
         return [
@@ -83,7 +87,7 @@ class TargetController extends Controller implements HasMiddleware
 
             $targets = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
-            Log::info('Targets index accessed', [
+            $this->logActivity('Index', 'Target', 'Targets index accessed', [
                 'user_id' => Auth::id(),
                 'filters' => $request->only(['user_id', 'period_type', 'period_key']),
                 'count' => $targets->count()
@@ -152,7 +156,7 @@ class TargetController extends Controller implements HasMiddleware
 
             $target = Target::create($data);
 
-            Log::info('Target created', [
+            $this->logActivity('Create', 'Target', 'Target created', [
                 'creator_id' => $currentUser->id,
                 'target_id' => $target->id,
                 'target_user_id' => $target->user_id
@@ -250,7 +254,7 @@ class TargetController extends Controller implements HasMiddleware
 
             $target->update($data);
 
-            Log::info('Target updated', [
+            $this->logActivity('Update', 'Target', 'Target updated', [
                 'updater_id' => Auth::id(),
                 'target_id' => $target->id
             ]);
@@ -291,7 +295,7 @@ class TargetController extends Controller implements HasMiddleware
 
             $target->delete();
 
-            Log::info('Target deleted', [
+            $this->logActivity('Delete', 'Target', 'Target deleted', [
                 'deleter_id' => Auth::id(),
                 'target_id' => $id
             ]);
@@ -388,7 +392,7 @@ class TargetController extends Controller implements HasMiddleware
                 $count++;
             }
 
-            Log::info('Bulk target setup completed', [
+            $this->logActivity('Info', 'Target', 'Bulk target setup completed', [
                 'user_id' => $user->id,
                 'source' => $sourceKey,
                 'target' => $targetKey,
