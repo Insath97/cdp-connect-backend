@@ -113,6 +113,8 @@ class ExternalApiController extends Controller
                     'name' => $user->name,
                     'username' => $user->username,
                     'employee_code' => $user->employee_code,
+                    'id_type' => $user->id_type,
+                    'id_number' => $user->id_number,
                     'level' => $user->level->level_name ?? 'N/A',
                     'branch' => $user->branch->name ?? 'N/A',
                     'metrics' => [
