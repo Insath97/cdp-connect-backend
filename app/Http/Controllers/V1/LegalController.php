@@ -174,7 +174,7 @@ class LegalController extends Controller implements HasMiddleware
                 $query->whereDate('created_at', Carbon::today());
             }
 
-            $legals = $query->paginate($perPage);
+            $legals = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
             $transformedLegals = $legals->getCollection()->map(function ($legal) {
                 return $this->transformLegal($legal);
