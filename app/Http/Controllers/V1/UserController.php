@@ -557,7 +557,7 @@ class UserController extends Controller implements HasMiddleware
                 $query->where('branch_id', $request->branch_id);
             }
 
-            $users = $query->select('id', 'name', 'username', 'user_type', 'branch_id')
+            $users = $query->select('id', 'name', 'username', 'user_type', 'branch_id', 'is_active')
                 ->orderBy('name', 'asc')
                 ->get();
 
@@ -599,7 +599,7 @@ class UserController extends Controller implements HasMiddleware
                 $query->where('branch_id', $request->branch_id);
             }
 
-            $users = $query->select('id', 'name', 'username', 'employee_code', 'level_id', 'branch_id')
+            $users = $query->select('id', 'name', 'username', 'employee_code', 'level_id', 'branch_id', 'is_active')
                 ->with(['level:id,level_name'])
                 ->orderByRaw('FIELD(level_id, 9, 10, 11)')
                 ->get();

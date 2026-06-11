@@ -141,9 +141,25 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
 
     /* Helper Methods */
 
+    /**
+     * Check if the user is active
+     */
+    public function is_active(): bool
+    {
+        return (bool) $this->is_active;
+    }
+
+    /**
+     * Check if the user is active (camelCase version)
+     */
+    public function isActive(): bool
+    {
+        return (bool) $this->is_active;
+    }
+
     public function canLogin(): bool
     {
-        return $this->is_active && $this->can_login;
+        return $this->is_active() && $this->can_login;
     }
 
     public function updateLastLogin($ipAddress = null)

@@ -96,6 +96,7 @@ class LegalController extends Controller implements HasMiddleware
                     'id' => $legal->investment->creator->id,
                     'name' => $legal->investment->creator->name,
                     'email' => $legal->investment->creator->email,
+                    'is_active' => (bool) $legal->investment->creator->is_active,
                 ] : null,
                 'investment_product' => $legal->investment->investmentProduct ? [
                     'id' => $legal->investment->investmentProduct->id,
@@ -114,6 +115,7 @@ class LegalController extends Controller implements HasMiddleware
                     'name' => $legal->investment->unitHead->name,
                     'email' => $legal->investment->unitHead->email,
                     'employee_code' => $legal->investment->unitHead->employee_code,
+                    'is_active' => (bool) $legal->investment->unitHead->is_active,
                 ] : null,
             ] : null,
         ];
@@ -484,7 +486,7 @@ class LegalController extends Controller implements HasMiddleware
     {
         $investment->loadMissing([
             'creator' => function ($q) {
-                $q->select('id', 'name', 'email');
+                $q->select('id', 'name', 'email', 'is_active');
             },
             'investmentProduct' => function ($q) {
                 $q->select('id', 'name', 'code', 'duration_months', 'roi_percentage', 'is_variable_roi')->with('annualRates');
@@ -500,7 +502,7 @@ class LegalController extends Controller implements HasMiddleware
             },
             'customer',
             'unitHead' => function ($q) {
-                $q->select('id', 'name', 'email', 'employee_code');
+                $q->select('id', 'name', 'email', 'employee_code', 'is_active');
             },
         ]);
 
@@ -551,10 +553,10 @@ class LegalController extends Controller implements HasMiddleware
                     $q->select('id', 'name', 'code', 'duration_months', 'roi_percentage', 'is_variable_roi')->with('annualRates');
                 },
                 'unitHead' => function ($q) {
-                    $q->select('id', 'name', 'email', 'employee_code');
+                    $q->select('id', 'name', 'email', 'employee_code', 'is_active');
                 },
                 'creator' => function ($q) {
-                    $q->select('id', 'name', 'email');
+                    $q->select('id', 'name', 'email', 'is_active');
                 },
             ]);
 
