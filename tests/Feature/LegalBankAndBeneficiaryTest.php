@@ -336,4 +336,31 @@ class LegalBankAndBeneficiaryTest extends TestCase
             ]
         ]);
     }
+
+    /** @test */
+    public function test_it_strips_metadata_and_saves_successfully_with_long_input()
+    {
+        $metadataJson = '|||METADATA:{"customer_name":"Jane Doe","customer_address":"123 Main St"}';
+        $longWitnessAddress = 'Hatton ' . $metadataJson;
+
+        $response = $this->actingAs($this->user, 'api')
+            ->postJson('/api/v1/legals', [
+                'investment_id' => $this->investment->id,
+                'language' => 'tamil',
+                'full_name' => 'Jane Doe',
+                'name_with_initials' => 'J. Doe',
+                'address_line_1' => '123 Main St',
+                'witness_02_name' => 'Witness Name',
+                'witness_02_nic' => '987654321V',
+                'witness_02_address' => $longWitnessAddress,
+            ]);
+
+        $response->assertStatus(201);
+
+        $legal = Legal::first();
+        $this->assertNotNull($legal);
+        // Assert the metadata suffix was stripped and only the base address is stored
+        $this->assertEquals('Hatton', $legal->witness_02_address);
+    }
 }
+

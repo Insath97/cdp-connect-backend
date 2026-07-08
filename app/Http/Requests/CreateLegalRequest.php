@@ -54,6 +54,23 @@ class CreateLegalRequest extends FormRequest
         ];
     }
 
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        $sanitized = [];
+        foreach ($this->all() as $key => $value) {
+            if (is_string($value) && str_contains($value, '|||METADATA:')) {
+                $sanitized[$key] = trim(explode('|||METADATA:', $value)[0]);
+            }
+        }
+
+        if (!empty($sanitized)) {
+            $this->merge($sanitized);
+        }
+    }
+
     protected function failedValidation(Validator $validator)
     {
         $errorMessages = $validator->errors();
