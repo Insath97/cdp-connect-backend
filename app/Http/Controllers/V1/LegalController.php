@@ -57,6 +57,10 @@ class LegalController extends Controller implements HasMiddleware
             'business_entered_date' => $legal->business_entered_date,
             'completed_date' => $legal->completed_date,
             'execution_year' => $legal->execution_year,
+            'amount_in_words' => $legal->amount_in_words,
+            'plan' => $legal->plan,
+            'monthly_profit' => $legal->monthly_profit,
+            'monthly_profit_day' => $legal->monthly_profit_day,
 
             'monthly_return' => (float) $legal->monthly_return,
             'annual_return' => (float) $legal->annual_return,
@@ -241,6 +245,10 @@ class LegalController extends Controller implements HasMiddleware
                     'business_entered_date' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['business_entered_date'] ?? $existingLegal->business_entered_date) : $existingLegal->business_entered_date,
                     'completed_date' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['completed_date'] ?? $existingLegal->completed_date) : $existingLegal->completed_date,
                     'execution_year' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['execution_year'] ?? $existingLegal->execution_year) : $existingLegal->execution_year,
+                    'amount_in_words' => in_array($data['language'], ['tamil', 'english']) ? ($data['amount_in_words'] ?? $existingLegal->amount_in_words) : $existingLegal->amount_in_words,
+                    'plan' => in_array($data['language'], ['tamil', 'english']) ? ($data['plan'] ?? $existingLegal->plan) : $existingLegal->plan,
+                    'monthly_profit' => in_array($data['language'], ['tamil', 'english']) ? ($data['monthly_profit'] ?? $existingLegal->monthly_profit) : $existingLegal->monthly_profit,
+                    'monthly_profit_day' => in_array($data['language'], ['tamil', 'english']) ? ($data['monthly_profit_day'] ?? $existingLegal->monthly_profit_day) : $existingLegal->monthly_profit_day,
                     'witness_01_name' => $data['witness_01_name'] ?? $existingLegal->witness_01_name,
                     'witness_01_nic' => $data['witness_01_nic'] ?? $existingLegal->witness_01_nic,
                     'witness_01_address' => $data['witness_01_address'] ?? $existingLegal->witness_01_address,
@@ -335,6 +343,10 @@ class LegalController extends Controller implements HasMiddleware
                 'business_entered_date' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['business_entered_date'] ?? null) : null,
                 'completed_date' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['completed_date'] ?? null) : null,
                 'execution_year' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['execution_year'] ?? null) : null,
+                'amount_in_words' => in_array($data['language'], ['tamil', 'english']) ? ($data['amount_in_words'] ?? null) : null,
+                'plan' => in_array($data['language'], ['tamil', 'english']) ? ($data['plan'] ?? null) : null,
+                'monthly_profit' => in_array($data['language'], ['tamil', 'english']) ? ($data['monthly_profit'] ?? null) : null,
+                'monthly_profit_day' => in_array($data['language'], ['tamil', 'english']) ? ($data['monthly_profit_day'] ?? null) : null,
                 'investment_product_id' => $investment->investment_product_id,
                 'year_in_words' => $data['year_in_words'] ?? null,
                 'year' => $data['year'] ?? null,
@@ -462,6 +474,14 @@ class LegalController extends Controller implements HasMiddleware
                     $data['business_entered_date'],
                     $data['completed_date'],
                     $data['execution_year']
+                );
+            }
+            if ($legal->language === 'sinhala') {
+                unset(
+                    $data['amount_in_words'],
+                    $data['plan'],
+                    $data['monthly_profit'],
+                    $data['monthly_profit_day']
                 );
             }
             $legal->update($data);

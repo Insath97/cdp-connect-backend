@@ -386,5 +386,28 @@ class LegalBankAndBeneficiaryTest extends TestCase
         $this->assertEquals('2027-06-17', $legal->completed_date);
         $this->assertEquals('2026', $legal->execution_year);
     }
+
+    /** @test */
+    public function test_it_validates_and_stores_new_tamil_and_english_translation_fields()
+    {
+        $response = $this->actingAs($this->user, 'api')
+            ->postJson('/api/v1/legals', [
+                'investment_id' => $this->investment->id,
+                'language' => 'english',
+                'amount_in_words' => 'Five Hundred Thousand Rupees Only',
+                'plan' => '12 Months',
+                'monthly_profit' => 'Fifteen Thousand Rupees Only',
+                'monthly_profit_day' => '17th',
+            ]);
+
+        $response->assertStatus(201);
+
+        $legal = Legal::first();
+        $this->assertNotNull($legal);
+        $this->assertEquals('Five Hundred Thousand Rupees Only', $legal->amount_in_words);
+        $this->assertEquals('12 Months', $legal->plan);
+        $this->assertEquals('Fifteen Thousand Rupees Only', $legal->monthly_profit);
+        $this->assertEquals('17th', $legal->monthly_profit_day);
+    }
 }
 
