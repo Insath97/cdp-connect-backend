@@ -28,7 +28,7 @@ class CreateLegalRequest extends FormRequest
             'name_with_initials' => 'required_if:language,tamil,sinhala|nullable|string|max:255',
             'address_line_1' => 'required_if:language,tamil,sinhala|nullable|string|max:255',
             'address_line_2' => 'nullable|string|max:255',
-            'city' => 'required_if:language,tamil,sinhala|nullable|string|max:255',
+            'city' => 'nullable|string|max:255',
             'state' => 'nullable|string|max:255',
             'country' => 'nullable|string|max:255',
             'date_of_agreement' => 'nullable|date',
