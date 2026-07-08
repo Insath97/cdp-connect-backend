@@ -24,6 +24,13 @@ class CreateLegalRequest extends FormRequest
         return [
             'investment_id' => 'required|exists:investments,id',
             'language' => 'required|in:english,tamil,sinhala',
+            'full_name' => 'required_if:language,tamil,sinhala|nullable|string|max:255',
+            'name_with_initials' => 'required_if:language,tamil,sinhala|nullable|string|max:255',
+            'address_line_1' => 'required_if:language,tamil,sinhala|nullable|string|max:255',
+            'address_line_2' => 'nullable|string|max:255',
+            'city' => 'required_if:language,tamil,sinhala|nullable|string|max:255',
+            'state' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:255',
             'date_of_agreement' => 'nullable|date',
             'year_in_words' => 'nullable|string|max:255',
             'year' => 'nullable|string|max:4',

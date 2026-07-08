@@ -224,6 +224,13 @@ class LegalController extends Controller implements HasMiddleware
                     'date_of_agreement' => $data['date_of_agreement'] ?? $existingLegal->date_of_agreement,
                     'year_in_words' => $data['year_in_words'] ?? $existingLegal->year_in_words,
                     'year' => $data['year'] ?? $existingLegal->year,
+                    'full_name' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['full_name'] ?? $existingLegal->full_name) : $existingLegal->full_name,
+                    'name_with_initials' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['name_with_initials'] ?? $existingLegal->name_with_initials) : $existingLegal->name_with_initials,
+                    'address_line_1' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['address_line_1'] ?? $existingLegal->address_line_1) : $existingLegal->address_line_1,
+                    'address_line_2' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['address_line_2'] ?? $existingLegal->address_line_2) : $existingLegal->address_line_2,
+                    'city' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['city'] ?? $existingLegal->city) : $existingLegal->city,
+                    'state' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['state'] ?? $existingLegal->state) : $existingLegal->state,
+                    'country' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['country'] ?? $existingLegal->country) : $existingLegal->country,
                     'witness_01_name' => $data['witness_01_name'] ?? $existingLegal->witness_01_name,
                     'witness_01_nic' => $data['witness_01_nic'] ?? $existingLegal->witness_01_nic,
                     'witness_01_address' => $data['witness_01_address'] ?? $existingLegal->witness_01_address,
@@ -301,17 +308,17 @@ class LegalController extends Controller implements HasMiddleware
                 'date_of_agreement' => $data['date_of_agreement'] ?? now(),
                 'branch_id' => $investment->branch_id,
                 'customer_id' => $investment->customer_id,
-                'full_name' => $customer->full_name,
-                'name_with_initials' => $customer->name_with_initials,
+                'full_name' => in_array($data['language'], ['tamil', 'sinhala']) ? $data['full_name'] : $customer->full_name,
+                'name_with_initials' => in_array($data['language'], ['tamil', 'sinhala']) ? $data['name_with_initials'] : $customer->name_with_initials,
                 'id_type' => $customer->id_type ?? 'nic',
                 'id_number' => $customer->id_number,
                 'email' => $customer->email,
-                'address_line_1' => $customer->address_line_1,
-                'address_line_2' => $customer->address_line_2,
+                'address_line_1' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['address_line_1'] ?? null) : $customer->address_line_1,
+                'address_line_2' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['address_line_2'] ?? null) : $customer->address_line_2,
                 'landmark' => $customer->landmark,
-                'city' => $customer->city,
-                'state' => $customer->state,
-                'country' => $customer->country ?? 'Sri Lanka',
+                'city' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['city'] ?? null) : $customer->city,
+                'state' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['state'] ?? null) : $customer->state,
+                'country' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['country'] ?? 'Sri Lanka') : ($customer->country ?? 'Sri Lanka'),
                 'postal_code' => $customer->postal_code,
                 'investment_product_id' => $investment->investment_product_id,
                 'year_in_words' => $data['year_in_words'] ?? null,
@@ -428,6 +435,9 @@ class LegalController extends Controller implements HasMiddleware
             }
 
             $data = $request->validated();
+            if ($legal->language === 'english') {
+                unset($data['full_name'], $data['name_with_initials'], $data['address_line_1'], $data['address_line_2'], $data['city'], $data['state'], $data['country']);
+            }
             $legal->update($data);
 
             $this->logActivity('Update', 'Legal', 'Legal updated', [

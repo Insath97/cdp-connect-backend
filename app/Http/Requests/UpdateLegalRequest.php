@@ -22,6 +22,13 @@ class UpdateLegalRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'full_name' => 'nullable|string|max:255',
+            'name_with_initials' => 'nullable|string|max:255',
+            'address_line_1' => 'nullable|string|max:255',
+            'address_line_2' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'state' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:255',
             'date_of_agreement' => 'nullable|date',
             'year_in_words' => 'nullable|string|max:255',
             'year' => 'nullable|string|max:4',
