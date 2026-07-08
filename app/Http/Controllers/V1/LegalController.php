@@ -54,6 +54,9 @@ class LegalController extends Controller implements HasMiddleware
             'postal_code' => $legal->postal_code,
             'branch_location' => $legal->branch_location,
             'execution_location' => $legal->execution_location,
+            'business_entered_date' => $legal->business_entered_date,
+            'completed_date' => $legal->completed_date,
+            'execution_year' => $legal->execution_year,
 
             'monthly_return' => (float) $legal->monthly_return,
             'annual_return' => (float) $legal->annual_return,
@@ -235,6 +238,9 @@ class LegalController extends Controller implements HasMiddleware
                     'country' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['country'] ?? $existingLegal->country) : $existingLegal->country,
                     'branch_location' => $data['branch_location'] ?? $existingLegal->branch_location,
                     'execution_location' => $data['execution_location'] ?? $existingLegal->execution_location,
+                    'business_entered_date' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['business_entered_date'] ?? $existingLegal->business_entered_date) : $existingLegal->business_entered_date,
+                    'completed_date' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['completed_date'] ?? $existingLegal->completed_date) : $existingLegal->completed_date,
+                    'execution_year' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['execution_year'] ?? $existingLegal->execution_year) : $existingLegal->execution_year,
                     'witness_01_name' => $data['witness_01_name'] ?? $existingLegal->witness_01_name,
                     'witness_01_nic' => $data['witness_01_nic'] ?? $existingLegal->witness_01_nic,
                     'witness_01_address' => $data['witness_01_address'] ?? $existingLegal->witness_01_address,
@@ -326,6 +332,9 @@ class LegalController extends Controller implements HasMiddleware
                 'postal_code' => $customer->postal_code,
                 'branch_location' => $data['branch_location'] ?? null,
                 'execution_location' => $data['execution_location'] ?? null,
+                'business_entered_date' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['business_entered_date'] ?? null) : null,
+                'completed_date' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['completed_date'] ?? null) : null,
+                'execution_year' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['execution_year'] ?? null) : null,
                 'investment_product_id' => $investment->investment_product_id,
                 'year_in_words' => $data['year_in_words'] ?? null,
                 'year' => $data['year'] ?? null,
@@ -442,7 +451,18 @@ class LegalController extends Controller implements HasMiddleware
 
             $data = $request->validated();
             if ($legal->language === 'english') {
-                unset($data['full_name'], $data['name_with_initials'], $data['address_line_1'], $data['address_line_2'], $data['city'], $data['state'], $data['country']);
+                unset(
+                    $data['full_name'],
+                    $data['name_with_initials'],
+                    $data['address_line_1'],
+                    $data['address_line_2'],
+                    $data['city'],
+                    $data['state'],
+                    $data['country'],
+                    $data['business_entered_date'],
+                    $data['completed_date'],
+                    $data['execution_year']
+                );
             }
             $legal->update($data);
 

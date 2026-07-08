@@ -362,5 +362,29 @@ class LegalBankAndBeneficiaryTest extends TestCase
         // Assert the metadata suffix was stripped and only the base address is stored
         $this->assertEquals('Hatton', $legal->witness_02_address);
     }
+
+    /** @test */
+    public function test_it_validates_and_stores_new_tamil_and_sinhala_translation_fields()
+    {
+        $response = $this->actingAs($this->user, 'api')
+            ->postJson('/api/v1/legals', [
+                'investment_id' => $this->investment->id,
+                'language' => 'tamil',
+                'full_name' => 'Jane Doe',
+                'name_with_initials' => 'J. Doe',
+                'address_line_1' => '123 Main St',
+                'business_entered_date' => '2026-06-17',
+                'completed_date' => '2027-06-17',
+                'execution_year' => '2026',
+            ]);
+
+        $response->assertStatus(201);
+
+        $legal = Legal::first();
+        $this->assertNotNull($legal);
+        $this->assertEquals('2026-06-17', $legal->business_entered_date);
+        $this->assertEquals('2027-06-17', $legal->completed_date);
+        $this->assertEquals('2026', $legal->execution_year);
+    }
 }
 
