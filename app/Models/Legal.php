@@ -26,6 +26,8 @@ class Legal extends Model
         'state',
         'country',
         'postal_code',
+        'branch_location',
+        'execution_location',
         'year_in_words',
         'year',
         'witness_01_name',

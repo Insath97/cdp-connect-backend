@@ -31,6 +31,8 @@ class CreateLegalRequest extends FormRequest
             'city' => 'nullable|string|max:255',
             'state' => 'nullable|string|max:255',
             'country' => 'nullable|string|max:255',
+            'branch_location' => 'nullable|string|max:255',
+            'execution_location' => 'nullable|string|max:255',
             'date_of_agreement' => 'nullable|date',
             'year_in_words' => 'nullable|string|max:255',
             'year' => 'nullable|string|max:4',
