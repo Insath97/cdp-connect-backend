@@ -435,7 +435,7 @@ class LegalBankAndBeneficiaryTest extends TestCase
         $legal = Legal::first();
         $this->assertNotNull($legal);
         $this->assertEquals('tamil month 6 words', $legal->month_6_breakdown_in_words);
-        $this->assertEquals('tamil year 5 words', $legal->year_5_breakdown_in_words);
+        $this->assertEquals('tamil year_5_breakdown_in_words', 'tamil year 5 words', $legal->year_5_breakdown_in_words);
     }
 
     /** @test */
