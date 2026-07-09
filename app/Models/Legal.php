@@ -62,7 +62,13 @@ class Legal extends Model
         'year_3_breakdown',
         'year_4_breakdown',
         'year_5_breakdown',
-        'yearly_breakdown'
+        'yearly_breakdown',
+        'month_6_breakdown_in_words',
+        'year_1_breakdown_in_words',
+        'year_2_breakdown_in_words',
+        'year_3_breakdown_in_words',
+        'year_4_breakdown_in_words',
+        'year_5_breakdown_in_words'
     ];
 
     protected $casts = [

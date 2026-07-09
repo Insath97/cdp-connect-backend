@@ -72,6 +72,12 @@ class LegalController extends Controller implements HasMiddleware
             'year_4_breakdown' => (float) $legal->year_4_breakdown,
             'year_5_breakdown' => (float) $legal->year_5_breakdown,
             'yearly_breakdown' => $legal->yearly_breakdown,
+            'month_6_breakdown_in_words' => $legal->month_6_breakdown_in_words,
+            'year_1_breakdown_in_words' => $legal->year_1_breakdown_in_words,
+            'year_2_breakdown_in_words' => $legal->year_2_breakdown_in_words,
+            'year_3_breakdown_in_words' => $legal->year_3_breakdown_in_words,
+            'year_4_breakdown_in_words' => $legal->year_4_breakdown_in_words,
+            'year_5_breakdown_in_words' => $legal->year_5_breakdown_in_words,
 
             'bank_name' => $legal->bank_name,
             'branch_name' => $legal->branch_name,
@@ -249,6 +255,12 @@ class LegalController extends Controller implements HasMiddleware
                     'plan' => in_array($data['language'], ['tamil', 'english']) ? ($data['plan'] ?? $existingLegal->plan) : $existingLegal->plan,
                     'monthly_profit' => in_array($data['language'], ['tamil', 'english']) ? ($data['monthly_profit'] ?? $existingLegal->monthly_profit) : $existingLegal->monthly_profit,
                     'monthly_profit_day' => in_array($data['language'], ['tamil', 'english']) ? ($data['monthly_profit_day'] ?? $existingLegal->monthly_profit_day) : $existingLegal->monthly_profit_day,
+                    'month_6_breakdown_in_words' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['month_6_breakdown_in_words'] ?? $existingLegal->month_6_breakdown_in_words) : $existingLegal->month_6_breakdown_in_words,
+                    'year_1_breakdown_in_words' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['year_1_breakdown_in_words'] ?? $existingLegal->year_1_breakdown_in_words) : $existingLegal->year_1_breakdown_in_words,
+                    'year_2_breakdown_in_words' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['year_2_breakdown_in_words'] ?? $existingLegal->year_2_breakdown_in_words) : $existingLegal->year_2_breakdown_in_words,
+                    'year_3_breakdown_in_words' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['year_3_breakdown_in_words'] ?? $existingLegal->year_3_breakdown_in_words) : $existingLegal->year_3_breakdown_in_words,
+                    'year_4_breakdown_in_words' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['year_4_breakdown_in_words'] ?? $existingLegal->year_4_breakdown_in_words) : $existingLegal->year_4_breakdown_in_words,
+                    'year_5_breakdown_in_words' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['year_5_breakdown_in_words'] ?? $existingLegal->year_5_breakdown_in_words) : $existingLegal->year_5_breakdown_in_words,
                     'witness_01_name' => $data['witness_01_name'] ?? $existingLegal->witness_01_name,
                     'witness_01_nic' => $data['witness_01_nic'] ?? $existingLegal->witness_01_nic,
                     'witness_01_address' => $data['witness_01_address'] ?? $existingLegal->witness_01_address,
@@ -347,6 +359,12 @@ class LegalController extends Controller implements HasMiddleware
                 'plan' => in_array($data['language'], ['tamil', 'english']) ? ($data['plan'] ?? null) : null,
                 'monthly_profit' => in_array($data['language'], ['tamil', 'english']) ? ($data['monthly_profit'] ?? null) : null,
                 'monthly_profit_day' => in_array($data['language'], ['tamil', 'english']) ? ($data['monthly_profit_day'] ?? null) : null,
+                'month_6_breakdown_in_words' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['month_6_breakdown_in_words'] ?? null) : null,
+                'year_1_breakdown_in_words' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['year_1_breakdown_in_words'] ?? null) : null,
+                'year_2_breakdown_in_words' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['year_2_breakdown_in_words'] ?? null) : null,
+                'year_3_breakdown_in_words' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['year_3_breakdown_in_words'] ?? null) : null,
+                'year_4_breakdown_in_words' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['year_4_breakdown_in_words'] ?? null) : null,
+                'year_5_breakdown_in_words' => in_array($data['language'], ['tamil', 'sinhala']) ? ($data['year_5_breakdown_in_words'] ?? null) : null,
                 'investment_product_id' => $investment->investment_product_id,
                 'year_in_words' => $data['year_in_words'] ?? null,
                 'year' => $data['year'] ?? null,
@@ -473,7 +491,13 @@ class LegalController extends Controller implements HasMiddleware
                     $data['country'],
                     $data['business_entered_date'],
                     $data['completed_date'],
-                    $data['execution_year']
+                    $data['execution_year'],
+                    $data['month_6_breakdown_in_words'],
+                    $data['year_1_breakdown_in_words'],
+                    $data['year_2_breakdown_in_words'],
+                    $data['year_3_breakdown_in_words'],
+                    $data['year_4_breakdown_in_words'],
+                    $data['year_5_breakdown_in_words']
                 );
             }
             if ($legal->language === 'sinhala') {

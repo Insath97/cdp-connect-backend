@@ -409,5 +409,63 @@ class LegalBankAndBeneficiaryTest extends TestCase
         $this->assertEquals('Fifteen Thousand Rupees Only', $legal->monthly_profit);
         $this->assertEquals('17th', $legal->monthly_profit_day);
     }
+
+    /** @test */
+    public function test_it_validates_and_stores_new_tamil_and_sinhala_word_breakdown_fields()
+    {
+        $response = $this->actingAs($this->user, 'api')
+            ->postJson('/api/v1/legals', [
+                'investment_id' => $this->investment->id,
+                'language' => 'tamil',
+                'full_name' => 'Jane Doe',
+                'name_with_initials' => 'J. Doe',
+                'address_line_1' => '123 Main St',
+                'month_6_breakdown_in_words' => 'tamil month 6 words',
+                'year_1_breakdown_in_words' => 'tamil year 1 words',
+                'year_2_breakdown_in_words' => 'tamil year 2 words',
+                'year_3_breakdown_in_words' => 'tamil year 3 words',
+                'year_4_breakdown_in_words' => 'tamil year 4 words',
+                'year_5_breakdown_in_words' => 'tamil year 5 words',
+            ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.month_6_breakdown_in_words', 'tamil month 6 words');
+        $response->assertJsonPath('data.year_1_breakdown_in_words', 'tamil year 1 words');
+
+        $legal = Legal::first();
+        $this->assertNotNull($legal);
+        $this->assertEquals('tamil month 6 words', $legal->month_6_breakdown_in_words);
+        $this->assertEquals('tamil year 5 words', $legal->year_5_breakdown_in_words);
+    }
+
+    /** @test */
+    public function test_it_does_not_save_sinhala_tamil_word_breakdown_fields_for_english_language()
+    {
+        // First create a tamil legal record with breakdowns in words
+        $legal = Legal::create([
+            'investment_id' => $this->investment->id,
+            'language' => 'english',
+            'legal_number' => 'LEG-COL-26050009',
+            'branch_id' => $this->investment->branch_id,
+            'customer_id' => $this->investment->customer_id,
+            'full_name' => 'Jane Doe',
+            'name_with_initials' => 'J. Doe',
+            'id_type' => 'nic',
+            'id_number' => '123456789V',
+            'investment_product_id' => $this->investment->investment_product_id,
+            'month_6_breakdown_in_words' => 'english month 6 words',
+        ]);
+
+        // When updating, since the language is english, it should unset these word breakdown fields
+        $response = $this->actingAs($this->user, 'api')
+            ->putJson('/api/v1/legals/' . $legal->id, [
+                'month_6_breakdown_in_words' => 'updated month 6 words',
+            ]);
+
+        $response->assertStatus(200);
+        $legal->refresh();
+        // Since language is english, updating should not change it
+        $this->assertNotEquals('updated month 6 words', $legal->month_6_breakdown_in_words);
+    }
 }
 
