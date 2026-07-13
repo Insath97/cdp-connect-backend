@@ -42,7 +42,22 @@ class CreateInvestmentRequest extends FormRequest
                 }
             ],
             'investment_product_id' => 'required|exists:investment_products,id',
-            'beneficiary_id' => 'nullable|exists:beneficiaries,id',
+            'beneficiary_id' => [
+                'nullable',
+                'exists:beneficiaries,id',
+                function ($attribute, $value, $fail) {
+                    $beneficiary = \App\Models\Beneficiary::find($value);
+                    if ($beneficiary) {
+                        $userExists = \App\Models\User::where('id_type', $beneficiary->id_type)
+                            ->where('id_number', $beneficiary->id_number)
+                            ->whereIn('user_type', ['admin', 'hierarchy'])
+                            ->exists();
+                        if ($userExists) {
+                            $fail('The selected beneficiary cannot be a staff or hierarchy member.');
+                        }
+                    }
+                }
+            ],
             'customer_bank_detail_id' => 'nullable|exists:customer_bank_details,id',
 
             // Nested Beneficiary Data
@@ -50,7 +65,23 @@ class CreateInvestmentRequest extends FormRequest
             'beneficiary.full_name' => 'required_with:beneficiary|string|max:255',
             'beneficiary.type' => 'required_with:beneficiary|in:adult,child',
             'beneficiary.id_type' => 'required_with:beneficiary|in:nic,passport,driving_license,other',
-            'beneficiary.id_number' => 'required_with:beneficiary|string|max:50',
+            'beneficiary.id_number' => [
+                'required_with:beneficiary',
+                'string',
+                'max:50',
+                function ($attribute, $value, $fail) {
+                    $idType = $this->input('beneficiary.id_type');
+                    if ($idType && $value) {
+                        $userExists = \App\Models\User::where('id_type', $idType)
+                            ->where('id_number', $value)
+                            ->whereIn('user_type', ['admin', 'hierarchy'])
+                            ->exists();
+                        if ($userExists) {
+                            $fail('The beneficiary cannot be a staff or hierarchy member.');
+                        }
+                    }
+                }
+            ],
             'beneficiary.phone_primary' => 'required_with:beneficiary|string|max:20',
             'beneficiary.relationship' => 'required_with:beneficiary|string|max:100',
             'beneficiary.share_percentage' => 'required_with:beneficiary|numeric|min:0|max:100',

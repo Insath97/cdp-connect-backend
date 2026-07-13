@@ -57,8 +57,43 @@ class UpdateLegalRequest extends FormRequest
             'branch_name' => 'nullable|string|max:255',
             'account_number' => 'nullable|string|max:50',
             'beneficiary_full_name' => 'nullable|string|max:255',
-            'beneficiary_id_type' => 'nullable|in:nic,passport,driving_license,other',
-            'beneficiary_id_number' => 'nullable|string|max:50',
+            'beneficiary_id_type' => [
+                'nullable',
+                'in:nic,passport,driving_license,other',
+                function ($attribute, $value, $fail) {
+                    $id = $this->route('legal');
+                    $legal = $id ? \App\Models\Legal::find($id) : null;
+                    $idNumber = $this->input('beneficiary_id_number') ?? ($legal ? $legal->beneficiary_id_number : null);
+                    if ($value && $idNumber) {
+                        $userExists = \App\Models\User::where('id_type', $value)
+                            ->where('id_number', $idNumber)
+                            ->whereIn('user_type', ['admin', 'hierarchy'])
+                            ->exists();
+                        if ($userExists) {
+                            $fail('The beneficiary cannot be a staff or hierarchy member.');
+                        }
+                    }
+                }
+            ],
+            'beneficiary_id_number' => [
+                'nullable',
+                'string',
+                'max:50',
+                function ($attribute, $value, $fail) {
+                    $id = $this->route('legal');
+                    $legal = $id ? \App\Models\Legal::find($id) : null;
+                    $idType = $this->input('beneficiary_id_type') ?? ($legal ? $legal->beneficiary_id_type : null);
+                    if ($idType && $value) {
+                        $userExists = \App\Models\User::where('id_type', $idType)
+                            ->where('id_number', $value)
+                            ->whereIn('user_type', ['admin', 'hierarchy'])
+                            ->exists();
+                        if ($userExists) {
+                            $fail('The beneficiary cannot be a staff or hierarchy member.');
+                        }
+                    }
+                }
+            ],
             'beneficiary_phone_primary' => 'nullable|string|max:20',
             'beneficiary_relationship' => 'nullable|string|max:100',
             'beneficiary_share_percentage' => 'nullable|numeric|between:0,100',
