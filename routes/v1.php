@@ -51,6 +51,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::patch('profile/change-password', [ProfileController::class, 'changePassword']);
 
     Route::get('dashboard', [DashboardController::class, 'index']);
+    Route::get('dashboard/top-performance', [DashboardController::class, 'topPerformance']);
 
     Route::get('permissions/list', [PermissionController::class, 'getAvailablePermissions']);
     Route::apiResource('permissions', PermissionController::class);

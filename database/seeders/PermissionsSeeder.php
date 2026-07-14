@@ -159,6 +159,7 @@ class PermissionsSeeder extends Seeder
 
             /* Dashboard Management */
             ['name' => 'Dashboard View', 'group_name' => 'Dashboard Management Permissions'],
+            ['name' => 'Dashboard Top Performance View', 'group_name' => 'Dashboard Management Permissions'],
 
             /* SMS Management */
             ['name' => 'Sms Send', 'group_name' => 'SMS Management Permissions'],

@@ -13,6 +13,8 @@ use App\Models\InvestmentProduct;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -25,6 +27,7 @@ class DashboardController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('permission:Dashboard View', only: ['index']),
+            new Middleware('permission:Dashboard Top Performance View', only: ['topPerformance']),
         ];
     }
 
@@ -261,5 +264,232 @@ class DashboardController extends Controller implements HasMiddleware
                 'error' => $th->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Get top performance dashboard metrics.
+     */
+    public function topPerformance(Request $request)
+    {
+        try {
+            $user = Auth::guard('api')->user();
+
+            // 1. Determine User Scope
+            $isSuperAdmin = $user->hasRole('Super Admin');
+            $isBranchCoordinator = $user->hasRole('Branch Coordinator');
+            $isRegularAdmin = ($user->user_type === 'admin');
+            $isAdminView = $isSuperAdmin || $isRegularAdmin;
+
+            $descendantIds = [];
+            $assignedBranchIds = [];
+            $accessibleUserIds = [];
+
+            if ($isBranchCoordinator) {
+                $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+            } elseif (!$isAdminView) {
+                $descendantIds = $user->getAllDescendantIds();
+                $accessibleUserIds = array_merge([$user->id], $descendantIds);
+            }
+
+            // 2. Parse Date Filters for the Current/Selected Period
+            $fromDate = $request->get('from_date');
+            $toDate = $request->get('to_date');
+            $periodKeyInput = $request->get('period_key');
+            $limit = (int) $request->get('limit', 3);
+            if ($limit < 1) $limit = 3;
+            if ($limit > 50) $limit = 50;
+
+            if ($fromDate && $toDate) {
+                $from = Carbon::parse($fromDate)->startOfDay();
+                $to = Carbon::parse($toDate)->endOfDay();
+                $periodKey = $from->format('Y-m');
+            } elseif ($periodKeyInput) {
+                $periodKey = $periodKeyInput;
+                $from = Carbon::parse($periodKey . '-01')->startOfMonth();
+                $to = Carbon::parse($periodKey . '-01')->endOfMonth();
+            } else {
+                $periodKey = Carbon::now()->format('Y-m');
+                $from = Carbon::now()->startOfMonth();
+                $to = Carbon::now()->endOfMonth();
+            }
+
+            // 3. Compute Current Performance
+            $currentData = $this->getTopPerformersData(
+                $from,
+                $to,
+                $periodKey,
+                $limit,
+                $isBranchCoordinator,
+                $assignedBranchIds,
+                $isAdminView,
+                $accessibleUserIds
+            );
+
+            // 4. Compute Last 3 Months Performance History
+            $last3MonthsData = [];
+            // We use the start of the current $from as the base date
+            for ($i = 1; $i <= 3; $i++) {
+                $pastMonthDate = (clone $from)->subMonths($i);
+                $pastFrom = (clone $pastMonthDate)->startOfMonth();
+                $pastTo = (clone $pastMonthDate)->endOfMonth();
+                $pastPeriodKey = $pastMonthDate->format('Y-m');
+
+                $last3MonthsData[] = $this->getTopPerformersData(
+                    $pastFrom,
+                    $pastTo,
+                    $pastPeriodKey,
+                    $limit,
+                    $isBranchCoordinator,
+                    $assignedBranchIds,
+                    $isAdminView,
+                    $accessibleUserIds
+                );
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Dashboard top performance data retrieved successfully',
+                'data' => [
+                    'current_performance' => $currentData,
+                    'last_3_months' => $last3MonthsData
+                ]
+            ], 200);
+
+        } catch (\Throwable $th) {
+            $this->logActivity('Error', 'Dashboard', 'Dashboard top performance data retrieval failed', [
+                'error' => $th->getMessage(),
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve dashboard top performance data',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Helper to compute top performers for a specific date range and scope.
+     */
+    private function getTopPerformersData($from, $to, $periodKey, $limit, $isBranchCoordinator, $assignedBranchIds, $isAdminView, $accessibleUserIds)
+    {
+        // 1. Query Approved Investments
+        $investmentQuery = Investment::query()
+            ->where('status', '=', 'approved', 'and')
+            ->whereBetween('reservation_date', [$from, $to]);
+
+        if ($isBranchCoordinator) {
+            $investmentQuery->whereIn('branch_id', $assignedBranchIds);
+        } elseif (!$isAdminView) {
+            $investmentQuery->whereIn('unit_head_id', $accessibleUserIds);
+        }
+
+        $sales = $investmentQuery
+            ->select('unit_head_id')
+            ->selectRaw('SUM(investment_amount) as total_amount')
+            ->selectRaw('COUNT(*) as total_count')
+            ->groupBy('unit_head_id')
+            ->with(['unitHead.level', 'unitHead.branch'])
+            ->get();
+
+        // 2. Compute Direct Top Performers by Amount
+        $directByAmount = $sales->filter(fn($s) => !is_null($s->unitHead))
+            ->sortByDesc(fn($s) => (float)$s->total_amount)
+            ->take($limit)
+            ->map(function ($s) {
+                return [
+                    'user_id' => $s->unit_head_id,
+                    'name' => $s->unitHead->name,
+                    'employee_code' => $s->unitHead->employee_code,
+                    'level' => $s->unitHead->level->level_name ?? 'N/A',
+                    'branch' => $s->unitHead->branch->name ?? 'N/A',
+                    'total_amount' => (float)$s->total_amount,
+                    'total_count' => (int)$s->total_count,
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        // 3. Compute Direct Top Performers by Count
+        $directByCount = $sales->filter(fn($s) => !is_null($s->unitHead))
+            ->sortByDesc(fn($s) => (int)$s->total_count)
+            ->take($limit)
+            ->map(function ($s) {
+                return [
+                    'user_id' => $s->unit_head_id,
+                    'name' => $s->unitHead->name,
+                    'employee_code' => $s->unitHead->employee_code,
+                    'level' => $s->unitHead->level->level_name ?? 'N/A',
+                    'branch' => $s->unitHead->branch->name ?? 'N/A',
+                    'total_amount' => (float)$s->total_amount,
+                    'total_count' => (int)$s->total_count,
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        // 4. Compute Team/Downline Performers (Amount-wise)
+        $usersQuery = User::where('user_type', '=', 'hierarchy', 'and')
+            ->where('is_active', '=', true, 'and');
+
+        if ($isBranchCoordinator) {
+            $usersQuery->whereIn('branch_id', $assignedBranchIds);
+        } elseif (!$isAdminView) {
+            $usersQuery->whereIn('id', $accessibleUserIds);
+        }
+
+        $users = $usersQuery->with(['level', 'branch'])->get();
+
+        $salesMap = $sales->keyBy('unit_head_id')->map(fn($s) => [
+            'amount' => (float)$s->total_amount,
+            'count' => (int)$s->total_count,
+        ])->toArray();
+
+        $teamPerformance = [];
+        foreach ($users as $u) {
+            $descendants = $u->getAllDescendantIds();
+            $allTeamUserIds = array_merge([$u->id], $descendants);
+
+            $teamAmount = 0.0;
+            $teamCount = 0;
+
+            foreach ($allTeamUserIds as $teamUserId) {
+                if (isset($salesMap[$teamUserId])) {
+                    $teamAmount += $salesMap[$teamUserId]['amount'];
+                    $teamCount += $salesMap[$teamUserId]['count'];
+                }
+            }
+
+            if ($teamAmount > 0) {
+                $teamPerformance[] = [
+                    'user_id' => $u->id,
+                    'name' => $u->name,
+                    'employee_code' => $u->employee_code,
+                    'level' => $u->level->level_name ?? 'N/A',
+                    'branch' => $u->branch->name ?? 'N/A',
+                    'total_amount' => $teamAmount,
+                    'total_count' => $teamCount,
+                    'is_manager' => !empty($descendants),
+                ];
+            }
+        }
+
+        usort($teamPerformance, function ($a, $b) {
+            return $b['total_amount'] <=> $a['total_amount'];
+        });
+
+        $teamList = array_slice($teamPerformance, 0, $limit);
+
+        return [
+            'period' => [
+                'from_date' => $from->format('Y-m-d'),
+                'to_date' => $to->format('Y-m-d'),
+                'period_key' => $periodKey
+            ],
+            'direct_by_amount' => $directByAmount,
+            'direct_by_count' => $directByCount,
+            'team_by_amount' => $teamList
+        ];
     }
 }
