@@ -31,6 +31,7 @@ class Investment extends Model
         'monthly_payment_date',
         'payment_proof',
         'business_type',
+        'investment_type',
         'status',
         'created_by',
         'unit_head_id',

@@ -12,7 +12,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement("ALTER TABLE investments MODIFY COLUMN status ENUM('pending', 'approved', 'cancelled', 'rejected', 'terminated') DEFAULT 'pending'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE investments MODIFY COLUMN status ENUM('pending', 'approved', 'cancelled', 'rejected', 'terminated') DEFAULT 'pending'");
+        }
 
         Schema::table('investments', function (Blueprint $table) {
             $table->timestamp('terminated_at')->nullable()->after('rejection_reason');
@@ -29,6 +31,8 @@ return new class extends Migration
             $table->dropColumn(['terminated_at', 'termination_reason']);
         });
 
-        DB::statement("ALTER TABLE investments MODIFY COLUMN status ENUM('pending', 'approved', 'cancelled', 'rejected') DEFAULT 'pending'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE investments MODIFY COLUMN status ENUM('pending', 'approved', 'cancelled', 'rejected') DEFAULT 'pending'");
+        }
     }
 };

@@ -27,10 +27,11 @@ class Commission extends Model
         // 1. Fetch percentages from the linked InvestmentProduct
         $product = $investment->investmentProduct;
 
-        if (!$product) {
+        if (! $product) {
             \Illuminate\Support\Facades\Log::warning('Commission processing skipped: Investment product not found', [
-                'investment_id' => $investment->id
+                'investment_id' => $investment->id,
             ]);
+
             return;
         }
 
@@ -40,14 +41,23 @@ class Commission extends Model
         $amount = (float) $investment->investment_amount;
 
         // Eligible Level IDs: 14=SGL, 15=GL, 16=SC, 17=C
-        $eligibleLevels = [14,15,16,17]; // Added new levels based on LevelSeeder
+        $eligibleLevels = [14, 15, 16, 17]; // Added new levels based on LevelSeeder
 
         // 2. Unit Head Commission
         if ($investment->unit_head_id) {
             $unitHead = $investment->unitHead;
 
-            // Ensure we have the level_id
-            if ($unitHead && in_array($unitHead->level_id, $eligibleLevels)) {
+            // Determine if unit head is eligible based on investment type
+            $isEligibleUnitHead = false;
+            if ($unitHead) {
+                if ($investment->investment_type === 'direct') {
+                    $isEligibleUnitHead = $unitHead->level_id >= 2 && $unitHead->level_id <= 17;
+                } else {
+                    $isEligibleUnitHead = in_array($unitHead->level_id, $eligibleLevels);
+                }
+            }
+
+            if ($isEligibleUnitHead) {
                 $unitHeadCommissionAmount = ($amount * $unitHeadPct) / 100;
 
                 self::create([
@@ -66,17 +76,26 @@ class Commission extends Model
                     // Fetch parent with their level
                     $parent = \App\Models\User::find($unitHead->parent_user_id);
 
-                    if ($parent && in_array($parent->level_id, $eligibleLevels)) {
-                        self::create([
-                            'investment_id' => $investment->id,
-                            'user_id' => $unitHead->parent_user_id,
-                            'investment_amount' => $amount,
-                            'commission_amount' => ($unitHeadCommissionAmount * $parentPct) / 100,
-                            'commission_percentage' => $parentPct,
-                            'tier' => 'parent',
-                            'period_key' => $investment->target_period_key,
-                            'status' => 'pending',
-                        ]);
+                    if ($parent) {
+                        $isEligibleParent = false;
+                        if ($investment->investment_type === 'direct') {
+                            $isEligibleParent = $parent->level_id >= 2 && $parent->level_id <= 17;
+                        } else {
+                            $isEligibleParent = in_array($parent->level_id, $eligibleLevels);
+                        }
+
+                        if ($isEligibleParent) {
+                            self::create([
+                                'investment_id' => $investment->id,
+                                'user_id' => $unitHead->parent_user_id,
+                                'investment_amount' => $amount,
+                                'commission_amount' => ($unitHeadCommissionAmount * $parentPct) / 100,
+                                'commission_percentage' => $parentPct,
+                                'tier' => 'parent',
+                                'period_key' => $investment->target_period_key,
+                                'status' => 'pending',
+                            ]);
+                        }
                     }
                 }
             }
