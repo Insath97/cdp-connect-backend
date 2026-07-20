@@ -36,6 +36,10 @@ class UpdateInvestmentRequest extends FormRequest
                 'nullable',
                 'exists:beneficiaries,id',
                 function ($attribute, $value, $fail) {
+                    $currentUser = auth('api')->user();
+                    if ($currentUser && ($currentUser->hasPermissionTo('Allow Hierarchy As Beneficiary') || $currentUser->can('Allow Hierarchy As Beneficiary'))) {
+                        return;
+                    }
                     $beneficiary = \App\Models\Beneficiary::find($value);
                     if ($beneficiary) {
                         $userExists = \App\Models\User::where('id_type', $beneficiary->id_type)
@@ -60,6 +64,10 @@ class UpdateInvestmentRequest extends FormRequest
                 'string',
                 'max:50',
                 function ($attribute, $value, $fail) {
+                    $currentUser = auth('api')->user();
+                    if ($currentUser && ($currentUser->hasPermissionTo('Allow Hierarchy As Beneficiary') || $currentUser->can('Allow Hierarchy As Beneficiary'))) {
+                        return;
+                    }
                     $idType = $this->input('beneficiary.id_type');
                     if ($idType && $value) {
                         $userExists = \App\Models\User::where('id_type', $idType)

@@ -120,6 +120,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Investment Terminate', 'group_name' => 'Investment Management Permissions'],
             ['name' => 'Investment Payout Index', 'group_name' => 'Investment Management Permissions'],
             ['name' => 'Investment Payout Update', 'group_name' => 'Investment Management Permissions'],
+            ['name' => 'Allow Hierarchy As Beneficiary', 'group_name' => 'Investment Management Permissions'],
             /*  */
             ['name' => 'Welcome Call Index', 'group_name' => 'Welcome Call Management Permissions'],
             ['name' => 'Welcome Call Update', 'group_name' => 'Welcome Call Management Permissions'],
