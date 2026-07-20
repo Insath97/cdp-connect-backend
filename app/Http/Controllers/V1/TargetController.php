@@ -45,7 +45,7 @@ class TargetController extends Controller implements HasMiddleware
                 $query->whereHas('user', function($uq) use ($assignedBranchIds) {
                     $uq->whereIn('branch_id', $assignedBranchIds);
                 });
-            } elseif (!$user->hasRole('Super Admin') && !$user->hasRole('Admin-IT')) {
+            } elseif (!$user->hasRole('Super Admin') && !$user->hasRole('Admin-IT') && !$user->hasRole('HR Admin')) {
                 $descendantIds = $user->getAllDescendantIds();
                 $accessibleUserIds = array_merge([$user->id], $descendantIds);
 
@@ -59,7 +59,7 @@ class TargetController extends Controller implements HasMiddleware
             if ($request->has('user_id')) {
                 $targetUserId = $request->user_id;
                 // If not admin, ensure requested user_id is in allowed scope
-                if (!$user->hasRole('Super Admin') && !$user->hasRole('Admin-IT')) {
+                if (!$user->hasRole('Super Admin') && !$user->hasRole('Admin-IT') && !$user->hasRole('HR Admin')) {
                     $allowedIds = array_merge([$user->id], $user->getAllDescendantIds());
                     if (!in_array($targetUserId, $allowedIds)) {
                         return response()->json([
@@ -121,7 +121,7 @@ class TargetController extends Controller implements HasMiddleware
             $targetUser = User::with('level')->findOrFail($data['user_id']);
 
             // 1. Hierarchy Check and Budget Validation for Non-Admins
-            if (!$currentUser->hasRole('Super Admin') && !$currentUser->hasRole('Admin-IT')) {
+            if (!$currentUser->hasRole('Super Admin') && !$currentUser->hasRole('Admin-IT') && !$currentUser->hasRole('HR Admin')) {
                 // Unallocated Target Check
                 $parentTarget = Target::where('user_id', $currentUser->id)
                     ->where('period_type', $data['period_type'])
@@ -217,16 +217,16 @@ class TargetController extends Controller implements HasMiddleware
             $data = $request->validated();
             $currentUser = Auth::user();
 
-            // Permission Check: Super Admin or Admin-IT
-            if (!$currentUser->hasRole('Super Admin') && !$currentUser->hasRole('Admin-IT')) {
+            // Permission Check: Super Admin, Admin-IT or HR Admin
+            if (!$currentUser->hasRole('Super Admin') && !$currentUser->hasRole('Admin-IT') && !$currentUser->hasRole('HR Admin')) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Unauthorized. Only Super Admins and Admin-ITs can update targets.'
+                    'message' => 'Unauthorized. Only Super Admins, Admin-ITs, and HR Admins can update targets.'
                 ], 403);
             }
 
             // Unallocated Target Check on Amount Increase
-            if (isset($data['target_amount']) && !$currentUser->hasRole('Super Admin') && !$currentUser->hasRole('Admin-IT')) {
+            if (isset($data['target_amount']) && !$currentUser->hasRole('Super Admin') && !$currentUser->hasRole('Admin-IT') && !$currentUser->hasRole('HR Admin')) {
                 $parentTarget = Target::where('user_id', $currentUser->id)
                     ->where('period_type', $target->period_type)
                     ->where('period_key', $target->period_key)
@@ -285,11 +285,11 @@ class TargetController extends Controller implements HasMiddleware
                 ], 404);
             }
 
-            // Permission check: Super Admin or Admin-IT Only
-            if (!Auth::guard('api')->user()->hasRole('Super Admin') && !Auth::guard('api')->user()->hasRole('Admin-IT')) {
+            // Permission check: Super Admin, Admin-IT or HR Admin
+            if (!Auth::guard('api')->user()->hasRole('Super Admin') && !Auth::guard('api')->user()->hasRole('Admin-IT') && !Auth::guard('api')->user()->hasRole('HR Admin')) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Unauthorized. Only Super Admins and Admin-ITs can delete targets.'
+                    'message' => 'Unauthorized. Only Super Admins, Admin-ITs, and HR Admins can delete targets.'
                 ], 403);
             }
 
@@ -347,10 +347,10 @@ class TargetController extends Controller implements HasMiddleware
     {
         try {
             $user = Auth::user();
-            if (!$user->hasRole('Super Admin') && !$user->hasRole('Admin-IT')) {
+            if (!$user->hasRole('Super Admin') && !$user->hasRole('Admin-IT') && !$user->hasRole('HR Admin')) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Unauthorized. Only Super Admins and Admin-ITs can setup bulk targets.'
+                    'message' => 'Unauthorized. Only Super Admins, Admin-ITs, and HR Admins can setup bulk targets.'
                 ], 403);
             }
 

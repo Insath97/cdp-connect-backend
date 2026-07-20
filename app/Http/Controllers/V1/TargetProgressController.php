@@ -34,7 +34,7 @@ class TargetProgressController extends Controller implements HasMiddleware
 
             // 1. Identify allowed user IDs for filtering
             $allowedUserIds = [];
-            $isAdmin = $user->hasRole('Super Admin') || $user->hasRole('Admin-IT');
+            $isAdmin = $user->hasRole('Super Admin') || $user->hasRole('Admin-IT') || $user->hasRole('HR Admin');
 
             if (!$isAdmin) {
                 // If not admin, you can only see yourself and your descendants
@@ -110,7 +110,7 @@ class TargetProgressController extends Controller implements HasMiddleware
             $targetUserId = $request->get('user_id', $user->id);
 
             // Access control
-            if (!$user->hasRole('Super Admin') && !$user->hasRole('Admin-IT')) {
+            if (!$user->hasRole('Super Admin') && !$user->hasRole('Admin-IT') && !$user->hasRole('HR Admin')) {
                 $allowedUserIds = array_merge([$user->id], $user->getAllDescendantIds());
                 if (!in_array($targetUserId, $allowedUserIds)) {
                     return response()->json([
