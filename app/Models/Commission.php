@@ -79,7 +79,8 @@ class Commission extends Model
                     if ($parent) {
                         $isEligibleParent = false;
                         if ($investment->investment_type === 'direct') {
-                            $isEligibleParent = $parent->level_id >= 2 && $parent->level_id <= 17;
+                            // Override commission is calculated ONLY when unit head level is 17 (Consultant)
+                            $isEligibleParent = ($unitHead->level_id == 17) && ($parent->level_id >= 2 && $parent->level_id <= 17);
                         } else {
                             $isEligibleParent = in_array($parent->level_id, $eligibleLevels);
                         }

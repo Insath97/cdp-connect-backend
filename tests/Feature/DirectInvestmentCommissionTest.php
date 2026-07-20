@@ -177,8 +177,11 @@ class DirectInvestmentCommissionTest extends TestCase
     }
 
     /** @test */
-    public function test_direct_investment_commission_calculates_override_normally_for_other_levels()
+    public function test_direct_investment_commission_calculates_override_only_for_level_17_unit_head()
     {
+        $this->createLevel(16, 'Senior Consultant', 'senior-consultant', 'SC', 16);
+        $this->createLevel(17, 'Consultant', 'consultant', 'C', 17);
+
         // Setup SGL user (tire_level = 14) and GL user (tire_level = 15)
         $sglUser = User::create([
             'name' => 'SGL User',
@@ -202,7 +205,7 @@ class DirectInvestmentCommissionTest extends TestCase
         ]);
 
         // Create direct investment with GL (tire_level = 15) as unit head
-        $investment = Investment::create([
+        $investmentGl = Investment::create([
             'policy_number' => 'CDP-COL-00000002',
             'application_number' => 'APP-COL-00000002',
             'sales_code' => 'COL-0002',
@@ -218,23 +221,78 @@ class DirectInvestmentCommissionTest extends TestCase
             'investment_type' => 'direct',
         ]);
 
-        Commission::generateForInvestment($investment);
+        Commission::generateForInvestment($investmentGl);
 
-        // Verify direct commission is created for GL
-        $uhCommission = Commission::where('investment_id', $investment->id)
+        // Verify direct commission is created for GL (level 15)
+        $uhCommissionGl = Commission::where('investment_id', $investmentGl->id)
             ->where('tier', 'unit_head')
             ->first();
-        $this->assertNotNull($uhCommission);
-        $this->assertEquals(10000, $uhCommission->commission_amount);
-        $this->assertEquals($glUser->id, $uhCommission->user_id);
+        $this->assertNotNull($uhCommissionGl);
+        $this->assertEquals(10000, $uhCommissionGl->commission_amount);
+        $this->assertEquals($glUser->id, $uhCommissionGl->user_id);
 
-        // Verify override/parent commission IS created for SGL (tire_level = 14)
-        $parentCommission = Commission::where('investment_id', $investment->id)
+        // Verify override/parent commission is NOT created for GL's parent because GL is level 15 (not level 17)
+        $parentCommissionGl = Commission::where('investment_id', $investmentGl->id)
             ->where('tier', 'parent')
             ->first();
-        $this->assertNotNull($parentCommission);
-        $this->assertEquals(2000, $parentCommission->commission_amount); // 20% of 10,000
-        $this->assertEquals($sglUser->id, $parentCommission->user_id);
+        $this->assertNull($parentCommissionGl);
+
+        // Setup Consultant user (tire_level = 17) with SC parent (tire_level = 16)
+        $scUser = User::create([
+            'name' => 'SC User',
+            'username' => 'sc_user',
+            'email' => 'sc@example.com',
+            'password' => bcrypt('password'),
+            'user_type' => 'hierarchy',
+            'level_id' => 16,
+            'is_active' => true,
+        ]);
+
+        $consultantUser = User::create([
+            'name' => 'Consultant User',
+            'username' => 'consultant_user',
+            'email' => 'consultant@example.com',
+            'password' => bcrypt('password'),
+            'user_type' => 'hierarchy',
+            'level_id' => 17,
+            'parent_user_id' => $scUser->id,
+            'is_active' => true,
+        ]);
+
+        // Create direct investment with Consultant (tire_level = 17) as unit head
+        $investmentC = Investment::create([
+            'policy_number' => 'CDP-COL-00000005',
+            'application_number' => 'APP-COL-00000005',
+            'sales_code' => 'COL-0005',
+            'reservation_date' => now()->format('Y-m-d'),
+            'target_period_key' => now()->format('Y-m'),
+            'customer_id' => $this->customer->id,
+            'branch_id' => $this->branch->id,
+            'investment_product_id' => $this->product->id,
+            'investment_amount' => 100000,
+            'business_type' => 'bank_deposit',
+            'created_by' => $consultantUser->id,
+            'unit_head_id' => $consultantUser->id,
+            'investment_type' => 'direct',
+        ]);
+
+        Commission::generateForInvestment($investmentC);
+
+        // Verify direct commission is created for Consultant (level 17)
+        $uhCommissionC = Commission::where('investment_id', $investmentC->id)
+            ->where('tier', 'unit_head')
+            ->first();
+        $this->assertNotNull($uhCommissionC);
+        $this->assertEquals(10000, $uhCommissionC->commission_amount);
+        $this->assertEquals($consultantUser->id, $uhCommissionC->user_id);
+
+        // Verify override/parent commission IS created for SC (parent of level 17 consultant)
+        $parentCommissionC = Commission::where('investment_id', $investmentC->id)
+            ->where('tier', 'parent')
+            ->first();
+        $this->assertNotNull($parentCommissionC);
+        $this->assertEquals(2000, $parentCommissionC->commission_amount); // 20% of 10,000
+        $this->assertEquals($scUser->id, $parentCommissionC->user_id);
     }
 
     /** @test */
