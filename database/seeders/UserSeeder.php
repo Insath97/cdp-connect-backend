@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class UserSeeder extends Seeder
@@ -29,6 +28,6 @@ class UserSeeder extends Seeder
 
         $this->command->info('Development admin user created!');
         $this->command->info('Email: dev@localhost.com');
-        $this->command->info('Password: core@CDPE@2026#?');
+        $this->command->info('Password: password');
     }
 }
