@@ -18,7 +18,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Development Admin',
                 'profile_image' => '/image',
-                'password' => bcrypt('core@CDPE@2026#?'),
+                'password' => bcrypt('password'),
                 'user_type' => 'admin',
                 'is_active' => true,
                 'can_login' => true,

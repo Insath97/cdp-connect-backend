@@ -106,6 +106,7 @@ class LegalController extends Controller implements HasMiddleware
                 'payment_type' => $legal->investment->payment_type,
                 'business_type' => $legal->investment->business_type,
                 'status' => $legal->investment->status,
+                'reservation_date' => $legal->investment->reservation_date,
                 'created_at' => $legal->investment->created_at ? $legal->investment->created_at->toIso8601String() : null,
                 'creator' => $legal->investment->creator ? [
                     'id' => $legal->investment->creator->id,
