@@ -8,6 +8,6 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('app:send-monthly-payout-notifications')->dailyAt('00:00');
-Schedule::command('targets:bulk-setup')->monthlyOn(1, '00:01');
+/* Schedule::command('app:send-monthly-payout-notifications')->dailyAt('00:00'); */
+Schedule::command('targets:bulk-setup')->monthlyOn(1, '00:00');
 

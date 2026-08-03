@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Target;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 
 class BulkSetupTargets extends Command
@@ -25,21 +27,21 @@ class BulkSetupTargets extends Command
      */
     public function handle()
     {
-        $sourceKey = $this->argument('source') ?? \Carbon\Carbon::now()->subMonth()->format('Y-m');
-        $targetKey = $this->argument('target') ?? \Carbon\Carbon::now()->format('Y-m');
+        $sourceKey = $this->argument('source') ?? Carbon::now()->subMonth()->format('Y-m');
+        $targetKey = $this->argument('target') ?? Carbon::now()->format('Y-m');
 
         $this->info("Copying targets from {$sourceKey} to {$targetKey}...");
 
-        $sourceTargets = \App\Models\Target::where('period_key', $sourceKey)->get();
+        $sourceTargets = Target::where('period_key', $sourceKey)->get();
 
         if ($sourceTargets->isEmpty()) {
             $this->warn("No targets found for source period: {$sourceKey}");
-            return Command::SUCCESS;
+            return \Symfony\Component\Console\Command\Command::SUCCESS;
         }
 
         $count = 0;
         foreach ($sourceTargets as $sourceTarget) {
-            \App\Models\Target::updateOrCreate(
+            Target::updateOrCreate(
                 [
                     'user_id' => $sourceTarget->user_id,
                     'period_key' => $targetKey,
@@ -59,6 +61,6 @@ class BulkSetupTargets extends Command
         }
 
         $this->info("Successfully setup {$count} targets for {$targetKey}.");
-        return Command::SUCCESS;
+        return \Symfony\Component\Console\Command\Command::SUCCESS;
     }
 }
