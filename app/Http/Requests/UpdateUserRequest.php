@@ -49,10 +49,17 @@ class UpdateUserRequest extends FormRequest
             // Employee Code (Required for hierarchy users)
             'employee_code' => 'sometimes|required_if:user_type,hierarchy|nullable|string|max:255|unique:users,employee_code,' . $id,
 
+            'is_head_office_user' => 'sometimes|boolean',
+
             'level_id' => 'required_if:user_type,hierarchy|nullable|exists:levels,id',
-            'parent_user_id' => 'nullable|exists:users,id',
+            'parent_user_id' => [
+                'required_if:is_head_office_user,true,1',
+                'nullable',
+                'exists:users,id',
+            ],
 
             'branch_id' => [
+                'required_if:is_head_office_user,true,1',
                 'nullable',
                 'exists:branches,id',
                 function ($attribute, $value, $fail) {

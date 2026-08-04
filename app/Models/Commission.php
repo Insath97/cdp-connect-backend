@@ -50,7 +50,9 @@ class Commission extends Model
             // Determine if unit head is eligible based on investment type
             $isEligibleUnitHead = false;
             if ($unitHead) {
-                if ($investment->investment_type === 'direct') {
+                if ($unitHead->user_type === 'admin') {
+                    $isEligibleUnitHead = true;
+                } elseif ($investment->investment_type === 'direct') {
                     $isEligibleUnitHead = $unitHead->level_id >= 2 && $unitHead->level_id <= 17;
                 } else {
                     $isEligibleUnitHead = in_array($unitHead->level_id, $eligibleLevels);
@@ -71,12 +73,14 @@ class Commission extends Model
                     'status' => 'pending',
                 ]);
 
-                // 3. Parent Commission
-                if ($unitHead->parent_user_id) {
+                // 3. Parent Commission (ORC)
+                // Skip if unit head is admin, as they only get direct commission
+                if ($unitHead->user_type !== 'admin' && $unitHead->parent_user_id) {
                     // Fetch parent with their level
                     $parent = \App\Models\User::find($unitHead->parent_user_id);
 
-                    if ($parent) {
+                    // Skip if parent is admin
+                    if ($parent && $parent->user_type !== 'admin') {
                         $isEligibleParent = false;
                         if ($investment->investment_type === 'direct') {
                             // Override commission is calculated ONLY when unit head level is 17 (Consultant)

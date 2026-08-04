@@ -48,12 +48,19 @@ class CreateUserRequest extends FormRequest
             // Employee Code (Required for hierarchy users)
             'employee_code' => 'required_if:user_type,hierarchy|nullable|string|max:255|unique:users,employee_code',
 
+            'is_head_office_user' => 'sometimes|boolean',
+
             // Hierarchy specific validation
             'level_id' => 'required_if:user_type,hierarchy|nullable|exists:levels,id',
-            'parent_user_id' => 'nullable|exists:users,id',
+            'parent_user_id' => [
+                'required_if:is_head_office_user,true,1',
+                'nullable',
+                'exists:users,id',
+            ],
 
             // Location fields (required based on business logic, but nullable in DB)
             'branch_id' => [
+                'required_if:is_head_office_user,true,1',
                 'nullable',
                 'exists:branches,id',
                 function ($attribute, $value, $fail) {
