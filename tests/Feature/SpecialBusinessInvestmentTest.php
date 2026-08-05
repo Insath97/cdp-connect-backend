@@ -191,7 +191,7 @@ class SpecialBusinessInvestmentTest extends TestCase
     }
 
     /** @test */
-    public function test_creating_special_business_without_description_fails_validation()
+    public function test_creating_special_business_without_description_succeeds()
     {
         $token = auth('api')->login($this->authorizedUser);
 
@@ -209,9 +209,11 @@ class SpecialBusinessInvestmentTest extends TestCase
                 'unit_head_id' => $this->authorizedUser->id,
             ]);
 
-        $response->assertStatus(422);
-        $response->assertJsonFragment([
-            'field' => 'special_business_description'
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('investments', [
+            'investment_product_id' => $this->normalProduct->id,
+            'business_type' => 'special',
+            'special_business_description' => null,
         ]);
     }
 

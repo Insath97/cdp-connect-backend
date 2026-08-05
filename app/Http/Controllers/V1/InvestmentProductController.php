@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\V1;
 
 use App\Traits\ActivityLogTrait;
+use App\Traits\InvestmentCalculationTrait;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateInvestmentProductRequest;
@@ -18,7 +19,7 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class InvestmentProductController extends Controller implements HasMiddleware
 {
-    use ActivityLogTrait;
+    use ActivityLogTrait, InvestmentCalculationTrait;
 
     public static function middleware(): array
     {
@@ -154,6 +155,9 @@ class InvestmentProductController extends Controller implements HasMiddleware
             $data = $request->validated();
 
             $investmentProduct = DB::transaction(function () use ($investmentProduct, $data) {
+                $oldRoi = (float) $investmentProduct->roi_percentage;
+                $oldIsVariable = (bool) $investmentProduct->is_variable_roi;
+
                 $investmentProduct->update($data);
 
                 if (isset($data['is_variable_roi'])) {
@@ -166,6 +170,20 @@ class InvestmentProductController extends Controller implements HasMiddleware
                     } elseif (!$data['is_variable_roi']) {
                         // Clear rates if variable ROI is disabled
                         $investmentProduct->annualRates()->delete();
+                    }
+                }
+
+                $newRoi = (float) $investmentProduct->roi_percentage;
+                $newIsVariable = (bool) $investmentProduct->is_variable_roi;
+                $ratesChanged = isset($data['rates']);
+
+                if ($oldRoi !== $newRoi || $oldIsVariable !== $newIsVariable || $ratesChanged) {
+                    $investments = \App\Models\Investment::where('investment_product_id', $investmentProduct->id)
+                        ->where('status', 'approved')
+                        ->get();
+
+                    foreach ($investments as $investment) {
+                        $this->recalculateUnpaidPayouts($investment);
                     }
                 }
 

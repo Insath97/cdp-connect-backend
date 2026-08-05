@@ -42,7 +42,7 @@ class InvestmentController extends Controller implements HasMiddleware
         return [
             new Middleware('permission:Investment Index', only: ['index', 'show']),
             new Middleware('permission:Investment Create', only: ['store']),
-            new Middleware('permission:Investment Update', only: ['update']),
+            new Middleware('permission:Investment Update', only: ['update', 'recalculatePayouts']),
             new Middleware('permission:Investment Delete', only: ['destroy']),
             new Middleware('permission:Investment Approve', only: ['approve']),
             new Middleware('permission:Investment Cancel', only: ['cancel']),
@@ -161,14 +161,6 @@ class InvestmentController extends Controller implements HasMiddleware
                         'status' => 'error',
                         'message' => 'You cannot create this special investment because you do not have the required permission.'
                     ], 403);
-                }
-
-                if ($data['business_type'] !== 'special') {
-                    DB::rollBack();
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => 'The signature document is required for special investment plans.'
-                    ], 422);
                 }
             }
 
@@ -842,14 +834,6 @@ class InvestmentController extends Controller implements HasMiddleware
                         'message' => 'You cannot update this special investment because you do not have the required permission.'
                     ], 403);
                 }
-
-                if ($businessType !== 'special' && empty($investment->signature_document) && !$request->hasFile('signature_document')) {
-                    DB::rollBack();
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => 'The signature document is required for special investment plans.'
-                    ], 422);
-                }
             }
 
             $oldAmount = (float) $investment->investment_amount;
@@ -969,12 +953,21 @@ class InvestmentController extends Controller implements HasMiddleware
                 }
             }
 
+            $oldAmount = (float) $investment->investment_amount;
+            $oldProduct = $investment->investment_product_id;
+
             $investment->update($data);
             $investment->refresh();
 
             // 6. Handle Target Re-sync if status is 'approved' and amounts/unit head changed
             if ($status === 'approved') {
                 $newAmount = (float) $investment->investment_amount;
+                $newProduct = $investment->investment_product_id;
+
+                if ($oldAmount !== $newAmount || $oldProduct !== $newProduct) {
+                    $this->recalculateUnpaidPayouts($investment);
+                }
+
                 $newUnitHeadId = $investment->unit_head_id;
                 $newPeriodKey = $investment->target_period_key;
 
@@ -1467,6 +1460,58 @@ class InvestmentController extends Controller implements HasMiddleware
                     'recover_amount' => round($recoverAmount, 2)
                 ]);
             }
+        }
+    }
+
+    /**
+     * Recalculate unpaid payouts for one or more investments.
+     */
+    public function recalculatePayouts(Request $request)
+    {
+        $request->validate([
+            'investment_id' => 'nullable|exists:investments,id',
+            'period_key' => 'nullable|string|regex:/^\d{4}-\d{2}$/'
+        ]);
+
+        $investmentId = $request->investment_id;
+        $periodKey = $request->period_key;
+
+        if (!$investmentId && !$periodKey) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Please provide either investment_id or period_key.'
+            ], 422);
+        }
+
+        try {
+            $count = 0;
+
+            if ($investmentId) {
+                $investment = Investment::findOrFail($investmentId);
+                $this->recalculateUnpaidPayouts($investment);
+                $count = 1;
+            } elseif ($periodKey) {
+                $investments = Investment::where('target_period_key', $periodKey)
+                    ->where('status', 'approved')
+                    ->get();
+
+                foreach ($investments as $investment) {
+                    $this->recalculateUnpaidPayouts($investment);
+                    $count++;
+                }
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "Successfully recalculated unpaid payouts for {$count} investment(s)."
+            ], 200);
+
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to recalculate payouts.',
+                'error' => $th->getMessage()
+            ], 500);
         }
     }
 }

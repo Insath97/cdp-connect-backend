@@ -110,6 +110,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
 
     Route::get('investments/maturity-report', [InvestmentController::class, 'investorMaturity']);
     Route::apiResource('investments', InvestmentController::class);
+    Route::post('investments/recalculate-payouts', [InvestmentController::class, 'recalculatePayouts']);
     Route::patch('investments/{id}/approve', [InvestmentController::class, 'approve']);
     Route::post('investments/{id}/cancel', [InvestmentController::class, 'cancel']);
     Route::post('investments/{id}/terminate', [InvestmentController::class, 'terminate']);

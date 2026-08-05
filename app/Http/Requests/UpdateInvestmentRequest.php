@@ -94,7 +94,7 @@ class UpdateInvestmentRequest extends FormRequest
             'bank_detail.payment_method' => 'required_with:bank_detail|in:bank_transfer,cheque,cash',
 
             'business_type' => 'sometimes|in:counter_business,bank_deposit,special',
-            'special_business_description' => 'sometimes|required_if:business_type,special|nullable|string',
+            'special_business_description' => 'nullable|string',
             'investment_amount' => 'sometimes|numeric|min:0',
             'bank' => 'sometimes|in:HNB,Sampath,Commercial Bank,Peoples Bank,NSB,Other',
             'payment_type' => 'sometimes|in:full_payment,monthly',

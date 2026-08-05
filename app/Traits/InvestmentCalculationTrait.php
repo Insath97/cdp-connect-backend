@@ -113,4 +113,38 @@ trait InvestmentCalculationTrait
             'yearly_breakdown' => $yearlyBreakdown
         ]);
     }
+
+    /**
+     * Recalculate unpaid payouts for an investment.
+     */
+    public function recalculateUnpaidPayouts(\App\Models\Investment $investment): void
+    {
+        $product = $investment->investmentProduct;
+        if (!$product) {
+            return;
+        }
+
+        $calculations = $this->calculateInvestmentROI((float)$investment->investment_amount, $product);
+        
+        $monthlyAmounts = [];
+        foreach ($calculations['yearly_breakdown'] ?? [] as $yearData) {
+            $monthlyPayout = $yearData['monthly_payout'];
+            $monthsInYear = $yearData['duration_months'];
+            for ($i = 0; $i < $monthsInYear; $i++) {
+                $monthlyAmounts[] = round($monthlyPayout, 2);
+            }
+        }
+
+        $allPayouts = \App\Models\InvestmentPayout::where('investment_id', $investment->id)
+            ->orderBy('scheduled_date', 'asc')
+            ->get();
+
+        foreach ($allPayouts as $index => $payout) {
+            if ($payout->status === 'unpaid' && isset($monthlyAmounts[$index])) {
+                $payout->update([
+                    'amount' => $monthlyAmounts[$index]
+                ]);
+            }
+        }
+    }
 }
