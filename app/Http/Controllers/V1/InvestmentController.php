@@ -257,6 +257,7 @@ class InvestmentController extends Controller implements HasMiddleware
             $data['status'] = 'pending';
 
             $investment = Investment::create($data);
+            $investment->saveHierarchySnapshot();
 
             if ($investment->business_type === 'counter_business') {
                 $billingPrefix = 'BIL-' . $branch->code . '-' . $yymm;
@@ -501,12 +502,7 @@ class InvestmentController extends Controller implements HasMiddleware
 
             // 3. Trigger Target Achievement Sync (bypassed if Unit Head is an Admin)
             if ($investment->unitHead && $investment->unitHead->user_type !== 'admin') {
-                Target::syncAchievement(
-                    $investment->unit_head_id,
-                    $investment->target_period_key,
-                    $investment->investment_amount,
-                    false
-                );
+                Target::syncInvestmentAchievement($investment);
             }
 
             // 4. Calculate and Store Commissions
@@ -832,6 +828,12 @@ class InvestmentController extends Controller implements HasMiddleware
             $oldPeriodKey = $investment->target_period_key;
             $status = $investment->status;
 
+            // Fetch the old snapshotted ancestors before we update
+            $oldAncestorUserIds = array_merge(
+                [$oldUnitHeadId],
+                $investment->hierarchySnapshot()->pluck('ancestor_id')->toArray()
+            );
+
             // 2. Handle reservation_date -> target_period_key
             if (isset($data['reservation_date'])) {
                 $reservationDate = Carbon::parse($data['reservation_date']);
@@ -945,6 +947,11 @@ class InvestmentController extends Controller implements HasMiddleware
             }
 
             $investment->update($data);
+
+            if (isset($data['unit_head_id']) && (int)$data['unit_head_id'] !== (int)$oldUnitHeadId) {
+                $investment->saveHierarchySnapshot();
+            }
+
             $investment->refresh();
 
             // 6. Handle Target Re-sync if status is 'approved' and amounts/unit head changed
@@ -954,17 +961,19 @@ class InvestmentController extends Controller implements HasMiddleware
                 $newPeriodKey = $investment->target_period_key;
 
                 if ($oldAmount !== $newAmount || $oldUnitHeadId !== $newUnitHeadId || $oldPeriodKey !== $newPeriodKey) {
-                    // Recalculate for old state (bypassed if old Unit Head is Admin)
+                    // Recalculate for all old ancestors (bypassed if old Unit Head is Admin)
                     $oldUnitHead = \App\Models\User::find($oldUnitHeadId);
                     if ($oldUnitHead && $oldUnitHead->user_type !== 'admin') {
-                        Target::recalculateForUser($oldUnitHeadId, $oldPeriodKey);
+                        foreach ($oldAncestorUserIds as $oldUserId) {
+                            Target::recalculateForUser($oldUserId, $oldPeriodKey);
+                        }
                     }
 
-                    // Recalculate for new state (if different and new Unit Head is not Admin)
-                    if ($oldUnitHeadId !== $newUnitHeadId || $oldPeriodKey !== $newPeriodKey) {
+                    // Recalculate for new ancestors (if different and new Unit Head is not Admin)
+                    if ($oldUnitHeadId !== $newUnitHeadId || $oldPeriodKey !== $newPeriodKey || $oldAmount !== $newAmount) {
                         $newUnitHead = \App\Models\User::find($newUnitHeadId);
                         if ($newUnitHead && $newUnitHead->user_type !== 'admin') {
-                            Target::recalculateForUser($newUnitHeadId, $newPeriodKey);
+                            Target::recalculateHierarchyTargetsForInvestment($investment);
                         }
                     }
                 }
@@ -1093,7 +1102,7 @@ class InvestmentController extends Controller implements HasMiddleware
             if ($status === 'approved') {
                 $unitHead = \App\Models\User::find($unitHeadId);
                 if ($unitHead && $unitHead->user_type !== 'admin') {
-                    Target::recalculateHierarchyTargets($unitHeadId, $periodKey);
+                    Target::recalculateHierarchyTargetsForInvestment($investment);
                 }
             }
 
@@ -1220,7 +1229,7 @@ class InvestmentController extends Controller implements HasMiddleware
 
             // 3. Hierarchical Target Achievement Recalculation (bypassed if Unit Head is Admin)
             if ($investment->unitHead && $investment->unitHead->user_type !== 'admin') {
-                Target::recalculateHierarchyTargets($investment->unit_head_id, $investment->target_period_key);
+                Target::recalculateHierarchyTargetsForInvestment($investment);
             }
 
             // 4. Commission Recovery
