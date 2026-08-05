@@ -25,6 +25,7 @@ class Investment extends Model
         'bank',
         'payment_type',
         'payment_description',
+        'special_business_description',
         'initial_payment',
         'initial_payment_date',
         'monthly_payment_amount',

@@ -143,16 +143,28 @@ class InvestmentController extends Controller implements HasMiddleware
             $currentUser = Auth::guard('api')->user();
             $data = $request->validated();
 
+            if ($data['business_type'] === 'special_business') {
+                if (!$currentUser || (!$currentUser->hasPermissionTo('Special Business Create') && !$currentUser->can('Special Business Create'))) {
+                    DB::rollBack();
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'You cannot create this special business investment because you do not have the required permission.'
+                    ], 403);
+                }
+            }
+
             $product = InvestmentProduct::findOrFail($data['investment_product_id']);
             if ($product->plan_type === 'special') {
                 if (!$currentUser || (!$currentUser->hasPermissionTo('Special Investment Create') && !$currentUser->can('Special Investment Create'))) {
+                    DB::rollBack();
                     return response()->json([
                         'status' => 'error',
                         'message' => 'You cannot create this special investment because you do not have the required permission.'
                     ], 403);
                 }
 
-                if (!$request->hasFile('signature_document')) {
+                if ($data['business_type'] !== 'special_business') {
+                    DB::rollBack();
                     return response()->json([
                         'status' => 'error',
                         'message' => 'The signature document is required for special investment plans.'
@@ -809,17 +821,30 @@ class InvestmentController extends Controller implements HasMiddleware
 
             $data = $request->validated();
 
+            $businessType = $data['business_type'] ?? $investment->business_type;
+            if ($businessType === 'special_business') {
+                if (!$user || (!$user->hasPermissionTo('Special Business Create') && !$user->can('Special Business Create'))) {
+                    DB::rollBack();
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'You cannot update this investment to special business because you do not have the required permission.'
+                    ], 403);
+                }
+            }
+
             $productId = $data['investment_product_id'] ?? $investment->investment_product_id;
             $product = InvestmentProduct::findOrFail($productId);
             if ($product->plan_type === 'special') {
                 if (!$user || (!$user->hasPermissionTo('Special Investment Create') && !$user->can('Special Investment Create'))) {
+                    DB::rollBack();
                     return response()->json([
                         'status' => 'error',
                         'message' => 'You cannot update this special investment because you do not have the required permission.'
                     ], 403);
                 }
 
-                if (empty($investment->signature_document) && !$request->hasFile('signature_document')) {
+                if ($businessType !== 'special_business' && empty($investment->signature_document) && !$request->hasFile('signature_document')) {
+                    DB::rollBack();
                     return response()->json([
                         'status' => 'error',
                         'message' => 'The signature document is required for special investment plans.'

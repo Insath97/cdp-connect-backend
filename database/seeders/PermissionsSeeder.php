@@ -111,6 +111,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Investment Index', 'group_name' => 'Investment Management Permissions'],
             ['name' => 'Investment Create', 'group_name' => 'Investment Management Permissions'],
             ['name' => 'Special Investment Create', 'group_name' => 'Investment Management Permissions'],
+            ['name' => 'Special Business Create', 'group_name' => 'Investment Management Permissions'],
             ['name' => 'Investment Update', 'group_name' => 'Investment Management Permissions'],
             ['name' => 'Investment Delete', 'group_name' => 'Investment Management Permissions'],
             ['name' => 'Investment Approve', 'group_name' => 'Investment Management Permissions'],
