@@ -143,7 +143,6 @@ class UserController extends Controller implements HasMiddleware
             // For admin users, ensure hierarchy fields are null/ignored if sent
             if ($data['user_type'] === 'admin') {
                 $data['level_id'] = null;
-                $data['employee_code'] = null;
 
                 // Keep parent_user_id, branch_id, and other location fields if provided.
                 // Otherwise, explicitly default them to null.
@@ -378,7 +377,6 @@ class UserController extends Controller implements HasMiddleware
             // Logic to clear hierarchy fields if switching to admin
             if (isset($data['user_type']) && $data['user_type'] === 'admin') {
                 $data['level_id'] = null;
-                $data['employee_code'] = null;
 
                 // If updating the user to admin type from a non-admin type, clear hierarchy fields
                 // EXCEPT when they are explicitly provided in the request data.

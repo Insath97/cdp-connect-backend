@@ -46,7 +46,7 @@ class CreateUserRequest extends FormRequest
             ],
 
             // Employee Code (Required for hierarchy users)
-            'employee_code' => 'required_if:user_type,hierarchy|nullable|string|max:255|unique:users,employee_code',
+            'employee_code' => 'required_if:user_type,hierarchy,admin|nullable|string|max:255|unique:users,employee_code',
 
             'is_head_office_user' => 'sometimes|boolean',
 
