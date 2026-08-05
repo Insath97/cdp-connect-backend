@@ -175,7 +175,7 @@ class SpecialBusinessInvestmentTest extends TestCase
                 'branch_id' => $this->branch->id,
                 'investment_product_id' => $this->normalProduct->id,
                 'investment_amount' => 50000.00,
-                'business_type' => 'special_business',
+                'business_type' => 'special',
                 'special_business_description' => 'Test special business description',
                 'bank' => 'HNB',
                 'payment_type' => 'full_payment',
@@ -202,7 +202,7 @@ class SpecialBusinessInvestmentTest extends TestCase
                 'branch_id' => $this->branch->id,
                 'investment_product_id' => $this->normalProduct->id,
                 'investment_amount' => 50000.00,
-                'business_type' => 'special_business',
+                'business_type' => 'special',
                 'bank' => 'HNB',
                 'payment_type' => 'full_payment',
                 'initial_payment' => 50000.00,
@@ -227,7 +227,7 @@ class SpecialBusinessInvestmentTest extends TestCase
                 'branch_id' => $this->branch->id,
                 'investment_product_id' => $this->specialProduct->id,
                 'investment_amount' => 50000.00,
-                'business_type' => 'special_business',
+                'business_type' => 'special',
                 'special_business_description' => 'A special description for this investment',
                 'bank' => 'HNB',
                 'payment_type' => 'full_payment',
@@ -239,7 +239,7 @@ class SpecialBusinessInvestmentTest extends TestCase
 
         $this->assertDatabaseHas('investments', [
             'investment_product_id' => $this->specialProduct->id,
-            'business_type' => 'special_business',
+            'business_type' => 'special',
             'special_business_description' => 'A special description for this investment',
             'signature_document' => null
         ]);

@@ -143,7 +143,7 @@ class InvestmentController extends Controller implements HasMiddleware
             $currentUser = Auth::guard('api')->user();
             $data = $request->validated();
 
-            if ($data['business_type'] === 'special_business') {
+            if ($data['business_type'] === 'special') {
                 if (!$currentUser || (!$currentUser->hasPermissionTo('Special Business Create') && !$currentUser->can('Special Business Create'))) {
                     DB::rollBack();
                     return response()->json([
@@ -163,7 +163,7 @@ class InvestmentController extends Controller implements HasMiddleware
                     ], 403);
                 }
 
-                if ($data['business_type'] !== 'special_business') {
+                if ($data['business_type'] !== 'special') {
                     DB::rollBack();
                     return response()->json([
                         'status' => 'error',
@@ -822,7 +822,7 @@ class InvestmentController extends Controller implements HasMiddleware
             $data = $request->validated();
 
             $businessType = $data['business_type'] ?? $investment->business_type;
-            if ($businessType === 'special_business') {
+            if ($businessType === 'special') {
                 if (!$user || (!$user->hasPermissionTo('Special Business Create') && !$user->can('Special Business Create'))) {
                     DB::rollBack();
                     return response()->json([
@@ -843,7 +843,7 @@ class InvestmentController extends Controller implements HasMiddleware
                     ], 403);
                 }
 
-                if ($businessType !== 'special_business' && empty($investment->signature_document) && !$request->hasFile('signature_document')) {
+                if ($businessType !== 'special' && empty($investment->signature_document) && !$request->hasFile('signature_document')) {
                     DB::rollBack();
                     return response()->json([
                         'status' => 'error',
