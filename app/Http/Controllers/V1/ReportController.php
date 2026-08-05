@@ -61,8 +61,15 @@ class ReportController extends Controller implements HasMiddleware
                 $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
                 $query->whereIn('users.branch_id', $assignedBranchIds);
             } elseif (!$isAdmin) {
-                $descendantIds = $user->getAllDescendantIds();
-                $accessibleIds = array_merge([$user->id], $descendantIds);
+                $currentDescendants = $user->getAllDescendantIds();
+                $historicalDescendants = Investment::where('target_period_key', $periodKey)
+                    ->whereHas('hierarchySnapshot', function ($q) use ($user) {
+                        $q->where('ancestor_id', $user->id);
+                    })
+                    ->pluck('unit_head_id')
+                    ->toArray();
+
+                $accessibleIds = array_unique(array_merge([$user->id], $currentDescendants, $historicalDescendants));
                 $query->whereIn('users.id', $accessibleIds);
             }
 
@@ -137,8 +144,15 @@ class ReportController extends Controller implements HasMiddleware
             // 1. Accessibility Check
             $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
             if (!$isAdmin) {
-                $descendantIds = $currentUser->getAllDescendantIds();
-                $accessibleIds = array_merge([$currentUser->id], $descendantIds);
+                $currentDescendants = $currentUser->getAllDescendantIds();
+                $historicalDescendants = Investment::where('target_period_key', $periodKey)
+                    ->whereHas('hierarchySnapshot', function ($q) use ($currentUser) {
+                        $q->where('ancestor_id', $currentUser->id);
+                    })
+                    ->pluck('unit_head_id')
+                    ->toArray();
+
+                $accessibleIds = array_unique(array_merge([$currentUser->id], $currentDescendants, $historicalDescendants));
                 if (!in_array($id, $accessibleIds)) {
                     return response()->json([
                         'status' => 'error',
@@ -234,8 +248,15 @@ class ReportController extends Controller implements HasMiddleware
                 $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
                 $query->whereIn('branch_id', $assignedBranchIds);
             } elseif (!$isAdmin) {
-                $descendantIds = $currentUser->getAllDescendantIds();
-                $accessibleIds = array_merge([$currentUser->id], $descendantIds);
+                $currentDescendants = $currentUser->getAllDescendantIds();
+                $historicalDescendants = Investment::where('target_period_key', $periodKey)
+                    ->whereHas('hierarchySnapshot', function ($q) use ($currentUser) {
+                        $q->where('ancestor_id', $currentUser->id);
+                    })
+                    ->pluck('unit_head_id')
+                    ->toArray();
+
+                $accessibleIds = array_unique(array_merge([$currentUser->id], $currentDescendants, $historicalDescendants));
                 $query->whereIn('id', $accessibleIds);
             }
 
@@ -264,10 +285,17 @@ class ReportController extends Controller implements HasMiddleware
 
             // 4. Customer Details (Investments)
             // Retrieve important datas as requested: Customer Name, Plan, Period, Amount, Maturity details
-            $investments = Investment::with(['customer', 'investmentProduct.annualRates'])
+            $investmentsQuery = Investment::with(['customer', 'investmentProduct.annualRates'])
                 ->where('unit_head_id', '=', $agent->id, 'and')
-                ->where('target_period_key', '=', $periodKey, 'and')
-                ->get()
+                ->where('target_period_key', '=', $periodKey, 'and');
+
+            if (!$isAdmin && !$isBranchCoordinator && $agent->id !== $currentUser->id) {
+                $investmentsQuery->whereHas('hierarchySnapshot', function ($q) use ($currentUser) {
+                    $q->where('ancestor_id', $currentUser->id);
+                });
+            }
+
+            $investments = $investmentsQuery->get()
                 ->map(function ($inv) {
                     $calculations = [];
                     if ($inv->investmentProduct) {
@@ -289,7 +317,15 @@ class ReportController extends Controller implements HasMiddleware
                 });
 
             // 5. Hierarchy Performance (Subordinates)
-            $descendantIds = $agent->getAllDescendantIds();
+            $currentDescendants = $agent->getAllDescendantIds();
+            $historicalDescendants = Investment::where('target_period_key', $periodKey)
+                ->whereHas('hierarchySnapshot', function ($q) use ($agent) {
+                    $q->where('ancestor_id', $agent->id);
+                })
+                ->pluck('unit_head_id')
+                ->toArray();
+
+            $descendantIds = array_unique(array_merge($currentDescendants, $historicalDescendants));
             $hierarchyPerformance = [];
 
             if (!empty($descendantIds)) {
@@ -402,9 +438,16 @@ class ReportController extends Controller implements HasMiddleware
                 $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
                 $rootQuery->whereIn('branch_id', $assignedBranchIds);
             } elseif (!$isAdmin) {
-                // If hierarchy user, the searched user must be the current user or their descendant
-                $myDescendantIds = $currentUser->getAllDescendantIds();
-                $accessibleIds = array_merge([$currentUser->id], $myDescendantIds);
+                // If hierarchy user, the searched user must be the current user or their descendant (current + historical)
+                $currentDescendants = $currentUser->getAllDescendantIds();
+                $historicalDescendants = Investment::where('target_period_key', $periodKey)
+                    ->whereHas('hierarchySnapshot', function ($q) use ($currentUser) {
+                        $q->where('ancestor_id', $currentUser->id);
+                    })
+                    ->pluck('unit_head_id')
+                    ->toArray();
+
+                $accessibleIds = array_unique(array_merge([$currentUser->id], $currentDescendants, $historicalDescendants));
                 $rootQuery->whereIn('id', $accessibleIds);
             }
 
@@ -421,8 +464,16 @@ class ReportController extends Controller implements HasMiddleware
                 ], 404);
             }
 
-            // 2. Get all descendants of the root user
-            $allTargetUserIds = $rootUser->getAllDescendantIds();
+            // 2. Get all descendants of the root user (current + historical)
+            $currentDescendants = $rootUser->getAllDescendantIds();
+            $historicalDescendants = Investment::where('target_period_key', $periodKey)
+                ->whereHas('hierarchySnapshot', function ($q) use ($rootUser) {
+                    $q->where('ancestor_id', $rootUser->id);
+                })
+                ->pluck('unit_head_id')
+                ->toArray();
+
+            $allTargetUserIds = array_unique(array_merge($currentDescendants, $historicalDescendants));
 
             if (empty($allTargetUserIds)) {
                 return response()->json([
@@ -538,8 +589,15 @@ class ReportController extends Controller implements HasMiddleware
             $rootQuery = User::with(['level', 'branch'])->where('user_type', '=', 'hierarchy', 'and');
 
             if (!$isAdmin) {
-                $myDescendantIds = $currentUser->getAllDescendantIds();
-                $accessibleIds = array_merge([$currentUser->id], $myDescendantIds);
+                $currentDescendants = $currentUser->getAllDescendantIds();
+                $historicalDescendants = Investment::where('target_period_key', $periodKey)
+                    ->whereHas('hierarchySnapshot', function ($q) use ($currentUser) {
+                        $q->where('ancestor_id', $currentUser->id);
+                    })
+                    ->pluck('unit_head_id')
+                    ->toArray();
+
+                $accessibleIds = array_unique(array_merge([$currentUser->id], $currentDescendants, $historicalDescendants));
                 $rootQuery->whereIn('id', $accessibleIds);
             }
 
@@ -561,8 +619,16 @@ class ReportController extends Controller implements HasMiddleware
                 ->where('period_key', '=', $periodKey, 'and')
                 ->first();
 
-            // 3. Get all descendants of the root user
-            $descendantIds = $rootUser->getAllDescendantIds();
+            // 3. Get all descendants of the root user (current + historical)
+            $currentDescendants = $rootUser->getAllDescendantIds();
+            $historicalDescendants = Investment::where('target_period_key', $periodKey)
+                ->whereHas('hierarchySnapshot', function ($q) use ($rootUser) {
+                    $q->where('ancestor_id', $rootUser->id);
+                })
+                ->pluck('unit_head_id')
+                ->toArray();
+
+            $descendantIds = array_unique(array_merge($currentDescendants, $historicalDescendants));
 
             // 4. Fetch all subordinates in this branch with their Target, Commission and Business Details
             $commissionsSub = Commission::select('user_id', DB::raw('SUM(commission_amount) as total_commission'))
@@ -572,8 +638,14 @@ class ReportController extends Controller implements HasMiddleware
             $descendantsQuery = User::with([
                 'level',
                 'branch',
-                'investments' => function ($q) use ($periodKey) {
+                'investments' => function ($q) use ($periodKey, $rootUser) {
                     $q->where('target_period_key', '=', $periodKey, 'and')
+                        ->where(function ($sub) use ($rootUser) {
+                            $sub->where('created_by', $rootUser->id)
+                                ->orWhereHas('hierarchySnapshot', function ($sq) use ($rootUser) {
+                                    $sq->where('ancestor_id', $rootUser->id);
+                                });
+                        })
                         ->with(['customer', 'investmentProduct']);
                 }
             ])
@@ -633,8 +705,14 @@ class ReportController extends Controller implements HasMiddleware
             });
 
             // 5. Construct Summary
-            $rootUser->load(['investments' => function ($q) use ($periodKey) {
+            $rootUser->load(['investments' => function ($q) use ($periodKey, $rootUser) {
                 $q->where('target_period_key', '=', $periodKey, 'and')
+                    ->where(function ($sub) use ($rootUser) {
+                        $sub->where('created_by', $rootUser->id)
+                            ->orWhereHas('hierarchySnapshot', function ($sq) use ($rootUser) {
+                                $sq->where('ancestor_id', $rootUser->id);
+                            });
+                    })
                     ->with(['customer', 'investmentProduct']);
             }]);
 
@@ -734,8 +812,15 @@ class ReportController extends Controller implements HasMiddleware
                     $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
                     $searchQuery->whereIn('branch_id', $assignedBranchIds);
                 } elseif (!$isAdmin) {
-                    $myDescendantIds = $currentUser->getAllDescendantIds();
-                    $accessibleIds = array_merge([$currentUser->id], $myDescendantIds);
+                    $currentDescendants = $currentUser->getAllDescendantIds();
+                    $historicalDescendants = Investment::where('target_period_key', $periodKey)
+                        ->whereHas('hierarchySnapshot', function ($q) use ($currentUser) {
+                            $q->where('ancestor_id', $currentUser->id);
+                        })
+                        ->pluck('unit_head_id')
+                        ->toArray();
+
+                    $accessibleIds = array_unique(array_merge([$currentUser->id], $currentDescendants, $historicalDescendants));
                     $searchQuery->whereIn('id', $accessibleIds);
                 }
 
@@ -787,7 +872,7 @@ class ReportController extends Controller implements HasMiddleware
             // 4. Build Recursive Tree
             $tree = [];
             foreach ($rootUsers as $root) {
-                $tree[] = $this->buildHierarchyNode($root, $from, $to, $periodKey);
+                $tree[] = $this->buildHierarchyNode($root, $from, $to, $periodKey, $root);
             }
 
             // 5. Total Summary
@@ -828,26 +913,47 @@ class ReportController extends Controller implements HasMiddleware
     /**
      * Recursive helper to build a hierarchy node with metrics and children.
      */
-    private function buildHierarchyNode($user, $from, $to, $periodKey)
+    private function buildHierarchyNode($user, $from, $to, $periodKey, $rootUser = null)
     {
         // 1. Calculate Branch-wide metrics (includes all descendants)
-        $descendantIds = $user->getAllDescendantIds();
-        $allBranchIds = array_merge([$user->id], $descendantIds);
-
-        $branchInvestments = Investment::whereIn('unit_head_id', $allBranchIds)
+        $branchInvestmentsQuery = Investment::where(function ($q) use ($user) {
+                $q->where('unit_head_id', $user->id)
+                  ->orWhereHas('hierarchySnapshot', function ($sq) use ($user) {
+                      $sq->where('ancestor_id', $user->id);
+                  });
+            })
             ->whereBetween('reservation_date', [$from, $to])
-            ->where('status', '=', 'approved', 'and')
-            ->get();
+            ->where('status', '=', 'approved', 'and');
 
+        if ($rootUser) {
+            $branchInvestmentsQuery->where(function ($q) use ($rootUser) {
+                $q->where('unit_head_id', $rootUser->id)
+                  ->orWhereHas('hierarchySnapshot', function ($sq) use ($rootUser) {
+                      $sq->where('ancestor_id', $rootUser->id);
+                  });
+            });
+        }
+
+        $branchInvestments = $branchInvestmentsQuery->get();
         $branchBusinessTotal = $branchInvestments->sum('investment_amount');
         $branchBusinessCount = $branchInvestments->count();
 
         // 2. Personal Business Details (ONLY for this user as Unit Head)
-        $personalInvestments = Investment::with(['customer', 'investmentProduct'])
+        $personalInvestmentsQuery = Investment::with(['customer', 'investmentProduct'])
             ->where('unit_head_id', $user->id)
             ->whereBetween('reservation_date', [$from, $to])
-            ->where('status', '=', 'approved', 'and')
-            ->get();
+            ->where('status', '=', 'approved', 'and');
+
+        if ($rootUser) {
+            $personalInvestmentsQuery->where(function ($q) use ($rootUser) {
+                $q->where('unit_head_id', $rootUser->id)
+                  ->orWhereHas('hierarchySnapshot', function ($sq) use ($rootUser) {
+                      $sq->where('ancestor_id', $rootUser->id);
+                  });
+            });
+        }
+
+        $personalInvestments = $personalInvestmentsQuery->get();
 
         // 3. Target and Achievement
         $target = Target::where('user_id', '=', $user->id, 'and')->where('period_key', '=', $periodKey, 'and')->first();
@@ -861,13 +967,23 @@ class ReportController extends Controller implements HasMiddleware
             ->sum('commission_amount');
 
         // 5. Recursive Children
+        $currentChildrenIds = User::where('parent_user_id', $user->id)->pluck('id')->toArray();
+        $historicalChildrenIds = Investment::whereBetween('reservation_date', [$from, $to])
+            ->whereHas('hierarchySnapshot', function ($sq) use ($user) {
+                $sq->where('ancestor_id', $user->id)->where('depth', 1);
+            })
+            ->pluck('unit_head_id')
+            ->toArray();
+
+        $allChildrenIds = array_unique(array_merge($currentChildrenIds, $historicalChildrenIds));
+
         $children = User::with(['level', 'branch'])
-            ->where('parent_user_id', '=', $user->id, 'and')
+            ->whereIn('id', $allChildrenIds)
             ->get();
 
         $childrenNodes = [];
         foreach ($children as $child) {
-            $childrenNodes[] = $this->buildHierarchyNode($child, $from, $to, $periodKey);
+            $childrenNodes[] = $this->buildHierarchyNode($child, $from, $to, $periodKey, $rootUser ?? $user);
         }
 
         // 6. Return Node Data
@@ -1050,8 +1166,15 @@ class ReportController extends Controller implements HasMiddleware
                     $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
                     $searchQuery->whereIn('branch_id', $assignedBranchIds);
                 } elseif (!$isAdmin) {
-                    $myDescendantIds = $currentUser->getAllDescendantIds();
-                    $accessibleIds = array_merge([$currentUser->id], $myDescendantIds);
+                    $currentDescendants = $currentUser->getAllDescendantIds();
+                    $historicalDescendants = Investment::where('target_period_key', $periodKey)
+                        ->whereHas('hierarchySnapshot', function ($q) use ($currentUser) {
+                            $q->where('ancestor_id', $currentUser->id);
+                        })
+                        ->pluck('unit_head_id')
+                        ->toArray();
+
+                    $accessibleIds = array_unique(array_merge([$currentUser->id], $currentDescendants, $historicalDescendants));
                     $searchQuery->whereIn('id', $accessibleIds);
                 }
 
@@ -1103,7 +1226,7 @@ class ReportController extends Controller implements HasMiddleware
             // 4. Build Recursive Tree
             $tree = [];
             foreach ($rootUsers as $root) {
-                $tree[] = $this->buildPlanWiseHierarchyNode($root, $from, $to, $periodKey);
+                $tree[] = $this->buildPlanWiseHierarchyNode($root, $from, $to, $periodKey, $root);
             }
 
             // 5. Total Summary
@@ -1158,20 +1281,47 @@ class ReportController extends Controller implements HasMiddleware
     /**
      * Recursive helper to build a plan-wise hierarchy node.
      */
-    private function buildPlanWiseHierarchyNode($user, $from, $to, $periodKey)
+    private function buildPlanWiseHierarchyNode($user, $from, $to, $periodKey, $rootUser = null)
     {
-        $descendantIds = $user->getAllDescendantIds();
-        $allBranchIds = array_merge([$user->id], $descendantIds);
-
-        $branchInvestments = Investment::with(['investmentProduct', 'customer'])->whereIn('unit_head_id', $allBranchIds, 'and', false)
+        $branchInvestmentsQuery = Investment::with(['investmentProduct', 'customer'])
+            ->where(function ($q) use ($user) {
+                $q->where('unit_head_id', $user->id)
+                  ->orWhereHas('hierarchySnapshot', function ($sq) use ($user) {
+                      $sq->where('ancestor_id', $user->id);
+                  });
+            })
             ->whereBetween('reservation_date', [$from, $to])
-            ->where('status', '=', 'approved', 'and')
-            ->get();
+            ->where('status', '=', 'approved', 'and');
 
-        $cancelledInvestments = Investment::with(['investmentProduct', 'customer'])->whereIn('unit_head_id', $allBranchIds, 'and', false)
+        $cancelledInvestmentsQuery = Investment::with(['investmentProduct', 'customer'])
+            ->where(function ($q) use ($user) {
+                $q->where('unit_head_id', $user->id)
+                  ->orWhereHas('hierarchySnapshot', function ($sq) use ($user) {
+                      $sq->where('ancestor_id', $user->id);
+                  });
+            })
             ->whereBetween('reservation_date', [$from, $to])
-            ->where('status', '=', 'cancelled', 'and')
-            ->get();
+
+            ->where('status', '=', 'cancelled', 'and');
+
+        if ($rootUser) {
+            $branchInvestmentsQuery->where(function ($q) use ($rootUser) {
+                $q->where('unit_head_id', $rootUser->id)
+                  ->orWhereHas('hierarchySnapshot', function ($sq) use ($rootUser) {
+                      $sq->where('ancestor_id', $rootUser->id);
+                  });
+            });
+
+            $cancelledInvestmentsQuery->where(function ($q) use ($rootUser) {
+                $q->where('unit_head_id', $rootUser->id)
+                  ->orWhereHas('hierarchySnapshot', function ($sq) use ($rootUser) {
+                      $sq->where('ancestor_id', $rootUser->id);
+                  });
+            });
+        }
+
+        $branchInvestments = $branchInvestmentsQuery->get();
+        $cancelledInvestments = $cancelledInvestmentsQuery->get();
 
         $branchBusinessTotal = $branchInvestments->sum('investment_amount');
         $branchBusinessCount = $branchInvestments->count();
@@ -1179,34 +1329,63 @@ class ReportController extends Controller implements HasMiddleware
         $cancelledBusinessTotal = $cancelledInvestments->sum('investment_amount');
         $cancelledBusinessCount = $cancelledInvestments->count();
 
-        $userCommissions = Commission::with(['investment.customer', 'investment.investmentProduct'])
+        $userCommissionsQuery = Commission::with(['investment.customer', 'investment.investmentProduct'])
             ->where('user_id', $user->id)
-            ->whereHas('investment', function ($q) use ($from, $to) {
+            ->whereHas('investment', function ($q) use ($from, $to, $rootUser) {
                 $q->whereBetween('reservation_date', [$from, $to])
                     ->where('status', 'approved');
-            })
-            ->get();
+                if ($rootUser) {
+                    $q->where(function ($sub) use ($rootUser) {
+                        $sub->where('unit_head_id', $rootUser->id)
+                            ->orWhereHas('hierarchySnapshot', function ($sq) use ($rootUser) {
+                                $sq->where('ancestor_id', $rootUser->id);
+                            });
+                    });
+                }
+            });
+        $userCommissions = $userCommissionsQuery->get();
 
         $personalUnitHeadCommission = $userCommissions->where('tier', 'unit_head')->sum('commission_amount');
         $personalOverrideCommission = $userCommissions->where('tier', 'parent')->sum('commission_amount');
         $personalCommission = $userCommissions->sum('commission_amount');
 
         // Commission Recoveries
-        $userRecoveries = Commission::where('user_id', $user->id)
-            ->whereHas('investment', function ($q) use ($from, $to) {
+        $userRecoveriesQuery = Commission::where('user_id', $user->id)
+            ->whereHas('investment', function ($q) use ($from, $to, $rootUser) {
                 $q->whereBetween('reservation_date', [$from, $to])
                     ->where('status', 'cancelled');
-            })
-            ->get();
+                if ($rootUser) {
+                    $q->where(function ($sub) use ($rootUser) {
+                        $sub->where('unit_head_id', $rootUser->id)
+                            ->orWhereHas('hierarchySnapshot', function ($sq) use ($rootUser) {
+                                $sq->where('ancestor_id', $rootUser->id);
+                            });
+                    });
+                }
+            });
+        $userRecoveries = $userRecoveriesQuery->get();
         
         $personalRecovery = $userRecoveries->sum('recover_amount');
 
-        $branchRecoveries = Commission::whereIn('user_id', $allBranchIds)
-            ->whereHas('investment', function ($q) use ($from, $to) {
-                $q->whereBetween('reservation_date', [$from, $to])
-                    ->where('status', 'cancelled');
-            })
-            ->get();
+        $branchRecoveriesQuery = Commission::whereHas('investment', function ($q) use ($from, $to, $user, $rootUser) {
+            $q->whereBetween('reservation_date', [$from, $to])
+                ->where('status', 'cancelled')
+                ->where(function ($sub) use ($user) {
+                    $sub->where('unit_head_id', $user->id)
+                        ->orWhereHas('hierarchySnapshot', function ($sq) use ($user) {
+                            $sq->where('ancestor_id', $user->id);
+                        });
+                });
+            if ($rootUser) {
+                $q->where(function ($sub) use ($rootUser) {
+                    $sub->where('unit_head_id', $rootUser->id)
+                        ->orWhereHas('hierarchySnapshot', function ($sq) use ($rootUser) {
+                            $sq->where('ancestor_id', $rootUser->id);
+                        });
+                });
+            }
+        });
+        $branchRecoveries = $branchRecoveriesQuery->get();
         
         $branchRecoveryTotal = $branchRecoveries->sum('recover_amount');
 
@@ -1214,13 +1393,23 @@ class ReportController extends Controller implements HasMiddleware
         $targetAmount = $target ? (float)$target->target_amount : 0;
         $achievementPercentage = $targetAmount > 0 ? ($branchBusinessTotal / $targetAmount) * 100 : ($branchBusinessTotal > 0 ? 100 : 0);
 
+        $currentChildrenIds = User::where('parent_user_id', $user->id)->pluck('id')->toArray();
+        $historicalChildrenIds = Investment::whereBetween('reservation_date', [$from, $to])
+            ->whereHas('hierarchySnapshot', function ($sq) use ($user) {
+                $sq->where('ancestor_id', $user->id)->where('depth', 1);
+            })
+            ->pluck('unit_head_id')
+            ->toArray();
+
+        $allChildrenIds = array_unique(array_merge($currentChildrenIds, $historicalChildrenIds));
+
         $children = User::with(['level', 'branch'])
-            ->where('parent_user_id', '=', $user->id, 'and')
+            ->whereIn('id', $allChildrenIds)
             ->get();
 
         $childrenNodes = [];
         foreach ($children as $child) {
-            $childrenNodes[] = $this->buildPlanWiseHierarchyNode($child, $from, $to, $periodKey);
+            $childrenNodes[] = $this->buildPlanWiseHierarchyNode($child, $from, $to, $periodKey, $rootUser ?? $user);
         }
 
         return [
@@ -1244,21 +1433,21 @@ class ReportController extends Controller implements HasMiddleware
                 'personal_override_commission' => (float)$personalOverrideCommission,
                 'personal_recovery_amount' => (float)$personalRecovery,
                 'branch_recovery_total' => (float)$branchRecoveryTotal,
-                'plan_breakdown' => $branchInvestments->groupBy('investment_product_id')->map(function ($group) use ($user, $allBranchIds) {
+                'plan_breakdown' => $branchInvestments->groupBy('investment_product_id')->map(function ($group) use ($user) {
                     $first = $group->first();
                     $planName = $first->investmentProduct->name ?? 'N/A';
 
                     // All commissions for these specific investments
                     $allComms = Commission::whereIn('investment_id', $group->pluck('id'))->get();
-
+ 
                     // 1. Current User's Earnings
                     $userUnitHead = $allComms->where('user_id', $user->id)->where('tier', 'unit_head')->sum('commission_amount');
                     $userOverride = $allComms->where('user_id', $user->id)->where('tier', 'parent')->sum('commission_amount');
-
+ 
                     // 2. Branch-wide Earnings (limited to users in this sub-tree)
-                    $branchUnitHead = $allComms->whereIn('user_id', $allBranchIds)->where('tier', 'unit_head')->sum('commission_amount');
-                    $branchOverride = $allComms->whereIn('user_id', $allBranchIds)->where('tier', 'parent')->sum('commission_amount');
-
+                    $branchUnitHead = $allComms->where('tier', 'unit_head')->sum('commission_amount');
+                    $branchOverride = $allComms->where('tier', 'parent')->sum('commission_amount');
+ 
                     return [
                         'plan_name' => $planName,
                         'business_count' => $group->count(),
@@ -1267,7 +1456,7 @@ class ReportController extends Controller implements HasMiddleware
                         'user_override_commission' => (float)$userOverride,
                         'branch_unit_head_total' => (float)$branchUnitHead,
                         'branch_override_total' => (float)$branchOverride,
-                        'total_commissions' => (float)$allComms->whereIn('user_id', $allBranchIds)->sum('commission_amount')
+                        'total_commissions' => (float)$allComms->sum('commission_amount')
                     ];
                 })->values(),
             ],

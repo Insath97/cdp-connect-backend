@@ -75,9 +75,12 @@ class Commission extends Model
 
                 // 3. Parent Commission (ORC)
                 // Skip if unit head is admin, as they only get direct commission
-                if ($unitHead->user_type !== 'admin' && $unitHead->parent_user_id) {
+                $parentSnapshot = $investment->hierarchySnapshot()->where('depth', 1)->first();
+                $parentId = $parentSnapshot ? $parentSnapshot->ancestor_id : $unitHead->parent_user_id;
+
+                if ($unitHead->user_type !== 'admin' && $parentId) {
                     // Fetch parent with their level
-                    $parent = \App\Models\User::find($unitHead->parent_user_id);
+                    $parent = \App\Models\User::find($parentId);
 
                     // Skip if parent is admin
                     if ($parent && $parent->user_type !== 'admin') {
@@ -92,7 +95,7 @@ class Commission extends Model
                         if ($isEligibleParent) {
                             self::create([
                                 'investment_id' => $investment->id,
-                                'user_id' => $unitHead->parent_user_id,
+                                'user_id' => $parentId,
                                 'investment_amount' => $amount,
                                 'commission_amount' => ($unitHeadCommissionAmount * $parentPct) / 100,
                                 'commission_percentage' => $parentPct,
