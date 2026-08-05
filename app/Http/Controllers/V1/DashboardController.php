@@ -114,7 +114,7 @@ class DashboardController extends Controller implements HasMiddleware
             $percentage = 0;
             if ($totalTarget > 0) {
                 $percentage = ($totalAchieved / $totalTarget) * 100;
-                $percentage = min($percentage, 999.99);
+                $percentage = min($percentage, 999999.99);
             } else {
                 $percentage = $totalAchieved > 0 ? 100.00 : 0;
             }

@@ -178,4 +178,23 @@ class HRAdminTargetAccessTest extends TestCase
                 'status' => 'success',
             ]);
     }
+
+    /** @test */
+    public function test_achievement_percentage_can_exceed_999_99()
+    {
+        $target = Target::create([
+            'user_id' => $this->targetUser->id,
+            'assigned_by' => $this->hrAdmin->id,
+            'period_type' => 'month',
+            'period_key' => '2026-08',
+            'target_amount' => 1000,
+            'status' => 'active',
+        ]);
+
+        Target::syncAchievement($this->targetUser->id, '2026-08', 12020);
+
+        $target->refresh();
+
+        $this->assertEquals(1202.00, (float)$target->achievement_percentage);
+    }
 }

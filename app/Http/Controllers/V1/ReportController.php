@@ -882,7 +882,7 @@ class ReportController extends Controller implements HasMiddleware
             'metrics' => [
                 'target_amount' => $targetAmount,
                 'achieved_branch_business' => (float)$branchBusinessTotal,
-                'achievement_percentage' => (float)min($achievementPercentage, 999.99),
+                'achievement_percentage' => (float)min($achievementPercentage, 999999.99),
                 'branch_business_count' => $branchBusinessCount,
                 'personal_business_count' => $personalInvestments->count(),
                 'personal_commission' => (float)$personalCommission,
@@ -1234,7 +1234,7 @@ class ReportController extends Controller implements HasMiddleware
             'metrics' => [
                 'target_amount' => $targetAmount,
                 'achieved_branch_business' => (float)$branchBusinessTotal,
-                'achievement_percentage' => (float)min($achievementPercentage, 999.99),
+                'achievement_percentage' => (float)min($achievementPercentage, 999999.99),
                 'branch_business_count' => $branchBusinessCount,
                 'cancelled_branch_business' => (float)$cancelledBusinessTotal,
                 'cancelled_branch_count' => $cancelledBusinessCount,

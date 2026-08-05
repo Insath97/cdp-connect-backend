@@ -97,7 +97,7 @@ class Target extends Model
             // 3. Calculate achievement percentage relative to THEIR own target
             if ($target->target_amount > 0) {
                 $percentage = ($target->achieved_amount / $target->target_amount) * 100;
-                $target->achievement_percentage = min($percentage, 999.99);
+                $target->achievement_percentage = min($percentage, 999999.99);
             } else {
                 $target->achievement_percentage = $target->achieved_amount > 0 ? 100.00 : 0;
             }
@@ -160,7 +160,7 @@ class Target extends Model
 
         if ($target->target_amount > 0) {
             $percentage = ($totalApproved / $target->target_amount) * 100;
-            $target->achievement_percentage = min($percentage, 999.99);
+            $target->achievement_percentage = min($percentage, 999999.99);
         } else {
             $target->achievement_percentage = $totalApproved > 0 ? 100.00 : 0;
         }

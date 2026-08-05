@@ -85,7 +85,7 @@ class ExternalApiController extends Controller
                 $achievementPercentage = $targetAmount > 0 
                     ? ($branchBusinessTotal / $targetAmount) * 100 
                     : ($branchBusinessTotal > 0 ? 100.0 : 0.0);
-                $achievementPercentage = (float)min($achievementPercentage, 999.99);
+                $achievementPercentage = (float)min($achievementPercentage, 999999.99);
 
                 // Commissions (approved)
                 $userCommissions = Commission::where('user_id', $user->id)
