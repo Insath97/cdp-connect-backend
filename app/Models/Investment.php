@@ -134,25 +134,4 @@ class Investment extends Model
     {
         return $this->belongsTo(User::class, 'welcome_call_by');
     }
-
-    public function hierarchySnapshot()
-    {
-        return $this->hasMany(InvestmentHierarchy::class, 'investment_id');
-    }
-
-    public function saveHierarchySnapshot()
-    {
-        $this->hierarchySnapshot()->delete();
-
-        $unitHead = $this->unitHead;
-        if ($unitHead) {
-            $ancestors = $unitHead->getAncestors();
-            foreach ($ancestors as $ancestor) {
-                $this->hierarchySnapshot()->create([
-                    'ancestor_id' => $ancestor['ancestor_id'],
-                    'depth' => $ancestor['depth'],
-                ]);
-            }
-        }
-    }
 }

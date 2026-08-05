@@ -71,9 +71,6 @@ class Target extends Model
     /**
      * Recursively update achieved_amount for a user and their superiors.
      */
-    /**
-     * Recursively update achieved_amount for a user and their superiors.
-     */
     public static function syncAchievement($userId, $periodKey, $amount, $isDeep = false)
     {
         Log::info("Syncing target achievement", [
@@ -135,50 +132,7 @@ class Target extends Model
     }
 
     /**
-     * Sync target achievements for an approved investment using its hierarchy snapshot.
-     */
-    public static function syncInvestmentAchievement(Investment $investment)
-    {
-        $userIds = array_merge(
-            [$investment->unit_head_id],
-            $investment->hierarchySnapshot()->pluck('ancestor_id')->toArray()
-        );
-
-        foreach ($userIds as $userId) {
-            Log::info("Syncing target achievement via investment snapshot", [
-                'user_id' => $userId,
-                'period_key' => $investment->target_period_key,
-                'amount' => $investment->investment_amount
-            ]);
-
-            $target = self::where('user_id', $userId)
-                ->where('period_key', $investment->target_period_key)
-                ->first();
-
-            if ($target) {
-                $target->increment('achieved_amount', $investment->investment_amount);
-                $target->refresh();
-                $target->current_amount = max(0, $target->target_amount - $target->achieved_amount);
-
-                if ($target->target_amount > 0) {
-                    $percentage = ($target->achieved_amount / $target->target_amount) * 100;
-                    $target->achievement_percentage = min($percentage, 999.99);
-                } else {
-                    $target->achievement_percentage = $target->achieved_amount > 0 ? 100.00 : 0;
-                }
-
-                if ($target->current_amount <= 0 || $target->achieved_amount >= $target->target_amount) {
-                    $target->status = 'achieved';
-                    $target->achieved_at = $target->achieved_at ?? now();
-                }
-
-                $target->save();
-            }
-        }
-    }
-
-    /**
-     * Full recalculation of achieved amount for a specific user and period based on hierarchy snapshot.
+     * Full recalculation of achieved amount for a specific user and period based on their branch's business.
      */
     public static function recalculateForUser($userId, $periodKey)
     {
@@ -191,13 +145,11 @@ class Target extends Model
 
         if (!$target) return false;
 
-        // Sum approved investments where user is unit_head OR user is in the hierarchy snapshot
-        $totalApproved = \App\Models\Investment::where(function ($query) use ($userId) {
-                $query->where('unit_head_id', $userId)
-                    ->orWhereHas('hierarchySnapshot', function ($q) use ($userId) {
-                        $q->where('ancestor_id', $userId);
-                    });
-            })
+        // Get all approved investments in this user's branch for the period
+        $descendantIds = $user->getAllDescendantIds();
+        $allIds = array_merge([$userId], $descendantIds);
+
+        $totalApproved = \App\Models\Investment::whereIn('unit_head_id', $allIds)
             ->where('target_period_key', $periodKey)
             ->where('status', 'approved')
             ->sum('investment_amount');
@@ -217,7 +169,7 @@ class Target extends Model
             $target->status = 'achieved';
             $target->achieved_at = $target->achieved_at ?? now();
         } else {
-            $target->status = 'active';
+            $target->status = 'active'; // Revert to active if no longer achieved (e.g. if investments were deleted)
             $target->achieved_at = null;
         }
 
@@ -234,21 +186,6 @@ class Target extends Model
         $user = User::find($userId);
         if ($user && $user->parent_user_id) {
             self::recalculateHierarchyTargets($user->parent_user_id, $periodKey);
-        }
-    }
-
-    /**
-     * Recalculate target achievements for an investment's snapshotted hierarchy (the unit head and all historical ancestors).
-     */
-    public static function recalculateHierarchyTargetsForInvestment(Investment $investment)
-    {
-        $userIds = array_merge(
-            [$investment->unit_head_id],
-            $investment->hierarchySnapshot()->pluck('ancestor_id')->toArray()
-        );
-
-        foreach ($userIds as $userId) {
-            self::recalculateForUser($userId, $investment->target_period_key);
         }
     }
 }

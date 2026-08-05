@@ -251,31 +251,4 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
         return !is_null($this->email_verified_at);
     }
 
-    /**
-     * Get all ancestors (reporting managers) of this user, cycle-safe.
-     */
-    public function getAncestors(): array
-    {
-        $ancestors = [];
-        $parentId = $this->parent_user_id;
-        $depth = 1;
-        $visited = [$this->id];
-
-        while ($parentId && !in_array($parentId, $visited)) {
-            $parent = self::find($parentId);
-            if (!$parent) {
-                break;
-            }
-            $ancestors[] = [
-                'ancestor_id' => $parent->id,
-                'depth' => $depth,
-            ];
-            $visited[] = $parentId;
-            $parentId = $parent->parent_user_id;
-            $depth++;
-        }
-
-        return $ancestors;
-    }
-
 }

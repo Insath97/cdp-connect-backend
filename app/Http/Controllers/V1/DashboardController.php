@@ -174,12 +174,7 @@ class DashboardController extends Controller implements HasMiddleware
             } elseif (!$isAdminView) {
                 // Scoped view for hierarchy users
                 $customerBaseQuery->whereIn('customer_id', $accessibleUserIds);
-                $investmentBaseQuery->where(function ($q) use ($user) {
-                    $q->where('unit_head_id', $user->id)
-                      ->orWhereHas('hierarchySnapshot', function ($sq) use ($user) {
-                          $sq->where('ancestor_id', $user->id);
-                      });
-                });
+                $investmentBaseQuery->whereIn('created_by', $accessibleUserIds, 'and', false);
                 $quotationBaseQuery->whereIn('created_by', $accessibleUserIds, 'and', false);
             }
             // Admins see global view (no extra filters)
@@ -208,12 +203,7 @@ class DashboardController extends Controller implements HasMiddleware
             if ($isBranchCoordinator) {
                 $distributionQuery->whereIn('investments.branch_id', $assignedBranchIds, 'and', false);
             } elseif (!$isAdminView) {
-                $distributionQuery->where(function ($q) use ($user) {
-                    $q->where('unit_head_id', $user->id)
-                      ->orWhereHas('hierarchySnapshot', function ($sq) use ($user) {
-                          $sq->where('ancestor_id', $user->id);
-                      });
-                });
+                $distributionQuery->whereIn('created_by', $accessibleUserIds, 'and', false);
             }
 
             $productVolumes = $distributionQuery->join('investment_products', 'investments.investment_product_id', '=', 'investment_products.id')
@@ -392,13 +382,7 @@ class DashboardController extends Controller implements HasMiddleware
         if ($isBranchCoordinator) {
             $investmentQuery->whereIn('branch_id', $assignedBranchIds);
         } elseif (!$isAdminView) {
-            $user = Auth::guard('api')->user();
-            $investmentQuery->where(function ($q) use ($user) {
-                $q->where('unit_head_id', $user->id)
-                  ->orWhereHas('hierarchySnapshot', function ($sq) use ($user) {
-                      $sq->where('ancestor_id', $user->id);
-                  });
-            });
+            $investmentQuery->whereIn('unit_head_id', $accessibleUserIds);
         }
 
         $sales = $investmentQuery
@@ -464,18 +448,8 @@ class DashboardController extends Controller implements HasMiddleware
 
         $teamPerformance = [];
         foreach ($users as $u) {
-            // Find all unit head IDs who historically made sales under this user (including themselves)
-            $allTeamUserIds = Investment::whereBetween('reservation_date', [$from, $to])
-                ->where('status', 'approved')
-                ->where(function ($q) use ($u) {
-                    $q->where('unit_head_id', $u->id)
-                      ->orWhereHas('hierarchySnapshot', function ($sq) use ($u) {
-                          $sq->where('ancestor_id', $u->id);
-                      });
-                })
-                ->pluck('unit_head_id')
-                ->unique()
-                ->toArray();
+            $descendants = $u->getAllDescendantIds();
+            $allTeamUserIds = array_merge([$u->id], $descendants);
 
             $teamAmount = 0.0;
             $teamCount = 0;
