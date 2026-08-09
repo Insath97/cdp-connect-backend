@@ -95,6 +95,7 @@ class UpdateInvestmentRequest extends FormRequest
 
             'business_type' => 'sometimes|in:counter_business,bank_deposit,special',
             'special_business_description' => 'nullable|string',
+            'investment_type' => 'sometimes|in:direct,hierarchy',
             'investment_amount' => 'sometimes|numeric|min:0',
             'bank' => 'sometimes|in:HNB,Sampath,Commercial Bank,Peoples Bank,NSB,Other',
             'payment_type' => 'sometimes|in:full_payment,monthly',
