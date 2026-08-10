@@ -36,6 +36,7 @@ class ReportController extends Controller implements HasMiddleware
             new Middleware('permission:Report Hierarchy Date Wise', only: ['hierarchyDateWiseReport']),
             new Middleware('permission:Report Investor Maturity', only: ['investorMaturity']),
             new Middleware('permission:Report Plan Wise Hierarchy', only: ['planWiseHierarchyReport']),
+            new Middleware('permission:Report Plan Wise Admin', only: ['planWiseAdminReport']),
         ];
     }
 
@@ -69,9 +70,12 @@ class ReportController extends Controller implements HasMiddleware
             // 2. Search
             if ($request->has('search')) {
                 $search = $request->search;
-                $query->where(function ($q) use ($search) {
+                $cleanSearch = str_replace(' ', '', $search);
+                $query->where(function ($q) use ($search, $cleanSearch) {
                     $q->where('users.name', 'like', "%{$search}%", 'and')
-                        ->orWhere('users.username', 'like', "%{$search}%", 'and');
+                        ->orWhere('users.username', 'like', "%{$search}%", 'and')
+                        ->orWhere('users.id_number', 'like', "%{$search}%", 'and')
+                        ->orWhereRaw("REPLACE(users.id_number, ' ', '') like ?", ["%{$cleanSearch}%"]);
                 });
             }
 
@@ -240,10 +244,12 @@ class ReportController extends Controller implements HasMiddleware
             }
 
             // 2. Execute Search
-            $agent = $query->where(function ($q) use ($search) {
+            $cleanSearch = str_replace(' ', '', $search);
+            $agent = $query->where(function ($q) use ($search, $cleanSearch) {
                 $q->where('name', 'like', "%{$search}%", 'and')
-                    ->orWhere('id_number', '=', $search, 'and')
-                    ->orWhere('username', '=', $search, 'and');
+                    ->orWhere('id_number', 'like', "%{$search}%", 'and')
+                    ->orWhereRaw("REPLACE(id_number, ' ', '') like ?", ["%{$cleanSearch}%"])
+                    ->orWhere('username', 'like', "%{$search}%", 'and');
             })->first();
 
             if (!$agent) {
@@ -408,10 +414,12 @@ class ReportController extends Controller implements HasMiddleware
                 $rootQuery->whereIn('id', $accessibleIds);
             }
 
-            $rootUser = $rootQuery->where(function ($q) use ($search) {
+            $cleanSearch = str_replace(' ', '', $search);
+            $rootUser = $rootQuery->where(function ($q) use ($search, $cleanSearch) {
                 $q->where('name', 'like', "%{$search}%", 'and')
-                    ->orWhere('id_number', '=', $search, 'and')
-                    ->orWhere('username', '=', $search, 'and');
+                    ->orWhere('id_number', 'like', "%{$search}%", 'and')
+                    ->orWhereRaw("REPLACE(id_number, ' ', '') like ?", ["%{$cleanSearch}%"])
+                    ->orWhere('username', 'like', "%{$search}%", 'and');
             })->first();
 
             if (!$rootUser) {
@@ -543,10 +551,12 @@ class ReportController extends Controller implements HasMiddleware
                 $rootQuery->whereIn('id', $accessibleIds);
             }
 
-            $rootUser = $rootQuery->where(function ($q) use ($search) {
+            $cleanSearch = str_replace(' ', '', $search);
+            $rootUser = $rootQuery->where(function ($q) use ($search, $cleanSearch) {
                 $q->where('name', 'like', "%{$search}%", 'and')
-                    ->orWhere('id_number', '=', $search, 'and')
-                    ->orWhere('username', '=', $search, 'and');
+                    ->orWhere('id_number', 'like', "%{$search}%", 'and')
+                    ->orWhereRaw("REPLACE(id_number, ' ', '') like ?", ["%{$cleanSearch}%"])
+                    ->orWhere('username', 'like', "%{$search}%", 'and');
             })->first();
 
             if (!$rootUser) {
@@ -739,10 +749,12 @@ class ReportController extends Controller implements HasMiddleware
                     $searchQuery->whereIn('id', $accessibleIds);
                 }
 
-                $targetUser = $searchQuery->where(function ($q) use ($search) {
+                $cleanSearch = str_replace(' ', '', $search);
+                $targetUser = $searchQuery->where(function ($q) use ($search, $cleanSearch) {
                     $q->where('name', 'like', "%{$search}%", 'and')
-                        ->orWhere('id_number', '=', $search, 'and')
-                        ->orWhere('username', '=', $search, 'and');
+                        ->orWhere('id_number', 'like', "%{$search}%", 'and')
+                        ->orWhereRaw("REPLACE(id_number, ' ', '') like ?", ["%{$cleanSearch}%"])
+                        ->orWhere('username', 'like', "%{$search}%", 'and');
                 })->first();
 
                 if (!$targetUser) {
@@ -1055,10 +1067,12 @@ class ReportController extends Controller implements HasMiddleware
                     $searchQuery->whereIn('id', $accessibleIds);
                 }
 
-                $targetUser = $searchQuery->where(function ($q) use ($search) {
+                $cleanSearch = str_replace(' ', '', $search);
+                $targetUser = $searchQuery->where(function ($q) use ($search, $cleanSearch) {
                     $q->where('name', 'like', "%{$search}%", 'and')
-                        ->orWhere('id_number', '=', $search, 'and')
-                        ->orWhere('username', '=', $search, 'and');
+                        ->orWhere('id_number', 'like', "%{$search}%", 'and')
+                        ->orWhereRaw("REPLACE(id_number, ' ', '') like ?", ["%{$cleanSearch}%"])
+                        ->orWhere('username', 'like', "%{$search}%", 'and');
                 })->first();
 
                 if (!$targetUser) {
@@ -1268,6 +1282,316 @@ class ReportController extends Controller implements HasMiddleware
                         'branch_unit_head_total' => (float)$branchUnitHead,
                         'branch_override_total' => (float)$branchOverride,
                         'total_commissions' => (float)$allComms->whereIn('user_id', $allBranchIds)->sum('commission_amount')
+                    ];
+                })->values(),
+            ],
+            'business_details' => $userCommissions->map(function ($comm) {
+                $inv = $comm->investment;
+                return [
+                    'customer' => $inv->customer->full_name ?? 'N/A',
+                    'policy' => $inv->policy_number ?? 'N/A',
+                    'amount' => (float)$inv->investment_amount,
+                    'plan' => $inv->investmentProduct->name ?? 'N/A',
+                    'date' => $inv->reservation_date ? $inv->reservation_date->format('Y-m-d') : 'N/A',
+                    'status' => $inv->status,
+                    'earned_commission' => (float)$comm->commission_amount,
+                    'commission_type' => $comm->tier === 'unit_head' ? 'Unit Head' : 'Override'
+                ];
+            }),
+            'cancelled_business_details' => $cancelledInvestments->map(function ($inv) use ($user) {
+                $comm = Commission::where('investment_id', $inv->id)->where('user_id', $user->id)->first();
+                return [
+                    'customer' => $inv->customer->full_name ?? 'N/A',
+                    'policy' => $inv->policy_number ?? 'N/A',
+                    'amount' => (float)$inv->investment_amount,
+                    'plan' => $inv->investmentProduct->name ?? 'N/A',
+                    'date' => $inv->reservation_date ? $inv->reservation_date->format('Y-m-d') : 'N/A',
+                    'status' => $inv->status,
+                    'recovery_amount' => $comm ? (float)$comm->recover_amount : 0,
+                    'commission_type' => $comm ? ($comm->tier === 'unit_head' ? 'Unit Head' : 'Override') : 'N/A'
+                ];
+            }),
+            'subordinates' => $childrenNodes
+        ];
+    }
+
+    /**
+     * Search for an admin user and get detailed performance metrics for them and their entire branch.
+     * Includes personal metrics, total branch business, and plan-wise breakdowns.
+     * Supports both date range and period key filtering.
+     */
+    public function planWiseAdminReport(Request $request): JsonResponse
+    {
+        try {
+            $currentUser = Auth::guard('api')->user();
+            $search = $request->get('search');
+            $fromDate = $request->get('from_date');
+            $toDate = $request->get('to_date');
+            $periodKeyInput = $request->get('period_key');
+
+            // 1. Determine Date Range & Period Key
+            if ($fromDate && $toDate) {
+                $from = Carbon::parse($fromDate)->startOfDay();
+                $to = Carbon::parse($toDate)->endOfDay();
+                $periodKey = $from->format('Y-m');
+            } elseif ($periodKeyInput) {
+                $periodKey = $periodKeyInput;
+                $from = Carbon::parse($periodKey . '-01')->startOfMonth();
+                $to = Carbon::parse($periodKey . '-01')->endOfMonth();
+            } else {
+                $periodKey = Carbon::now()->format('Y-m');
+                $from = Carbon::now()->startOfMonth();
+                $to = Carbon::now()->endOfMonth();
+            }
+
+            // 2. Accessibility & Roles
+            $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
+            $isBranchCoordinator = $currentUser->hasRole('Branch Coordinator');
+
+            // 3. Determine Root Users for the Tree (Admin Users)
+            $rootUsers = [];
+            if ($search) {
+                // Search for specific admin user
+                $searchQuery = User::where('user_type', '=', 'admin', 'and')
+                    ->where('is_head_office_user', '=', true, 'and');
+                if ($isBranchCoordinator) {
+                    $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                    $searchQuery->whereIn('branch_id', $assignedBranchIds);
+                } elseif (!$isAdmin) {
+                    $myDescendantIds = $currentUser->getAllDescendantIds();
+                    $accessibleIds = array_merge([$currentUser->id], $myDescendantIds);
+                    $searchQuery->whereIn('id', $accessibleIds);
+                }
+
+                $cleanSearch = str_replace(' ', '', $search);
+                $targetUser = $searchQuery->where(function ($q) use ($search, $cleanSearch) {
+                    $q->where('name', 'like', "%{$search}%", 'and')
+                        ->orWhere('id_number', 'like', "%{$search}%", 'and')
+                        ->orWhereRaw("REPLACE(id_number, ' ', '') like ?", ["%{$cleanSearch}%"])
+                        ->orWhere('username', 'like', "%{$search}%", 'and');
+                })->first();
+
+                if (!$targetUser) {
+                    return response()->json(['status' => 'error', 'message' => 'Admin user not found.'], 404);
+                }
+                $rootUsers = [$targetUser];
+            } else {
+                // No search: Determine roots based on role/type
+                if ($isAdmin) {
+                    // Admins see all top-level admin users (those without a parent)
+                    // No level-management, so structure reporting manager-wise
+                    $rootUsers = User::with(['level', 'branch'])
+                        ->where('user_type', '=', 'admin', 'and')
+                        ->where('is_head_office_user', '=', true, 'and')
+                        ->whereNull('parent_user_id')
+                        ->get();
+
+                    // If no top-level admin users found, get all admin users
+                    if ($rootUsers->isEmpty()) {
+                        $rootUsers = User::with(['level', 'branch'])
+                            ->where('user_type', '=', 'admin', 'and')
+                            ->where('is_head_office_user', '=', true, 'and')
+                            ->limit(10)
+                            ->get();
+                    }
+                } elseif ($isBranchCoordinator) {
+                    $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
+                    $rootUsers = User::with(['level', 'branch'])
+                        ->where('user_type', '=', 'admin', 'and')
+                        ->where('is_head_office_user', '=', true, 'and')
+                        ->whereIn('branch_id', $assignedBranchIds)
+                        ->whereNull('parent_user_id')
+                        ->get();
+                } else {
+                    // An admin user sees themselves as root if they are admin and head office
+                    if ($currentUser->user_type === 'admin' && $currentUser->is_head_office_user) {
+                        $rootUsers = [User::with(['level', 'branch'])->find($currentUser->id)];
+                    } else {
+                        $rootUsers = [];
+                    }
+                }
+            }
+
+            // 4. Build Recursive Tree
+            $tree = [];
+            foreach ($rootUsers as $root) {
+                $tree[] = $this->buildPlanWiseAdminNode($root, $from, $to, $periodKey);
+            }
+
+            // 5. Total Summary for Admin Users
+            $allAdminIds = User::where('user_type', '=', 'admin', 'and')
+                ->where('is_head_office_user', '=', true, 'and')
+                ->pluck('id')
+                ->toArray();
+            $totalInvestments = Investment::whereIn('unit_head_id', $allAdminIds)
+                ->whereBetween('reservation_date', [$from, $to])
+                ->where('status', '=', 'approved', 'and')
+                ->get();
+
+            $totalCancelled = Investment::whereIn('unit_head_id', $allAdminIds)
+                ->whereBetween('reservation_date', [$from, $to])
+                ->where('status', '=', 'cancelled', 'and')
+                ->get();
+
+            $totalRecovery = Commission::whereIn('user_id', $allAdminIds)
+                ->whereHas('investment', function ($q) use ($from, $to) {
+                    $q->whereBetween('reservation_date', [$from, $to])
+                        ->where('status', 'cancelled');
+                })->sum('recover_amount');
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Plan-wise admin report retrieved successfully',
+                'data' => [
+                    'hierarchy_tree' => $tree,
+                    'overall_summary' => [
+                        'total_business' => (float)$totalInvestments->sum('investment_amount'),
+                        'total_business_count' => $totalInvestments->count(),
+                        'total_cancelled_business' => (float)$totalCancelled->sum('investment_amount'),
+                        'total_cancelled_count' => $totalCancelled->count(),
+                        'total_recovery_amount' => (float)$totalRecovery,
+                        'period' => [
+                            'from' => $from->toDateString(),
+                            'to' => $to->toDateString()
+                        ]
+                    ]
+                ]
+            ], 200);
+        } catch (\Throwable $th) {
+            $this->logActivity('Error', 'Report', 'Plan-wise admin report failed', [
+                'error' => $th->getMessage(),
+                'trace' => $th->getTraceAsString()
+            ]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve plan-wise admin report',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Recursive helper to build a plan-wise admin node.
+     */
+    private function buildPlanWiseAdminNode($user, $from, $to, $periodKey)
+    {
+        $descendantIds = $user->getAllDescendantIds();
+        $adminDescendantIds = User::whereIn('id', $descendantIds)
+            ->where('user_type', '=', 'admin', 'and')
+            ->where('is_head_office_user', '=', true, 'and')
+            ->pluck('id')
+            ->toArray();
+        $allAdminBranchIds = array_merge([$user->id], $adminDescendantIds);
+
+        $branchInvestments = Investment::with(['investmentProduct', 'customer'])->whereIn('unit_head_id', $allAdminBranchIds, 'and', false)
+            ->whereBetween('reservation_date', [$from, $to])
+            ->where('status', '=', 'approved', 'and')
+            ->get();
+
+        $cancelledInvestments = Investment::with(['investmentProduct', 'customer'])->whereIn('unit_head_id', $allAdminBranchIds, 'and', false)
+            ->whereBetween('reservation_date', [$from, $to])
+            ->where('status', '=', 'cancelled', 'and')
+            ->get();
+
+        $branchBusinessTotal = $branchInvestments->sum('investment_amount');
+        $branchBusinessCount = $branchInvestments->count();
+
+        $cancelledBusinessTotal = $cancelledInvestments->sum('investment_amount');
+        $cancelledBusinessCount = $cancelledInvestments->count();
+
+        $userCommissions = Commission::with(['investment.customer', 'investment.investmentProduct'])
+            ->where('user_id', $user->id)
+            ->whereHas('investment', function ($q) use ($from, $to) {
+                $q->whereBetween('reservation_date', [$from, $to])
+                    ->where('status', 'approved');
+            })
+            ->get();
+
+        $personalUnitHeadCommission = $userCommissions->where('tier', 'unit_head')->sum('commission_amount');
+        $personalOverrideCommission = $userCommissions->where('tier', 'parent')->sum('commission_amount');
+        $personalCommission = $userCommissions->sum('commission_amount');
+
+        // Commission Recoveries
+        $userRecoveries = Commission::where('user_id', $user->id)
+            ->whereHas('investment', function ($q) use ($from, $to) {
+                $q->whereBetween('reservation_date', [$from, $to])
+                    ->where('status', 'cancelled');
+            })
+            ->get();
+        
+        $personalRecovery = $userRecoveries->sum('recover_amount');
+
+        $branchRecoveries = Commission::whereIn('user_id', $allAdminBranchIds)
+            ->whereHas('investment', function ($q) use ($from, $to) {
+                $q->whereBetween('reservation_date', [$from, $to])
+                    ->where('status', 'cancelled');
+            })
+            ->get();
+        
+        $branchRecoveryTotal = $branchRecoveries->sum('recover_amount');
+
+        // Target
+        $target = Target::where('user_id', '=', $user->id, 'and')->where('period_key', '=', $periodKey, 'and')->first();
+        $targetAmount = $target ? (float)$target->target_amount : 0;
+        $achievementPercentage = $targetAmount > 0 ? ($branchBusinessTotal / $targetAmount) * 100 : ($branchBusinessTotal > 0 ? 100 : 0);
+
+        // Fetch children (only of type admin and head office) reporting manager-wise
+        $children = User::with(['level', 'branch'])
+            ->where('parent_user_id', '=', $user->id, 'and')
+            ->where('user_type', '=', 'admin', 'and')
+            ->where('is_head_office_user', '=', true, 'and')
+            ->get();
+
+        $childrenNodes = [];
+        foreach ($children as $child) {
+            $childrenNodes[] = $this->buildPlanWiseAdminNode($child, $from, $to, $periodKey);
+        }
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'username' => $user->username,
+            'employee_code' => $user->employee_code,
+            'level' => $user->level->level_name ?? 'N/A',
+            'branch' => $user->branch->name ?? 'N/A',
+            'is_active' => (bool)$user->is_active,
+            'metrics' => [
+                'target_amount' => $targetAmount,
+                'achieved_branch_business' => (float)$branchBusinessTotal,
+                'achievement_percentage' => (float)min($achievementPercentage, 999999.99),
+                'branch_business_count' => $branchBusinessCount,
+                'cancelled_branch_business' => (float)$cancelledBusinessTotal,
+                'cancelled_branch_count' => $cancelledBusinessCount,
+                'personal_business_count' => $userCommissions->where('tier', 'unit_head')->count(),
+                'personal_commission' => (float)$personalCommission,
+                'personal_unit_head_commission' => (float)$personalUnitHeadCommission,
+                'personal_override_commission' => (float)$personalOverrideCommission,
+                'personal_recovery_amount' => (float)$personalRecovery,
+                'branch_recovery_total' => (float)$branchRecoveryTotal,
+                'plan_breakdown' => $branchInvestments->groupBy('investment_product_id')->map(function ($group) use ($user, $allAdminBranchIds) {
+                    $first = $group->first();
+                    $planName = $first->investmentProduct->name ?? 'N/A';
+
+                    // All commissions for these specific investments
+                    $allComms = Commission::whereIn('investment_id', $group->pluck('id'))->get();
+
+                    // 1. Current User's Earnings
+                    $userUnitHead = $allComms->where('user_id', $user->id)->where('tier', 'unit_head')->sum('commission_amount');
+                    $userOverride = $allComms->where('user_id', $user->id)->where('tier', 'parent')->sum('commission_amount');
+
+                    // 2. Branch-wide Earnings (limited to users in this sub-tree)
+                    $branchUnitHead = $allComms->whereIn('user_id', $allAdminBranchIds)->where('tier', 'unit_head')->sum('commission_amount');
+                    $branchOverride = $allComms->whereIn('user_id', $allAdminBranchIds)->where('tier', 'parent')->sum('commission_amount');
+
+                    return [
+                        'plan_name' => $planName,
+                        'business_count' => $group->count(),
+                        'total_investment_amount' => (float)$group->sum('investment_amount'),
+                        'user_unit_head_commission' => (float)$userUnitHead,
+                        'user_override_commission' => (float)$userOverride,
+                        'branch_unit_head_total' => (float)$branchUnitHead,
+                        'branch_override_total' => (float)$branchOverride,
+                        'total_commissions' => (float)$allComms->whereIn('user_id', $allAdminBranchIds)->sum('commission_amount')
                     ];
                 })->values(),
             ],

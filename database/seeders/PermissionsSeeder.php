@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -122,7 +121,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Investment Payout Index', 'group_name' => 'Investment Management Permissions'],
             ['name' => 'Investment Payout Update', 'group_name' => 'Investment Management Permissions'],
             ['name' => 'Allow Hierarchy As Beneficiary', 'group_name' => 'Investment Management Permissions'],
-            /*  */
+            /* */
             ['name' => 'Welcome Call Index', 'group_name' => 'Welcome Call Management Permissions'],
             ['name' => 'Welcome Call Update', 'group_name' => 'Welcome Call Management Permissions'],
 
@@ -157,7 +156,8 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Report Investor Maturity', 'group_name' => 'Report Management Permissions'],
             ['name' => 'Report Hierarchy Date Wise', 'group_name' => 'Report Management Permissions'],
             ['name' => 'Report Plan Wise',  'group_name' => 'Report Management Permissions'],
-            ['name' => 'Report Plan Wise Hierarchy','group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Plan Wise Hierarchy', 'group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Plan Wise Admin', 'group_name' => 'Report Management Permissions'],
 
             /* Dashboard Management */
             ['name' => 'Dashboard View', 'group_name' => 'Dashboard Management Permissions'],
@@ -177,11 +177,15 @@ class PermissionsSeeder extends Seeder
         ];
 
         foreach ($permissions as $permission) {
-            Permission::firstOrCreate([
-                'name' => $permission['name'],
-                'group_name' => $permission['group_name'],
-                'guard_name' => 'api',
-            ]);
+            Permission::updateOrCreate(
+                [
+                    'name' => $permission['name'],
+                    'guard_name' => 'api',
+                ],
+                [
+                    'group_name' => $permission['group_name'],
+                ]
+            );
         }
 
         $role = Role::firstOrCreate(['guard_name' => 'api', 'name' => 'Super Admin']);

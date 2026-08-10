@@ -49,13 +49,30 @@ class UserController extends Controller implements HasMiddleware
                 $query->whereIn('branch_id', $assignedBranchIds);
             }
 
-            if ($request->has('search')) {
+            if ($request->has('search') && $request->search !== null && $request->search !== '') {
                 $search = $request->search;
-                $query->where(function (Builder $builder) use ($search) {
-                    $builder->where('name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('username', 'like', "%{$search}%")
-                        ->orWhere('employee_code', 'like', "%{$search}%");
+                $cleanSearch = str_replace(' ', '', $search);
+                $words = array_filter(explode(' ', $search));
+                $query->where(function (Builder $builder) use ($search, $cleanSearch, $words) {
+                    $builder->where(function ($sub) use ($search, $cleanSearch) {
+                        $sub->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%")
+                            ->orWhere('username', 'like', "%{$search}%")
+                            ->orWhere('employee_code', 'like', "%{$search}%")
+                            ->orWhere('id_number', 'like', "%{$search}%")
+                            ->orWhereRaw("REPLACE(id_number, ' ', '') like ?", ["%{$cleanSearch}%"]);
+                    });
+
+                    if (count($words) > 1) {
+                        $builder->orWhere(function ($sub) use ($words) {
+                            foreach ($words as $word) {
+                                $sub->where(function ($wordSub) use ($word) {
+                                    $wordSub->where('name', 'like', "%{$word}%")
+                                        ->orWhere('username', 'like', "%{$word}%");
+                                });
+                            }
+                        });
+                    }
                 });
             }
 
@@ -583,6 +600,34 @@ class UserController extends Controller implements HasMiddleware
                 $query->where('branch_id', $request->branch_id);
             }
 
+            // Search
+            if ($request->has('search') && $request->search !== null && $request->search !== '') {
+                $search = $request->search;
+                $cleanSearch = str_replace(' ', '', $search);
+                $words = array_filter(explode(' ', $search));
+                $query->where(function ($q) use ($search, $cleanSearch, $words) {
+                    $q->where(function ($sub) use ($search, $cleanSearch) {
+                        $sub->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%")
+                            ->orWhere('username', 'like', "%{$search}%")
+                            ->orWhere('employee_code', 'like', "%{$search}%")
+                            ->orWhere('id_number', 'like', "%{$search}%")
+                            ->orWhereRaw("REPLACE(id_number, ' ', '') like ?", ["%{$cleanSearch}%"]);
+                    });
+
+                    if (count($words) > 1) {
+                        $q->orWhere(function ($sub) use ($words) {
+                            foreach ($words as $word) {
+                                $sub->where(function ($wordSub) use ($word) {
+                                    $wordSub->where('name', 'like', "%{$word}%")
+                                        ->orWhere('username', 'like', "%{$word}%");
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+
             $users = $query->select('id', 'name', 'username', 'user_type', 'branch_id', 'is_active')
                 ->orderBy('name', 'asc')
                 ->get();
@@ -625,10 +670,43 @@ class UserController extends Controller implements HasMiddleware
                 $query->where('branch_id', $request->branch_id);
             }
 
+            // Search
+            if ($request->has('search') && $request->search !== null && $request->search !== '') {
+                $search = $request->search;
+                $cleanSearch = str_replace(' ', '', $search);
+                $words = array_filter(explode(' ', $search));
+                $query->where(function ($q) use ($search, $cleanSearch, $words) {
+                    $q->where(function ($sub) use ($search, $cleanSearch) {
+                        $sub->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%")
+                            ->orWhere('username', 'like', "%{$search}%")
+                            ->orWhere('employee_code', 'like', "%{$search}%")
+                            ->orWhere('id_number', 'like', "%{$search}%")
+                            ->orWhereRaw("REPLACE(id_number, ' ', '') like ?", ["%{$cleanSearch}%"]);
+                    });
+
+                    if (count($words) > 1) {
+                        $q->orWhere(function ($sub) use ($words) {
+                            foreach ($words as $word) {
+                                $sub->where(function ($wordSub) use ($word) {
+                                    $wordSub->where('name', 'like', "%{$word}%")
+                                        ->orWhere('username', 'like', "%{$word}%");
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+
             $users = $query->select('id', 'name', 'username', 'employee_code', 'level_id', 'branch_id', 'is_active')
                 ->with(['level:id,level_name'])
-                ->orderByRaw('FIELD(level_id, 9, 10, 11)')
                 ->get();
+
+            // Sort in PHP to be database agnostic (SQLite compatibility)
+            $orderMap = [9 => 1, 10 => 2, 11 => 3, 15 => 1, 16 => 2, 17 => 3];
+            $users = $users->sortBy(function ($user) use ($orderMap) {
+                return $orderMap[$user->level_id] ?? 99;
+            })->values();
 
             return response()->json([
                 'status' => 'success',
