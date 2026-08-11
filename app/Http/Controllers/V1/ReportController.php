@@ -1378,13 +1378,34 @@ class ReportController extends Controller implements HasMiddleware
             } else {
                 // No search: Determine roots based on role/type
                 if ($isAdmin) {
-                    // Admins see all top-level admin users (those without a parent)
-                    // No level-management, so structure reporting manager-wise
+                    // Find all admin head-office users
+                    $headOfficeAdmins = User::where('user_type', '=', 'admin', 'and')
+                        ->where('is_head_office_user', '=', true, 'and')
+                        ->pluck('id')
+                        ->toArray();
+
+                    // 1. Try to find head-office admins with no parent (top of chain)
                     $rootUsers = User::with(['level', 'branch'])
                         ->where('user_type', '=', 'admin', 'and')
                         ->where('is_head_office_user', '=', true, 'and')
                         ->whereNull('parent_user_id')
                         ->get();
+
+                    // 2. If none found, walk up parent chains from head-office admins
+                    if ($rootUsers->isEmpty() && !empty($headOfficeAdmins)) {
+                        $topAncestorIds = [];
+                        foreach ($headOfficeAdmins as $adminId) {
+                            $ancestorId = $this->findTopAncestor($adminId);
+                            if ($ancestorId && !in_array($ancestorId, $topAncestorIds)) {
+                                $topAncestorIds[] = $ancestorId;
+                            }
+                        }
+                        if (!empty($topAncestorIds)) {
+                            $rootUsers = User::with(['level', 'branch'])
+                                ->whereIn('id', $topAncestorIds)
+                                ->get();
+                        }
+                    }
                 } elseif ($isBranchCoordinator) {
                     $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
                     $rootUsers = User::with(['level', 'branch'])
@@ -1626,5 +1647,26 @@ class ReportController extends Controller implements HasMiddleware
             }),
             'subordinates' => $childrenNodes
         ];
+    }
+
+    /**
+     * Walk up the parent chain to find the topmost ancestor.
+     */
+    private function findTopAncestor(int $userId): ?int
+    {
+        $currentId = $userId;
+        $visited = [$currentId];
+
+        while (true) {
+            $user = User::where('id', $currentId)->select('id', 'parent_user_id')->first();
+            if (!$user || $user->parent_user_id === null) {
+                return $currentId;
+            }
+            if (in_array($user->parent_user_id, $visited)) {
+                return $currentId;
+            }
+            $visited[] = $user->parent_user_id;
+            $currentId = $user->parent_user_id;
+        }
     }
 }
