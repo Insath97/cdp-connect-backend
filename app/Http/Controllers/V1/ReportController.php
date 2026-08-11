@@ -1385,15 +1385,6 @@ class ReportController extends Controller implements HasMiddleware
                         ->where('is_head_office_user', '=', true, 'and')
                         ->whereNull('parent_user_id')
                         ->get();
-
-                    // If no top-level admin users found, get all admin users
-                    if ($rootUsers->isEmpty()) {
-                        $rootUsers = User::with(['level', 'branch'])
-                            ->where('user_type', '=', 'admin', 'and')
-                            ->where('is_head_office_user', '=', true, 'and')
-                            ->limit(10)
-                            ->get();
-                    }
                 } elseif ($isBranchCoordinator) {
                     $assignedBranchIds = $currentUser->assignedBranches()->pluck('branches.id')->toArray();
                     $rootUsers = User::with(['level', 'branch'])
@@ -1414,8 +1405,12 @@ class ReportController extends Controller implements HasMiddleware
 
             // 4. Build Recursive Tree
             $tree = [];
+            $visited = [];
             foreach ($rootUsers as $root) {
-                $tree[] = $this->buildPlanWiseAdminNode($root, $from, $to, $periodKey);
+                $rootNode = $this->buildPlanWiseAdminNode($root, $from, $to, $periodKey, $visited);
+                if ($rootNode !== null) {
+                    $tree[] = $rootNode;
+                }
             }
 
             // 5. Total Summary for Admin Users
@@ -1473,8 +1468,13 @@ class ReportController extends Controller implements HasMiddleware
     /**
      * Recursive helper to build a plan-wise admin node.
      */
-    private function buildPlanWiseAdminNode($user, $from, $to, $periodKey)
+    private function buildPlanWiseAdminNode($user, $from, $to, $periodKey, &$visited = [])
     {
+        // Cycle detection: skip if this user was already visited
+        if (in_array($user->id, $visited)) {
+            return null;
+        }
+        $visited[] = $user->id;
         // 1. Personal investments (this user only)
         $personalInvestments = Investment::with(['investmentProduct', 'customer'])
             ->where('unit_head_id', $user->id)
@@ -1526,7 +1526,10 @@ class ReportController extends Controller implements HasMiddleware
 
         $childrenNodes = [];
         foreach ($children as $child) {
-            $childrenNodes[] = $this->buildPlanWiseAdminNode($child, $from, $to, $periodKey);
+            $childNode = $this->buildPlanWiseAdminNode($child, $from, $to, $periodKey, $visited);
+            if ($childNode !== null) {
+                $childrenNodes[] = $childNode;
+            }
         }
 
         // 6. Aggregate team metrics from self + all children recursively
