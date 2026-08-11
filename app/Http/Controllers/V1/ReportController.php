@@ -1475,30 +1475,20 @@ class ReportController extends Controller implements HasMiddleware
      */
     private function buildPlanWiseAdminNode($user, $from, $to, $periodKey)
     {
-        $descendantIds = $user->getAllDescendantIds();
-        $adminDescendantIds = User::whereIn('id', $descendantIds)
-            ->where('user_type', '=', 'admin', 'and')
-            ->where('is_head_office_user', '=', true, 'and')
-            ->pluck('id')
-            ->toArray();
-        $allAdminBranchIds = array_merge([$user->id], $adminDescendantIds);
-
-        $branchInvestments = Investment::with(['investmentProduct', 'customer'])->whereIn('unit_head_id', $allAdminBranchIds, 'and', false)
+        // 1. Personal investments (this user only)
+        $personalInvestments = Investment::with(['investmentProduct', 'customer'])
+            ->where('unit_head_id', $user->id)
             ->whereBetween('reservation_date', [$from, $to])
             ->where('status', '=', 'approved', 'and')
             ->get();
 
-        $cancelledInvestments = Investment::with(['investmentProduct', 'customer'])->whereIn('unit_head_id', $allAdminBranchIds, 'and', false)
+        $personalCancelledInvestments = Investment::with(['investmentProduct', 'customer'])
+            ->where('unit_head_id', $user->id)
             ->whereBetween('reservation_date', [$from, $to])
             ->where('status', '=', 'cancelled', 'and')
             ->get();
 
-        $branchBusinessTotal = $branchInvestments->sum('investment_amount');
-        $branchBusinessCount = $branchInvestments->count();
-
-        $cancelledBusinessTotal = $cancelledInvestments->sum('investment_amount');
-        $cancelledBusinessCount = $cancelledInvestments->count();
-
+        // 2. Personal commissions
         $userCommissions = Commission::with(['investment.customer', 'investment.investmentProduct'])
             ->where('user_id', $user->id)
             ->whereHas('investment', function ($q) use ($from, $to) {
@@ -1510,32 +1500,24 @@ class ReportController extends Controller implements HasMiddleware
         $personalUnitHeadCommission = $userCommissions->where('tier', 'unit_head')->sum('commission_amount');
         $personalOverrideCommission = $userCommissions->where('tier', 'parent')->sum('commission_amount');
         $personalCommission = $userCommissions->sum('commission_amount');
+        $personalBusinessCount = $userCommissions->where('tier', 'unit_head')->count();
 
-        // Commission Recoveries
+        // 3. Personal recovery
         $userRecoveries = Commission::where('user_id', $user->id)
             ->whereHas('investment', function ($q) use ($from, $to) {
                 $q->whereBetween('reservation_date', [$from, $to])
                     ->where('status', 'cancelled');
             })
             ->get();
-        
         $personalRecovery = $userRecoveries->sum('recover_amount');
 
-        $branchRecoveries = Commission::whereIn('user_id', $allAdminBranchIds)
-            ->whereHas('investment', function ($q) use ($from, $to) {
-                $q->whereBetween('reservation_date', [$from, $to])
-                    ->where('status', 'cancelled');
-            })
-            ->get();
-        
-        $branchRecoveryTotal = $branchRecoveries->sum('recover_amount');
-
-        // Target
-        $target = Target::where('user_id', '=', $user->id, 'and')->where('period_key', '=', $periodKey, 'and')->first();
+        // 4. Target
+        $target = Target::where('user_id', '=', $user->id, 'and')
+            ->where('period_key', '=', $periodKey, 'and')
+            ->first();
         $targetAmount = $target ? (float)$target->target_amount : 0;
-        $achievementPercentage = $targetAmount > 0 ? ($branchBusinessTotal / $targetAmount) * 100 : ($branchBusinessTotal > 0 ? 100 : 0);
 
-        // Fetch children (only of type admin and head office) reporting manager-wise
+        // 5. Recursively build children first
         $children = User::with(['level', 'branch'])
             ->where('parent_user_id', '=', $user->id, 'and')
             ->where('user_type', '=', 'admin', 'and')
@@ -1547,6 +1529,47 @@ class ReportController extends Controller implements HasMiddleware
             $childrenNodes[] = $this->buildPlanWiseAdminNode($child, $from, $to, $periodKey);
         }
 
+        // 6. Aggregate team metrics from self + all children recursively
+        $teamBusinessAmount = (float)$personalInvestments->sum('investment_amount');
+        $teamBusinessCount = $personalInvestments->count();
+        $teamCancelledAmount = (float)$personalCancelledInvestments->sum('investment_amount');
+        $teamCancelledCount = $personalCancelledInvestments->count();
+        $teamCommission = (float)$personalCommission;
+        $teamRecovery = (float)$personalRecovery;
+
+        foreach ($childrenNodes as $childNode) {
+            $teamBusinessAmount += $childNode['metrics']['team_business_amount'];
+            $teamBusinessCount += $childNode['metrics']['team_business_count'];
+            $teamCancelledAmount += $childNode['metrics']['team_cancelled_amount'];
+            $teamCancelledCount += $childNode['metrics']['team_cancelled_count'];
+            $teamCommission += $childNode['metrics']['team_commission'];
+            $teamRecovery += $childNode['metrics']['team_recovery'];
+        }
+
+        $achievementPercentage = $targetAmount > 0
+            ? ($teamBusinessAmount / $targetAmount) * 100
+            : ($teamBusinessAmount > 0 ? 100 : 0);
+
+        // 7. Personal plan breakdown
+        $planBreakdown = $personalInvestments->groupBy('investment_product_id')->map(function ($group) use ($user) {
+            $first = $group->first();
+            $planName = $first->investmentProduct->name ?? 'N/A';
+
+            $allComms = Commission::whereIn('investment_id', $group->pluck('id'))->get();
+
+            $userUnitHead = $allComms->where('user_id', $user->id)->where('tier', 'unit_head')->sum('commission_amount');
+            $userOverride = $allComms->where('user_id', $user->id)->where('tier', 'parent')->sum('commission_amount');
+
+            return [
+                'plan_name' => $planName,
+                'business_count' => $group->count(),
+                'total_investment_amount' => (float)$group->sum('investment_amount'),
+                'user_unit_head_commission' => (float)$userUnitHead,
+                'user_override_commission' => (float)$userOverride,
+                'total_commissions' => (float)$allComms->where('user_id', $user->id)->sum('commission_amount')
+            ];
+        })->values();
+
         return [
             'id' => $user->id,
             'name' => $user->name,
@@ -1557,43 +1580,20 @@ class ReportController extends Controller implements HasMiddleware
             'is_active' => (bool)$user->is_active,
             'metrics' => [
                 'target_amount' => $targetAmount,
-                'achieved_branch_business' => (float)$branchBusinessTotal,
                 'achievement_percentage' => (float)min($achievementPercentage, 999999.99),
-                'branch_business_count' => $branchBusinessCount,
-                'cancelled_branch_business' => (float)$cancelledBusinessTotal,
-                'cancelled_branch_count' => $cancelledBusinessCount,
-                'personal_business_count' => $userCommissions->where('tier', 'unit_head')->count(),
+                'personal_business_amount' => (float)$personalInvestments->sum('investment_amount'),
+                'personal_business_count' => $personalBusinessCount,
                 'personal_commission' => (float)$personalCommission,
                 'personal_unit_head_commission' => (float)$personalUnitHeadCommission,
                 'personal_override_commission' => (float)$personalOverrideCommission,
                 'personal_recovery_amount' => (float)$personalRecovery,
-                'branch_recovery_total' => (float)$branchRecoveryTotal,
-                'plan_breakdown' => $branchInvestments->groupBy('investment_product_id')->map(function ($group) use ($user, $allAdminBranchIds) {
-                    $first = $group->first();
-                    $planName = $first->investmentProduct->name ?? 'N/A';
-
-                    // All commissions for these specific investments
-                    $allComms = Commission::whereIn('investment_id', $group->pluck('id'))->get();
-
-                    // 1. Current User's Earnings
-                    $userUnitHead = $allComms->where('user_id', $user->id)->where('tier', 'unit_head')->sum('commission_amount');
-                    $userOverride = $allComms->where('user_id', $user->id)->where('tier', 'parent')->sum('commission_amount');
-
-                    // 2. Branch-wide Earnings (limited to users in this sub-tree)
-                    $branchUnitHead = $allComms->whereIn('user_id', $allAdminBranchIds)->where('tier', 'unit_head')->sum('commission_amount');
-                    $branchOverride = $allComms->whereIn('user_id', $allAdminBranchIds)->where('tier', 'parent')->sum('commission_amount');
-
-                    return [
-                        'plan_name' => $planName,
-                        'business_count' => $group->count(),
-                        'total_investment_amount' => (float)$group->sum('investment_amount'),
-                        'user_unit_head_commission' => (float)$userUnitHead,
-                        'user_override_commission' => (float)$userOverride,
-                        'branch_unit_head_total' => (float)$branchUnitHead,
-                        'branch_override_total' => (float)$branchOverride,
-                        'total_commissions' => (float)$allComms->whereIn('user_id', $allAdminBranchIds)->sum('commission_amount')
-                    ];
-                })->values(),
+                'team_business_amount' => (float)$teamBusinessAmount,
+                'team_business_count' => $teamBusinessCount,
+                'team_commission' => (float)$teamCommission,
+                'team_cancelled_amount' => (float)$teamCancelledAmount,
+                'team_cancelled_count' => $teamCancelledCount,
+                'team_recovery' => (float)$teamRecovery,
+                'plan_breakdown' => $planBreakdown,
             ],
             'business_details' => $userCommissions->map(function ($comm) {
                 $inv = $comm->investment;
@@ -1608,7 +1608,7 @@ class ReportController extends Controller implements HasMiddleware
                     'commission_type' => $comm->tier === 'unit_head' ? 'Unit Head' : 'Override'
                 ];
             }),
-            'cancelled_business_details' => $cancelledInvestments->map(function ($inv) use ($user) {
+            'cancelled_business_details' => $personalCancelledInvestments->map(function ($inv) use ($user) {
                 $comm = Commission::where('investment_id', $inv->id)->where('user_id', $user->id)->first();
                 return [
                     'customer' => $inv->customer->full_name ?? 'N/A',
