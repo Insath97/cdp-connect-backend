@@ -55,6 +55,7 @@ class Investment extends Model
         'welcome_call_notes',
         'signature_document',
         'renewal_sms_sent_at',
+        'same_day_expiry_sms_sent_at',
     ];
 
     protected $casts = [
@@ -67,6 +68,7 @@ class Investment extends Model
         'terminated_at' => 'datetime',
         'welcome_call_at' => 'datetime',
         'renewal_sms_sent_at' => 'datetime',
+        'same_day_expiry_sms_sent_at' => 'datetime',
         'investment_amount' => 'decimal:2',
         'initial_payment' => 'decimal:2',
         'monthly_payment_amount' => 'decimal:2',
