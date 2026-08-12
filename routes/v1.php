@@ -29,6 +29,7 @@ use App\Http\Controllers\V1\InvestmentPayoutController;
 use App\Http\Controllers\V1\WelcomeCallController;
 use App\Http\Controllers\V1\LegalController;
 use App\Http\Controllers\V1\BillingController;
+use App\Http\Controllers\V1\RenewalController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -130,6 +131,9 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::get('billings', [BillingController::class, 'index']);
     Route::get('billings/{id}', [BillingController::class, 'show']);
     Route::patch('billings/{id}/status', [BillingController::class, 'updateStatus']);
+
+    // Renewal Routes
+    Route::get('renewals', [RenewalController::class, 'index']);
 
     // Investment Payouts
     Route::get('investment-payouts', [InvestmentPayoutController::class, 'index']);
