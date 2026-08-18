@@ -154,6 +154,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::get('reports/investor-maturity', [ReportController::class, 'investorMaturity']);
     Route::get('reports/plan-wise-hierarchy', [ReportController::class, 'planWiseHierarchyReport']);
     Route::get('reports/plan-wise-admin', [ReportController::class, 'planWiseAdminReport']);
+    Route::get('reports/customer-investments-maturity', [ReportController::class, 'customerInvestmentsMaturityReport']);
     Route::get('reports/hierarchy/{id}', [ReportController::class, 'show']);
     Route::get('reports/aa',[ReportController::class, 'buildPlanWiseHierarchyNode']);
 

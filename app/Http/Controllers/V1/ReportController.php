@@ -37,6 +37,7 @@ class ReportController extends Controller implements HasMiddleware
             new Middleware('permission:Report Investor Maturity', only: ['investorMaturity']),
             new Middleware('permission:Report Plan Wise Hierarchy', only: ['planWiseHierarchyReport']),
             new Middleware('permission:Report Plan Wise Admin', only: ['planWiseAdminReport']),
+            new Middleware('permission:Report Customer Investments Maturity', only: ['customerInvestmentsMaturityReport']),
         ];
     }
 
@@ -1647,6 +1648,264 @@ class ReportController extends Controller implements HasMiddleware
             }),
             'subordinates' => $childrenNodes
         ];
+    }
+
+    /**
+     * Get a paginated list of all customer investments with beneficiary, bank, agent, and calculated maturity info,
+     * along with a consolidated product-wise monthly maturity summary.
+     */
+    public function customerInvestmentsMaturityReport(Request $request): JsonResponse
+    {
+        try {
+            $user = Auth::guard('api')->user();
+            $perPage = $request->get('per_page', 15);
+            $periodKey = $request->get('period_key', Carbon::now()->format('Y-m'));
+            $branchId = $request->get('branch_id');
+
+            // 1. Core query setup with all required relationships
+            $query = Investment::with([
+                'customer',
+                'beneficiary',
+                'bankDetail',
+                'unitHead.level',
+                'unitHead.branch',
+                'creator',
+                'investmentProduct.annualRates',
+                'branch'
+            ]);
+
+            // 2. Accessibility/Hierarchy Visibility Checks
+            $assignedBranchIds = [];
+            $accessibleUserIds = [];
+            
+            if ($user->hasRole('Branch Coordinator')) {
+                $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+                $query->whereIn('branch_id', $assignedBranchIds);
+            } elseif (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
+                // Hierarchical users see their own and descendants' investments
+                $descendantIds = $user->getAllDescendantIds();
+                $accessibleUserIds = array_merge([$user->id], $descendantIds);
+                $query->whereIn('created_by', $accessibleUserIds);
+            }
+
+            // 3. Filters
+            if ($request->has('investment_product_id')) {
+                $query->where('investment_product_id', '=', $request->investment_product_id);
+            }
+
+            if ($branchId) {
+                $query->where('branch_id', '=', $branchId);
+            }
+
+            $status = $request->get('status', 'approved');
+            $query->where('status', '=', $status);
+
+            if ($request->has('period_key')) {
+                $query->where('target_period_key', '=', $request->period_key);
+            }
+
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->whereHas('customer', function ($cq) use ($search) {
+                        $cq->where('full_name', 'like', "%{$search}%")
+                            ->orWhere('id_number', 'like', "%{$search}%")
+                            ->orWhere('customer_code', 'like', "%{$search}%");
+                    })
+                    ->orWhere('policy_number', 'like', "%{$search}%")
+                    ->orWhere('application_number', 'like', "%{$search}%");
+                });
+            }
+
+            // 4. Paginate Results
+            $investments = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+            // 5. Transform Data to calculated fields
+            $investments->getCollection()->transform(function ($inv) use ($periodKey) {
+                $calculations = [];
+                $monthlyMaturityAmount = 0;
+                $effectiveRoi = 0;
+
+                if ($inv->investmentProduct) {
+                    $calculations = $this->calculateInvestmentROI((float)$inv->investment_amount, $inv->investmentProduct);
+                    
+                    $reservationDate = $inv->reservation_date;
+                    if ($reservationDate) {
+                        $targetPeriodDate = Carbon::parse($periodKey . '-01');
+                        
+                        $yearDiff = $targetPeriodDate->year - $reservationDate->year;
+                        $monthDiff = $targetPeriodDate->month - $reservationDate->month;
+                        $diffInMonths = ($yearDiff * 12) + $monthDiff;
+
+                        // Calculate current year index (1-based)
+                        $currentYearOfInvestment = (int)ceil(($diffInMonths + 1) / 12);
+                        
+                        $durationMonths = $inv->investmentProduct->duration_months ?? 0;
+                        $maxYears = (int)ceil($durationMonths / 12);
+                        
+                        // clamp
+                        $currentYear = max(1, min($currentYearOfInvestment, $maxYears));
+
+                        // Find the breakdown for that year
+                        $yearData = collect($calculations['yearly_breakdown'] ?? [])->firstWhere('year', $currentYear);
+                        if ($yearData) {
+                            $monthlyMaturityAmount = $yearData['monthly_payout'];
+                            $effectiveRoi = $yearData['roi_percentage'];
+                        } else {
+                            $monthlyMaturityAmount = $calculations['monthly_return'] ?? 0;
+                            $effectiveRoi = $inv->investmentProduct->roi_percentage ?? 0;
+                        }
+                    } else {
+                        $monthlyMaturityAmount = $calculations['monthly_return'] ?? 0;
+                        $effectiveRoi = $inv->investmentProduct->roi_percentage ?? 0;
+                    }
+                }
+
+                $durationMonths = $inv->investmentProduct->duration_months ?? 0;
+                $maturityDate = $inv->reservation_date 
+                    ? $inv->reservation_date->copy()->addMonths($durationMonths)->format('Y-m-d') 
+                    : 'N/A';
+
+                return [
+                    'id' => $inv->id,
+                    'policy_number' => $inv->policy_number,
+                    'application_number' => $inv->application_number,
+                    'status' => $inv->status,
+                    'reservation_date' => $inv->reservation_date ? $inv->reservation_date->format('Y-m-d') : 'N/A',
+                    'maturity_date' => $maturityDate,
+                    'investment_amount' => (float)$inv->investment_amount,
+                    'percentage_of_investment' => (float)$effectiveRoi,
+                    'monthly_maturity_amount' => round((float)$monthlyMaturityAmount, 2),
+                    'maturity_breakdown' => $calculations['yearly_breakdown'] ?? [],
+                    
+                    'customer' => $inv->customer ? [
+                        'id' => $inv->customer->id,
+                        'full_name' => $inv->customer->full_name,
+                        'customer_code' => $inv->customer->customer_code,
+                        'id_type' => $inv->customer->id_type,
+                        'id_number' => $inv->customer->id_number,
+                        'phone_primary' => $inv->customer->phone_primary,
+                        'email' => $inv->customer->email,
+                        'address' => trim(($inv->customer->address_line_1 ?? '') . ' ' . ($inv->customer->address_line_2 ?? '') . ' ' . ($inv->customer->city ?? ''))
+                    ] : null,
+
+                    'beneficiary' => $inv->beneficiary ? [
+                        'id' => $inv->beneficiary->id,
+                        'full_name' => $inv->beneficiary->full_name,
+                        'relationship' => $inv->beneficiary->relationship,
+                        'share_percentage' => (float)$inv->beneficiary->share_percentage,
+                        'phone_primary' => $inv->beneficiary->phone_primary
+                    ] : null,
+
+                    'bank_detail' => $inv->bankDetail ? [
+                        'id' => $inv->bankDetail->id,
+                        'bank_name' => $inv->bankDetail->bank_name,
+                        'branch_name' => $inv->bankDetail->branch_name,
+                        'account_number' => $inv->bankDetail->account_number,
+                        'payment_method' => $inv->bankDetail->payment_method
+                    ] : null,
+
+                    'agent' => $inv->unitHead ? [
+                        'id' => $inv->unitHead->id,
+                        'name' => $inv->unitHead->name,
+                        'username' => $inv->unitHead->username,
+                        'employee_code' => $inv->unitHead->employee_code,
+                        'level' => $inv->unitHead->level->level_name ?? 'N/A',
+                        'branch' => $inv->unitHead->branch->name ?? 'N/A'
+                    ] : ($inv->creator ? [
+                        'id' => $inv->creator->id,
+                        'name' => $inv->creator->name,
+                        'username' => $inv->creator->username,
+                        'employee_code' => $inv->creator->employee_code,
+                        'level' => $inv->creator->level->level_name ?? 'N/A',
+                        'branch' => $inv->creator->branch->name ?? 'N/A'
+                    ] : null),
+
+                    'investment_product' => $inv->investmentProduct ? [
+                        'id' => $inv->investmentProduct->id,
+                        'name' => $inv->investmentProduct->name,
+                        'duration_months' => $inv->investmentProduct->duration_months,
+                        'roi_percentage' => (float)$inv->investmentProduct->roi_percentage,
+                        'is_variable_roi' => (bool)$inv->investmentProduct->is_variable_roi
+                    ] : null
+                ];
+            });
+
+            // 6. Calculate consolidated Product-wise Monthly Maturity Summary
+            // Let's filter by the same period (using scheduled payout date check)
+            $from = Carbon::parse($periodKey . '-01')->startOfMonth();
+            $to = Carbon::parse($periodKey . '-01')->endOfMonth();
+
+            $payoutsQuery = DB::table('investment_payouts')
+                ->join('investments', 'investment_payouts.investment_id', '=', 'investments.id')
+                ->join('investment_products', 'investments.investment_product_id', '=', 'investment_products.id')
+                ->select(
+                    'investment_products.id as product_id',
+                    'investment_products.name as product_name',
+                    'investment_products.duration_months',
+                    'investment_products.roi_percentage',
+                    DB::raw('COUNT(DISTINCT investments.id) as total_investments_count'),
+                    DB::raw('SUM(investments.investment_amount) as total_invested_amount'),
+                    DB::raw('SUM(investment_payouts.amount) as total_monthly_maturity_amount')
+                )
+                ->where('investments.status', '=', 'approved')
+                ->whereNull('investments.deleted_at')
+                ->whereBetween('investment_payouts.scheduled_date', [$from, $to]);
+
+            // Apply visibility constraints
+            if ($user->hasRole('Branch Coordinator')) {
+                $payoutsQuery->whereIn('investments.branch_id', $assignedBranchIds);
+            } elseif (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
+                $payoutsQuery->whereIn('investments.created_by', $accessibleUserIds);
+            }
+
+            if ($branchId) {
+                $payoutsQuery->where('investments.branch_id', '=', $branchId);
+            }
+
+            $productSummary = $payoutsQuery->groupBy(
+                'investment_products.id',
+                'investment_products.name',
+                'investment_products.duration_months',
+                'investment_products.roi_percentage'
+            )->get();
+
+            $formattedSummary = $productSummary->map(function ($row) {
+                return [
+                    'product_id' => $row->product_id,
+                    'product_name' => $row->product_name,
+                    'duration_months' => $row->duration_months,
+                    'roi_percentage' => (float)$row->roi_percentage,
+                    'total_investments_count' => (int)$row->total_investments_count,
+                    'total_invested_amount' => (float)$row->total_invested_amount,
+                    'total_monthly_maturity_amount' => round((float)$row->total_monthly_maturity_amount, 2)
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Consolidated customer investments and maturity report retrieved successfully',
+                'data' => $investments,
+                'meta' => [
+                    'period_key' => $periodKey,
+                    'period_from' => $from->toDateString(),
+                    'period_to' => $to->toDateString(),
+                    'product_wise_maturity_summary' => $formattedSummary
+                ]
+            ], 200);
+
+        } catch (\Throwable $th) {
+            $this->logActivity('Error', 'Report', 'Consolidated customer investments and maturity report failed', [
+                'error' => $th->getMessage(),
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve consolidated customer investments and maturity report',
+                'error' => $th->getMessage()
+            ], 500);
+        }
     }
 
     /**
