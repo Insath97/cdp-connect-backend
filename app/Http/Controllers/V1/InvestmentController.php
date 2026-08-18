@@ -203,7 +203,7 @@ class InvestmentController extends Controller implements HasMiddleware
             $yymm = $reservationDate->format('ym');
             $appPrefix = 'APP-' . $branch->code . '-' . $yymm;
 
-            $lastApp = Investment::where('application_number', 'like', $appPrefix . '%', 'and')
+            $lastApp = Investment::withTrashed()->where('application_number', 'like', $appPrefix . '%', 'and')
                 ->orderBy('application_number', 'desc')
                 ->first();
 
@@ -212,7 +212,7 @@ class InvestmentController extends Controller implements HasMiddleware
 
             // 4. Auto-generate Sales Code: {BranchCode}-{Sequence}
             $salesPrefix = $branch->code . '-';
-            $lastSales = Investment::where('sales_code', 'like', $salesPrefix . '%', 'and')
+            $lastSales = Investment::withTrashed()->where('sales_code', 'like', $salesPrefix . '%', 'and')
                 ->orderBy('sales_code', 'desc')
                 ->first();
 
