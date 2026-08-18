@@ -11,3 +11,11 @@ Artisan::command('inspire', function () {
 /* Schedule::command('app:send-monthly-payout-notifications')->dailyAt('00:00'); */
 Schedule::command('targets:bulk-setup')->monthlyOn(1, '00:00');
 
+// Daily 08:00 AM 7-Day Renewal Pre-Reminder SMS Notification
+Schedule::command('app:send-renewal-expiry-sms')->dailyAt('08:00');
+
+// Daily 08:00 AM Same-Day Expiration SMS Notification
+Schedule::command('app:send-same-day-expiry-sms')->dailyAt('08:00');
+
+
+

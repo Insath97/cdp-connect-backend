@@ -158,6 +158,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Report Plan Wise',  'group_name' => 'Report Management Permissions'],
             ['name' => 'Report Plan Wise Hierarchy', 'group_name' => 'Report Management Permissions'],
             ['name' => 'Report Plan Wise Admin', 'group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Customer Investments Maturity', 'group_name' => 'Report Management Permissions'],
 
             /* Dashboard Management */
             ['name' => 'Dashboard View', 'group_name' => 'Dashboard Management Permissions'],
@@ -174,6 +175,9 @@ class PermissionsSeeder extends Seeder
             /* Activity Log Management */
             ['name' => 'ActivityLog Index', 'group_name' => 'Activity Log Management Permissions'],
             ['name' => 'ActivityLog Show', 'group_name' => 'Activity Log Management Permissions'],
+
+            /* Renewal Management */
+            ['name' => 'Renewal Index', 'group_name' => 'Renewal Management Permissions'],
         ];
 
         foreach ($permissions as $permission) {
