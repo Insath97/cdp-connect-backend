@@ -134,6 +134,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
 
     // Renewal Routes
     Route::get('renewals', [RenewalController::class, 'index']);
+    Route::get('renewals/demo', [RenewalController::class, 'index_demo']);
 
     // Investment Payouts
     Route::get('investment-payouts', [InvestmentPayoutController::class, 'index']);
@@ -155,6 +156,7 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::get('reports/plan-wise-hierarchy', [ReportController::class, 'planWiseHierarchyReport']);
     Route::get('reports/plan-wise-admin', [ReportController::class, 'planWiseAdminReport']);
     Route::get('reports/customer-investments-maturity', [ReportController::class, 'customerInvestmentsMaturityReport']);
+    Route::get('reports/welcome-call', [ReportController::class, 'welcomeCallReport']);
     Route::get('reports/hierarchy/{id}', [ReportController::class, 'show']);
     Route::get('reports/aa',[ReportController::class, 'buildPlanWiseHierarchyNode']);
 
