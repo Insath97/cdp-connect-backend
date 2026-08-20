@@ -38,6 +38,7 @@ class ReportController extends Controller implements HasMiddleware
             new Middleware('permission:Report Plan Wise Hierarchy', only: ['planWiseHierarchyReport']),
             new Middleware('permission:Report Plan Wise Admin', only: ['planWiseAdminReport']),
             new Middleware('permission:Report Customer Investments Maturity', only: ['customerInvestmentsMaturityReport']),
+            new Middleware('permission:Report Welcome Call', only: ['welcomeCallReport']),
         ];
     }
 
@@ -1903,6 +1904,197 @@ class ReportController extends Controller implements HasMiddleware
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to retrieve consolidated customer investments and maturity report',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get a listing of investments with welcome call statuses, caller details, and filters.
+     */
+    public function welcomeCallReport(Request $request): JsonResponse
+    {
+        try {
+            $user = Auth::guard('api')->user();
+            $perPage = $request->get('per_page', 15);
+            $branchId = $request->get('branch_id');
+            $welcomeCallStatus = $request->get('welcome_call_status');
+
+            // 1. Core query setup with required relationships
+            $query = Investment::with([
+                'customer',
+                'branch',
+                'unitHead',
+                'investmentProduct',
+                'welcomeCallUser'
+            ]);
+
+            // 2. Accessibility/Hierarchy Visibility Checks
+            $assignedBranchIds = [];
+            $accessibleUserIds = [];
+
+            if ($user->hasRole('Branch Coordinator')) {
+                $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+                $query->whereIn('branch_id', $assignedBranchIds);
+            } elseif (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
+                // Hierarchical users see their own and descendants' investments
+                $descendantIds = $user->getAllDescendantIds();
+                $accessibleUserIds = array_merge([$user->id], $descendantIds);
+                $query->whereIn('created_by', $accessibleUserIds);
+            }
+
+            // 3. Filters
+            // Default status: approved (since welcome calls are on approved investments)
+            $status = $request->get('status', 'approved');
+            if ($status !== 'all') {
+                $query->where('status', '=', $status);
+            }
+
+            if ($branchId) {
+                $query->where('branch_id', '=', $branchId);
+            }
+
+            // Date filtering
+            $fromDate = $request->get('from_date');
+            $toDate = $request->get('to_date');
+            $dateType = $request->get('date_type', 'approved_at'); // approved_at or welcome_call_at
+
+            if (!in_array($dateType, ['approved_at', 'welcome_call_at'])) {
+                $dateType = 'approved_at';
+            }
+
+            if ($fromDate && $toDate) {
+                $query->whereBetween($dateType, [$fromDate, $toDate]);
+            } elseif ($fromDate) {
+                $query->where($dateType, '>=', $fromDate);
+            } elseif ($toDate) {
+                $query->where($dateType, '<=', $toDate);
+            }
+
+            // Search filter
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->whereHas('customer', function ($cq) use ($search) {
+                        $cq->where('full_name', 'like', "%{$search}%")
+                            ->orWhere('id_number', 'like', "%{$search}%")
+                            ->orWhere('customer_code', 'like', "%{$search}%")
+                            ->orWhere('phone_primary', 'like', "%{$search}%");
+                    })
+                    ->orWhere('policy_number', 'like', "%{$search}%")
+                    ->orWhere('application_number', 'like', "%{$search}%");
+                });
+            }
+
+            // Clone query to calculate summary statistics BEFORE applying welcome_call_status filter
+            $summaryQuery = clone $query;
+
+            // Apply welcome_call_status filter on the main query for the list
+            if ($welcomeCallStatus) {
+                $query->where('welcome_call_status', '=', $welcomeCallStatus);
+            }
+
+            // 4. Calculate Summary Statistics
+            $summaryStats = $summaryQuery->select('welcome_call_status', DB::raw('count(*) as count'), DB::raw('sum(investment_amount) as total_amount'))
+                ->groupBy('welcome_call_status')
+                ->get()
+                ->keyBy('welcome_call_status');
+
+            $statuses = ['pending', 'completed', 'not_reachable', 'no_answer', 'others'];
+            $summary = [
+                'total_investments' => 0,
+                'total_amount' => 0.0,
+            ];
+
+            foreach ($statuses as $st) {
+                $summary[$st . '_count'] = 0;
+            }
+
+            foreach ($summaryStats as $statusKey => $data) {
+                if (in_array($statusKey, $statuses)) {
+                    $summary[$statusKey . '_count'] = (int)$data->count;
+                }
+                $summary['total_investments'] += (int)$data->count;
+                $summary['total_amount'] += (float)$data->total_amount;
+            }
+
+            // 5. Paginate Results
+            $investments = $query->orderBy('approved_at', 'desc')->paginate($perPage);
+
+            // 6. Transform Data
+            $investments->getCollection()->transform(function ($inv) {
+                return [
+                    'id' => $inv->id,
+                    'policy_number' => $inv->policy_number,
+                    'application_number' => $inv->application_number,
+                    'investment_amount' => (float)$inv->investment_amount,
+                    'status' => $inv->status,
+                    'approved_at' => $inv->approved_at ? $inv->approved_at->format('Y-m-d') : null,
+                    
+                    'customer' => $inv->customer ? [
+                        'id' => $inv->customer->id,
+                        'full_name' => $inv->customer->full_name,
+                        'customer_code' => $inv->customer->customer_code,
+                        'phone_primary' => $inv->customer->phone_primary,
+                        'email' => $inv->customer->email,
+                    ] : null,
+
+                    'branch' => $inv->branch ? [
+                        'id' => $inv->branch->id,
+                        'name' => $inv->branch->name,
+                        'code' => $inv->branch->code,
+                    ] : null,
+
+                    'agent' => $inv->unitHead ? [
+                        'id' => $inv->unitHead->id,
+                        'name' => $inv->unitHead->name,
+                        'employee_code' => $inv->unitHead->employee_code,
+                    ] : null,
+
+                    'plan' => $inv->investmentProduct ? [
+                        'id' => $inv->investmentProduct->id,
+                        'name' => $inv->investmentProduct->name,
+                        'duration_months' => $inv->investmentProduct->duration_months,
+                    ] : null,
+
+                    'welcome_call' => [
+                        'status' => $inv->welcome_call_status,
+                        'notes' => $inv->welcome_call_notes,
+                        'at' => $inv->welcome_call_at ? $inv->welcome_call_at->format('Y-m-d H:i:s') : null,
+                        'by' => $inv->welcomeCallUser ? [
+                            'id' => $inv->welcomeCallUser->id,
+                            'name' => $inv->welcomeCallUser->name,
+                        ] : null,
+                    ]
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Welcome call report retrieved successfully',
+                'data' => $investments,
+                'meta' => [
+                    'summary' => $summary,
+                    'filters' => [
+                        'welcome_call_status' => $welcomeCallStatus,
+                        'branch_id' => $branchId,
+                        'status' => $status,
+                        'from_date' => $fromDate,
+                        'to_date' => $toDate,
+                        'date_type' => $dateType
+                    ]
+                ]
+            ], 200);
+
+        } catch (\Throwable $th) {
+            $this->logActivity('Error', 'Report', 'Welcome call report failed', [
+                'error' => $th->getMessage(),
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve welcome call report',
                 'error' => $th->getMessage()
             ], 500);
         }
