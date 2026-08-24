@@ -2029,6 +2029,7 @@ class ReportController extends Controller implements HasMiddleware
                     'application_number' => $inv->application_number,
                     'investment_amount' => (float)$inv->investment_amount,
                     'status' => $inv->status,
+                    'reservation_date' => $inv->reservation_date ? $inv->reservation_date->format('Y-m-d') : null,
                     'approved_at' => $inv->approved_at ? $inv->approved_at->format('Y-m-d') : null,
                     
                     'customer' => $inv->customer ? [
