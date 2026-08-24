@@ -293,4 +293,62 @@ class WelcomeCallReportTest extends TestCase
         $this->assertCount(1, $searchData);
         $this->assertEquals('POL-FIL-002', $searchData[0]['policy_number']);
     }
+
+    /** @test */
+    public function test_welcome_call_report_filtering_by_reservation_date()
+    {
+        // Reservation date 5 days ago
+        Investment::create([
+            'policy_number' => 'POL-RES-001',
+            'application_number' => 'APP-RES-001',
+            'sales_code' => 'SC-RES-001',
+            'customer_id' => $this->customer->id,
+            'investment_product_id' => $this->product->id,
+            'branch_id' => $this->branch->id,
+            'unit_head_id' => $this->adminUser->id,
+            'investment_amount' => 100000.00,
+            'payment_proof' => 'proof.jpg',
+            'reservation_date' => Carbon::now()->subDays(5),
+            'target_period_key' => Carbon::now()->subDays(5)->format('Y-m'),
+            'status' => 'approved',
+            'approved_at' => Carbon::now(),
+            'created_by' => $this->adminUser->id,
+            'welcome_call_status' => 'pending',
+        ]);
+
+        // Reservation date 15 days ago
+        Investment::create([
+            'policy_number' => 'POL-RES-002',
+            'application_number' => 'APP-RES-002',
+            'sales_code' => 'SC-RES-002',
+            'customer_id' => $this->customer->id,
+            'investment_product_id' => $this->product->id,
+            'branch_id' => $this->branch->id,
+            'unit_head_id' => $this->adminUser->id,
+            'investment_amount' => 200000.00,
+            'payment_proof' => 'proof.jpg',
+            'reservation_date' => Carbon::now()->subDays(15),
+            'target_period_key' => Carbon::now()->subDays(15)->format('Y-m'),
+            'status' => 'approved',
+            'approved_at' => Carbon::now(),
+            'created_by' => $this->adminUser->id,
+            'welcome_call_status' => 'pending',
+        ]);
+
+        $token = auth('api')->login($this->adminUser);
+
+        // Filter by reservation_date type with from_date 10 days ago and to_date now
+        $fromDate = Carbon::now()->subDays(10)->format('Y-m-d');
+        $toDate = Carbon::now()->format('Y-m-d');
+        
+        $response = $this->withHeaders(['Authorization' => "Bearer {$token}"])
+            ->getJson("/api/v1/reports/welcome-call?date_type=reservation_date&from_date={$fromDate}&to_date={$toDate}");
+
+        $response->assertStatus(200);
+        $data = $response->json('data.data');
+        
+        $policyNumbers = collect($data)->pluck('policy_number')->toArray();
+        $this->assertContains('POL-RES-001', $policyNumbers);
+        $this->assertNotContains('POL-RES-002', $policyNumbers);
+    }
 }
