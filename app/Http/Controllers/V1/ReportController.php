@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Target;
 use App\Models\Commission;
 use App\Models\Investment;
+use App\Models\UserHierarchyChange;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -1932,13 +1933,18 @@ class ReportController extends Controller implements HasMiddleware
             // 2. Accessibility/Hierarchy Visibility Checks
             $assignedBranchIds = [];
             $accessibleUserIds = [];
+            $asOfDate = $request->get('as_of_date');
 
             if ($user->hasRole('Branch Coordinator')) {
                 $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
                 $query->whereIn('branch_id', $assignedBranchIds);
             } elseif (!$user->hasRole('Super Admin') && ($user->user_type !== 'admin')) {
                 // Hierarchical users see their own and descendants' investments
-                $descendantIds = $user->getAllDescendantIds();
+                if ($asOfDate) {
+                    $descendantIds = $user->getAllDescendantIdsAt($asOfDate);
+                } else {
+                    $descendantIds = $user->getAllDescendantIds();
+                }
                 $accessibleUserIds = array_merge([$user->id], $descendantIds);
                 $query->whereIn('created_by', $accessibleUserIds);
             }
@@ -1957,9 +1963,9 @@ class ReportController extends Controller implements HasMiddleware
             // Date filtering
             $fromDate = $request->get('from_date');
             $toDate = $request->get('to_date');
-            $dateType = $request->get('date_type', 'approved_at'); // approved_at or welcome_call_at
+            $dateType = $request->get('date_type', 'approved_at'); // approved_at, welcome_call_at or reservation_date
 
-            if (!in_array($dateType, ['approved_at', 'welcome_call_at'])) {
+            if (!in_array($dateType, ['approved_at', 'welcome_call_at', 'reservation_date'])) {
                 $dateType = 'approved_at';
             }
 

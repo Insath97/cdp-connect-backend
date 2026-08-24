@@ -141,6 +141,11 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
         return $this->belongsToMany(Branch::class, 'branch_user', 'user_id', 'branch_id')->withTimestamps();
     }
 
+    public function hierarchyChanges()
+    {
+        return $this->hasMany(UserHierarchyChange::class);
+    }
+
     /* Helper Methods */
 
     /**
@@ -244,11 +249,109 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
     }
 
     /**
+     * Get all descendant IDs as of a specific date (point-in-time hierarchy).
+     */
+    public function getAllDescendantIdsAt(string $date): array
+    {
+        $descendants = [];
+        $children = User::where('parent_user_id', $this->id)->get();
+
+        foreach ($children as $child) {
+            // Check if this child was moved away before the date
+            $moveOut = UserHierarchyChange::where('user_id', $child->id)
+                ->where('old_parent_user_id', $this->id)
+                ->where('changed_at', '<=', $date)
+                ->orderBy('changed_at', 'desc')
+                ->first();
+
+            // If child was moved out before the date, skip
+            if ($moveOut && $moveOut->new_parent_user_id !== $this->id) {
+                continue;
+            }
+
+            $descendants[] = $child->id;
+            $descendants = array_merge($descendants, $child->getAllDescendantIdsAt($date));
+        }
+
+        return $descendants;
+    }
+
+    /**
      * Check if the user has verified their email
      */
     public function hasVerifiedEmail(): bool
     {
         return !is_null($this->email_verified_at);
+    }
+
+    /**
+     * Get ancestor user IDs as of a specific date (point-in-time hierarchy).
+     */
+    public function getAncestorIdsAt(string $date): array
+    {
+        $ancestorIds = [];
+        $currentId = $this->id;
+        $visited = [$currentId];
+
+        while (true) {
+            // Find the parent of current user as of the given date
+            $change = UserHierarchyChange::where('user_id', $currentId)
+                ->where('changed_at', '<=', $date)
+                ->orderBy('changed_at', 'desc')
+                ->first();
+
+            if ($change) {
+                $parentId = $change->new_parent_user_id;
+            } else {
+                // No change record, use current parent
+                $currentUser = User::find($currentId);
+                $parentId = $currentUser ? $currentUser->parent_user_id : null;
+            }
+
+            if (!$parentId || in_array($parentId, $visited)) {
+                break;
+            }
+
+            $ancestorIds[] = $parentId;
+            $visited[] = $parentId;
+            $currentId = $parentId;
+        }
+
+        return $ancestorIds;
+    }
+
+    /**
+     * Get descendant IDs as of a specific date using historical hierarchy.
+     */
+    public function getDescendantIdsAt(string $date): array
+    {
+        $descendants = [];
+        $children = User::where('parent_user_id', $this->id)->get();
+
+        foreach ($children as $child) {
+            // Check if this child was moved away before the date
+            $change = UserHierarchyChange::where('user_id', $child->id)
+                ->where('old_parent_user_id', $this->id)
+                ->where('changed_at', '<=', $date)
+                ->orderBy('changed_at', 'desc')
+                ->first();
+
+            // If child was moved before the date, it's not under this parent at that date
+            if ($change) {
+                continue;
+            }
+
+            $descendants[] = $child->id;
+            $descendants = array_merge($descendants, $child->getDescendantIdsAt($date));
+        }
+
+        // Also check users who were previously children but moved away
+        $movedChildren = UserHierarchyChange::where('old_parent_user_id', $this->id)
+            ->where('new_parent_user_id', $this->id)
+            ->where('changed_at', '<=', $date)
+            ->get();
+
+        return $descendants;
     }
 
 }

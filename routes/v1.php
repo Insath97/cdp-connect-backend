@@ -29,7 +29,7 @@ use App\Http\Controllers\V1\InvestmentPayoutController;
 use App\Http\Controllers\V1\WelcomeCallController;
 use App\Http\Controllers\V1\LegalController;
 use App\Http\Controllers\V1\BillingController;
-use App\Http\Controllers\V1\RenewalController;
+use App\Http\Controllers\V1\UserHierarchyController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -83,6 +83,12 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::apiResource('branches', BranchController::class);
     Route::patch('branches/{id}/toggle-status', [BranchController::class, 'toggleStatus']);
 
+    // User Hierarchy Management
+    Route::patch('users/{id}/reassign-children', [UserHierarchyController::class, 'reassignChildren']);
+    Route::get('users/{id}/hierarchy-changes', [UserHierarchyController::class, 'history']);
+    Route::get('users/{id}/hierarchy-tree', [UserHierarchyController::class, 'tree']);
+    Route::get('hierarchy-changes', [UserHierarchyController::class, 'allHistory']);
+
     Route::get('users/hierarchy-list', [UserController::class, 'getHierarchyUsersByBranch']);
     Route::get('users/list', [UserController::class, 'getAvailableUsers']);
     Route::apiResource('users', UserController::class);
@@ -131,10 +137,6 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::get('billings', [BillingController::class, 'index']);
     Route::get('billings/{id}', [BillingController::class, 'show']);
     Route::patch('billings/{id}/status', [BillingController::class, 'updateStatus']);
-
-    // Renewal Routes
-    Route::get('renewals', [RenewalController::class, 'index']);
-    Route::get('renewals/demo', [RenewalController::class, 'index_demo']);
 
     // Investment Payouts
     Route::get('investment-payouts', [InvestmentPayoutController::class, 'index']);
