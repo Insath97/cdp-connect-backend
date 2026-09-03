@@ -32,11 +32,6 @@ class PermissionsSeeder extends Seeder
             ['name' => 'User Delete', 'group_name' => 'User Management Permissions'],
             ['name' => 'User Toggle Status', 'group_name' => 'User Management Permissions'],
 
-            /* User Hierarchy Management */
-            ['name' => 'User Hierarchy Reassign', 'group_name' => 'User Hierarchy Management Permissions'],
-            ['name' => 'User Hierarchy View', 'group_name' => 'User Hierarchy Management Permissions'],
-            ['name' => 'User Hierarchy Tree', 'group_name' => 'User Hierarchy Management Permissions'],
-
             /* Level Management */
             ['name' => 'Level Index', 'group_name' => 'Level Management Permissions'],
             ['name' => 'Level Create', 'group_name' => 'Level Management Permissions'],
