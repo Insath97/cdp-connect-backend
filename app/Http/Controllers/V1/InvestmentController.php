@@ -1147,7 +1147,7 @@ class InvestmentController extends Controller implements HasMiddleware
             $user = Auth::guard('api')->user();
             $investment = Investment::with(['investmentProduct', 'payouts', 'customer'])->findOrFail($id);
 
-            if (in_array($investment->status, ['cancelled', 'rejected'])) {
+            if (in_array($investment->status, ['cancelled', 'rejected', 'terminated', 'expired'])) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Investment is already ' . $investment->status . '.'
