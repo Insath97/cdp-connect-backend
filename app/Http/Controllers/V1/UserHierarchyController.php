@@ -31,8 +31,13 @@ class UserHierarchyController extends Controller implements HasMiddleware
      * Reassign children from one user to another.
      * When a user leaves, their children are moved to a new parent.
      */
-    public function reassignChildren(ReassignChildrenRequest $request, string $userId)
+    public function reassignChildren(Request $request, string $userId)
     {
+        $request->validate([
+            'new_parent_user_id' => 'required|exists:users,id',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
         $user = User::find($userId);
 
         if (!$user) {
@@ -125,11 +130,13 @@ class UserHierarchyController extends Controller implements HasMiddleware
                         'name' => $newParent->name,
                     ],
                     'children_moved' => $children->count(),
-                    'children' => $children->map(fn ($child) => [
-                        'id' => $child->id,
-                        'name' => $child->name,
-                        'old_parent_id' => (int) $userId,
-                    ]),
+                    'children' => $children->map(function ($child) {
+                        return [
+                            'id' => $child->id,
+                            'name' => $child->name,
+                            'old_parent_id' => $userId,
+                        ];
+                    }),
                 ]
             ], 200);
         } catch (\Throwable $th) {
