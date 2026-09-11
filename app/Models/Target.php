@@ -151,7 +151,7 @@ class Target extends Model
 
         $totalApproved = \App\Models\Investment::whereIn('unit_head_id', $allIds)
             ->where('target_period_key', $periodKey)
-            ->where('status', 'approved')
+            ->whereIn('status', ['approved', 'expired'])
             ->sum('investment_amount');
 
         // Update target fields

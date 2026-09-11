@@ -107,7 +107,7 @@ class UpdateInvestmentRequest extends FormRequest
             'monthly_payment_date' => 'nullable|date',
             'unit_head_id' => 'sometimes|exists:users,id',
             'notes' => 'nullable|string',
-            'status' => 'sometimes|in:pending,approved,rejected',
+            'status' => 'sometimes|in:pending,approved,rejected,cancelled,terminated,expired',
             'signature_document' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
         ];
     }

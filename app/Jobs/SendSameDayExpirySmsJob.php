@@ -60,9 +60,14 @@ class SendSameDayExpirySmsJob implements ShouldQueue
             $recipientPhone = $customer->phone_primary ?? null;
 
             if (!$recipientPhone) {
-                $this->logActivity('Warning', 'SameDayExpirySms', "SendSameDayExpirySmsJob: Customer for investment #{$investment->id} has no primary phone number.", [
+                $investment->update([
+                    'status' => 'expired'
+                ]);
+
+                $this->logActivity('Warning', 'SameDayExpirySms', "SendSameDayExpirySmsJob: Customer for investment #{$investment->id} has no primary phone number. Status updated to expired without SMS.", [
                     'investment_id' => $investment->id,
-                    'customer_id' => $customer->id ?? null
+                    'customer_id' => $customer->id ?? null,
+                    'new_status' => 'expired'
                 ]);
                 return;
             }
@@ -86,15 +91,17 @@ class SendSameDayExpirySmsJob implements ShouldQueue
 
             if ($sent) {
                 $investment->update([
-                    'same_day_expiry_sms_sent_at' => now()
+                    'same_day_expiry_sms_sent_at' => now(),
+                    'status' => 'expired'
                 ]);
 
-                $this->logActivity('Success', 'SameDayExpirySms', "Same-day maturity SMS sent successfully to {$recipientPhone} for Policy #{$investment->policy_number}", [
+                $this->logActivity('Success', 'SameDayExpirySms', "Same-day maturity SMS sent successfully to {$recipientPhone} for Policy #{$investment->policy_number}. Status updated to expired.", [
                     'investment_id' => $investment->id,
                     'policy_number' => $investment->policy_number,
                     'recipient_phone' => $recipientPhone,
                     'maturity_date' => $maturityDate,
-                    'amount' => $investment->investment_amount
+                    'amount' => $investment->investment_amount,
+                    'new_status' => 'expired'
                 ]);
             } else {
                 $this->logActivity('Error', 'SameDayExpirySms', "Failed to send same-day maturity SMS to {$recipientPhone} for Policy #{$investment->policy_number}", [

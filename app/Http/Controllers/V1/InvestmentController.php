@@ -796,13 +796,13 @@ class InvestmentController extends Controller implements HasMiddleware
             $user = Auth::guard('api')->user();
             $investment = Investment::with(['beneficiary', 'bankDetail'])->findOrFail($id);
 
-            // 1. Strict Role Check: Only Super Admin can edit
+          /*   // 1. Strict Role Check: Only Super Admin can edit
             if (!$user->hasRole('Super Admin')) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Only Super Admin can update investment details.'
                 ], 403);
-            }
+            } */
 
             if ($investment->status === 'cancelled') {
                 return response()->json([
