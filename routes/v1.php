@@ -29,13 +29,22 @@ use App\Http\Controllers\V1\InvestmentPayoutController;
 use App\Http\Controllers\V1\WelcomeCallController;
 use App\Http\Controllers\V1\LegalController;
 use App\Http\Controllers\V1\BillingController;
-use App\Http\Controllers\V1\RenewalController;
+// use App\Http\Controllers\V1\RenewalController;
+use App\Http\Controllers\V1\CustomerVerificationController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
 
 Route::prefix('v1')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
+});
+
+/* portal & verification routes (secured by X-Portal-Key header) */
+Route::prefix('v1/portal')->middleware(['portal.key', 'throttle:30,1'])->group(function () {
+    Route::post('verify-investment', [CustomerVerificationController::class, 'verify']);
+});
+Route::prefix('v1')->middleware(['portal.key', 'throttle:30,1'])->group(function () {
+    Route::post('verify-investment', [CustomerVerificationController::class, 'verify']);
 });
 
 /* protected routes */
@@ -133,8 +142,8 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::patch('billings/{id}/status', [BillingController::class, 'updateStatus']);
 
     // Renewal Routes
-    Route::get('renewals', [RenewalController::class, 'index']);
-    Route::get('renewals/demo', [RenewalController::class, 'index_demo']);
+    // Route::get('renewals', [RenewalController::class, 'index']);
+    // Route::get('renewals/demo', [RenewalController::class, 'index_demo']);
 
     // Investment Payouts
     Route::get('investment-payouts', [InvestmentPayoutController::class, 'index']);

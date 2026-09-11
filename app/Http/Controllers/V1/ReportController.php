@@ -808,7 +808,7 @@ class ReportController extends Controller implements HasMiddleware
             $allHierarchyIds = User::where('user_type', '=', 'hierarchy', 'and')->pluck('id')->toArray();
             $totalInvestments = Investment::whereIn('unit_head_id', $allHierarchyIds)
                 ->whereBetween('reservation_date', [$from, $to])
-                ->where('status', '=', 'approved', 'and')
+                ->whereIn('status', ['approved', 'expired'])
                 ->get();
 
             return response()->json([
@@ -850,7 +850,7 @@ class ReportController extends Controller implements HasMiddleware
 
         $branchInvestments = Investment::whereIn('unit_head_id', $allBranchIds)
             ->whereBetween('reservation_date', [$from, $to])
-            ->where('status', '=', 'approved', 'and')
+            ->whereIn('status', ['approved', 'expired'])
             ->get();
 
         $branchBusinessTotal = $branchInvestments->sum('investment_amount');
@@ -860,7 +860,7 @@ class ReportController extends Controller implements HasMiddleware
         $personalInvestments = Investment::with(['customer', 'investmentProduct'])
             ->where('unit_head_id', $user->id)
             ->whereBetween('reservation_date', [$from, $to])
-            ->where('status', '=', 'approved', 'and')
+            ->whereIn('status', ['approved', 'expired'])
             ->get();
 
         // 3. Target and Achievement
@@ -1126,7 +1126,7 @@ class ReportController extends Controller implements HasMiddleware
             $allHierarchyIds = User::where('user_type', '=', 'hierarchy', 'and')->pluck('id')->toArray();
             $totalInvestments = Investment::whereIn('unit_head_id', $allHierarchyIds)
                 ->whereBetween('reservation_date', [$from, $to])
-                ->where('status', '=', 'approved', 'and')
+                ->whereIn('status', ['approved', 'expired'])
                 ->get();
 
             $totalCancelled = Investment::whereIn('unit_head_id', $allHierarchyIds)
@@ -1181,7 +1181,7 @@ class ReportController extends Controller implements HasMiddleware
 
         $branchInvestments = Investment::with(['investmentProduct', 'customer'])->whereIn('unit_head_id', $allBranchIds, 'and', false)
             ->whereBetween('reservation_date', [$from, $to])
-            ->where('status', '=', 'approved', 'and')
+            ->whereIn('status', ['approved', 'expired'])
             ->get();
 
         $cancelledInvestments = Investment::with(['investmentProduct', 'customer'])->whereIn('unit_head_id', $allBranchIds, 'and', false)
@@ -1199,7 +1199,7 @@ class ReportController extends Controller implements HasMiddleware
             ->where('user_id', $user->id)
             ->whereHas('investment', function ($q) use ($from, $to) {
                 $q->whereBetween('reservation_date', [$from, $to])
-                    ->where('status', 'approved');
+                    ->whereIn('status', ['approved', 'expired']);
             })
             ->get();
 
@@ -1443,7 +1443,7 @@ class ReportController extends Controller implements HasMiddleware
                 ->toArray();
             $totalInvestments = Investment::whereIn('unit_head_id', $allAdminIds)
                 ->whereBetween('reservation_date', [$from, $to])
-                ->where('status', '=', 'approved', 'and')
+                ->whereIn('status', ['approved', 'expired'])
                 ->get();
 
             $totalCancelled = Investment::whereIn('unit_head_id', $allAdminIds)
@@ -1502,7 +1502,7 @@ class ReportController extends Controller implements HasMiddleware
         $personalInvestments = Investment::with(['investmentProduct', 'customer'])
             ->where('unit_head_id', $user->id)
             ->whereBetween('reservation_date', [$from, $to])
-            ->where('status', '=', 'approved', 'and')
+            ->whereIn('status', ['approved', 'expired'])
             ->get();
 
         $personalCancelledInvestments = Investment::with(['investmentProduct', 'customer'])
@@ -1516,7 +1516,7 @@ class ReportController extends Controller implements HasMiddleware
             ->where('user_id', $user->id)
             ->whereHas('investment', function ($q) use ($from, $to) {
                 $q->whereBetween('reservation_date', [$from, $to])
-                    ->where('status', 'approved');
+                    ->whereIn('status', ['approved', 'expired']);
             })
             ->get();
 
@@ -1849,7 +1849,7 @@ class ReportController extends Controller implements HasMiddleware
                     DB::raw('SUM(investments.investment_amount) as total_invested_amount'),
                     DB::raw('SUM(investment_payouts.amount) as total_monthly_maturity_amount')
                 )
-                ->where('investments.status', '=', 'approved')
+                ->whereIn('investments.status', ['approved', 'expired'])
                 ->whereNull('investments.deleted_at')
                 ->whereBetween('investment_payouts.scheduled_date', [$from, $to]);
 
@@ -1957,9 +1957,9 @@ class ReportController extends Controller implements HasMiddleware
             // Date filtering
             $fromDate = $request->get('from_date');
             $toDate = $request->get('to_date');
-            $dateType = $request->get('date_type', 'approved_at'); // approved_at or welcome_call_at
+            $dateType = $request->get('date_type', 'approved_at'); // approved_at, welcome_call_at or reservation_date
 
-            if (!in_array($dateType, ['approved_at', 'welcome_call_at'])) {
+            if (!in_array($dateType, ['approved_at', 'welcome_call_at', 'reservation_date'])) {
                 $dateType = 'approved_at';
             }
 

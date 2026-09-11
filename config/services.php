@@ -45,4 +45,9 @@ return [
         'key' => env('EXTERNAL_API_KEY'),
     ],
 
+    'portal_api' => [
+        'key' => env('PORTAL_API_KEY', 'cdp_portal_secure_key_2024'),
+    ],
+
+
 ];

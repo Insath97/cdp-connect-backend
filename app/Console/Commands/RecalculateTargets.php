@@ -63,9 +63,9 @@ class RecalculateTargets extends Command
             // 1. Delete existing commissions for the period to avoid duplicates
             Commission::where('period_key', $period)->delete();
 
-            // 2. Fetch all approved investments for that period
+            // 2. Fetch all approved/expired investments for that period
             $investments = Investment::where('target_period_key', $period)
-                ->where('status', 'approved')
+                ->whereIn('status', ['approved', 'expired'])
                 ->with(['unitHead', 'investmentProduct'])
                 ->get();
 

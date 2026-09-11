@@ -44,7 +44,7 @@ class SendSameDayExpirySmsCommand extends Command
                 ->join('investment_products', 'investments.investment_product_id', '=', 'investment_products.id')
                 ->select('investments.*')
                 ->where('investments.status', 'approved')
-                ->whereRaw("DATE({$maturityDateSql}) = ?", [$targetMaturityDate])
+                ->whereRaw("DATE({$maturityDateSql}) <= ?", [$targetMaturityDate])
                 ->where(function ($q) {
                     $q->whereNull('same_day_expiry_sms_sent_at')
                       ->orWhere('same_day_expiry_sms_sent_at', '<', Carbon::now()->subDays(30));

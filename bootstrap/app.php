@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use App\Http\Middleware\VerifyExternalApiKey;
+use App\Http\Middleware\VerifyPortalApiKey;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role' => RoleMiddleware::class,
             'external.key' => VerifyExternalApiKey::class,
+            'portal.key' => VerifyPortalApiKey::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
