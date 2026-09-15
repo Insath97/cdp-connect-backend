@@ -15,4 +15,7 @@ require __DIR__ . '/v1.php';
 /* external routes */
 require __DIR__ . '/external.php';
 
+/* portal routes */
+require __DIR__ . '/portal.php';
+
 
