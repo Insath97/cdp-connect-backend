@@ -29,8 +29,8 @@ use App\Http\Controllers\V1\InvestmentPayoutController;
 use App\Http\Controllers\V1\WelcomeCallController;
 use App\Http\Controllers\V1\LegalController;
 use App\Http\Controllers\V1\BillingController;
+use App\Http\Controllers\V1\ExpiredBusinessController;
 // use App\Http\Controllers\V1\RenewalController;
-use App\Http\Controllers\V1\CustomerVerificationController;
 use Illuminate\Support\Facades\Route;
 
 /* public routes */
@@ -39,13 +39,6 @@ Route::prefix('v1')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
 });
 
-/* portal & verification routes (secured by X-Portal-Key header) */
-Route::prefix('v1/portal')->middleware(['portal.key', 'throttle:30,1'])->group(function () {
-    Route::post('verify-investment', [CustomerVerificationController::class, 'verify']);
-});
-Route::prefix('v1')->middleware(['portal.key', 'throttle:30,1'])->group(function () {
-    Route::post('verify-investment', [CustomerVerificationController::class, 'verify']);
-});
 
 /* protected routes */
 Route::middleware(['auth:api'])->prefix('v1')->group(function () {
@@ -149,6 +142,13 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::get('investment-payouts', [InvestmentPayoutController::class, 'index']);
     Route::post('investment-payouts/sync-legacy', [InvestmentPayoutController::class, 'generateLegacyPayouts']);
     Route::patch('investment-payouts/{id}/status', [InvestmentPayoutController::class, 'updateStatus']);
+
+    // Aliases for expired-investments
+    Route::get('expired-investments', [ExpiredBusinessController::class, 'index']);
+    Route::get('expired-investments/{id}', [ExpiredBusinessController::class, 'show']);
+    Route::post('expired-investments/{id}/payment', [ExpiredBusinessController::class, 'updatePayment']);
+    Route::patch('expired-investments/{id}/status', [ExpiredBusinessController::class, 'updatePayment']);
+    Route::post('expired-investments/sync', [ExpiredBusinessController::class, 'syncExpiredBusiness']);
 
     Route::get('target-progress', [TargetProgressController::class, 'index']);
     Route::get('target-progress/{period_key}', [TargetProgressController::class, 'show']);

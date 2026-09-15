@@ -179,6 +179,12 @@ class PermissionsSeeder extends Seeder
 
             /* Renewal Management */
             ['name' => 'Renewal Index', 'group_name' => 'Renewal Management Permissions'],
+
+            /* Expired Business Management */
+            ['name' => 'Expired Business Index', 'group_name' => 'Expired Business Management Permissions'],
+            ['name' => 'Expired Business Update', 'group_name' => 'Expired Business Management Permissions'],
+            ['name' => 'Expired Investment Index', 'group_name' => 'Expired Investment Management Permissions'],
+            ['name' => 'Expired Investment Update', 'group_name' => 'Expired Investment Management Permissions'],
         ];
 
         foreach ($permissions as $permission) {

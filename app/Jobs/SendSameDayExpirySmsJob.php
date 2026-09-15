@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Investment;
+use App\Models\ExpiredInvestment;
 use App\Services\SmsService;
 use App\Traits\ActivityLogTrait;
 use Illuminate\Bus\Queueable;
@@ -64,6 +65,16 @@ class SendSameDayExpirySmsJob implements ShouldQueue
                     'status' => 'expired'
                 ]);
 
+                ExpiredInvestment::firstOrCreate(
+                    ['investment_id' => $investment->id],
+                    [
+                        'customer_id' => $investment->customer_id,
+                        'branch_id' => $investment->branch_id,
+                        'investment_amount' => $investment->investment_amount,
+                        'status' => 'unpaid',
+                    ]
+                );
+
                 $this->logActivity('Warning', 'SameDayExpirySms', "SendSameDayExpirySmsJob: Customer for investment #{$investment->id} has no primary phone number. Status updated to expired without SMS.", [
                     'investment_id' => $investment->id,
                     'customer_id' => $customer->id ?? null,
@@ -94,6 +105,16 @@ class SendSameDayExpirySmsJob implements ShouldQueue
                     'same_day_expiry_sms_sent_at' => now(),
                     'status' => 'expired'
                 ]);
+
+                ExpiredInvestment::firstOrCreate(
+                    ['investment_id' => $investment->id],
+                    [
+                        'customer_id' => $investment->customer_id,
+                        'branch_id' => $investment->branch_id,
+                        'investment_amount' => $investment->investment_amount,
+                        'status' => 'unpaid',
+                    ]
+                );
 
                 $this->logActivity('Success', 'SameDayExpirySms', "Same-day maturity SMS sent successfully to {$recipientPhone} for Policy #{$investment->policy_number}. Status updated to expired.", [
                     'investment_id' => $investment->id,

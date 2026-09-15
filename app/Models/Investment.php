@@ -139,4 +139,14 @@ class Investment extends Model
     {
         return $this->belongsTo(User::class, 'welcome_call_by');
     }
+
+    public function expiredInvestment()
+    {
+        return $this->hasOne(ExpiredInvestment::class);
+    }
+
+    public function expiredSettlement()
+    {
+        return $this->hasOne(ExpiredInvestment::class);
+    }
 }

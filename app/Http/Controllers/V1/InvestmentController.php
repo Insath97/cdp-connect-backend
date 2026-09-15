@@ -959,6 +959,18 @@ class InvestmentController extends Controller implements HasMiddleware
             $investment->update($data);
             $investment->refresh();
 
+            if ($investment->status === 'expired') {
+                \App\Models\ExpiredInvestment::firstOrCreate(
+                    ['investment_id' => $investment->id],
+                    [
+                        'customer_id' => $investment->customer_id,
+                        'branch_id' => $investment->branch_id,
+                        'investment_amount' => $investment->investment_amount,
+                        'status' => 'unpaid',
+                    ]
+                );
+            }
+
             // 6. Handle Target Re-sync if status is 'approved' and amounts/unit head changed
             if ($status === 'approved') {
                 $newAmount = (float) $investment->investment_amount;
