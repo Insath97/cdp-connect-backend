@@ -38,7 +38,10 @@ class ReportController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:Report Index', only: ['index', 'show', 'listSnapshots', 'generateSnapshots', 'deleteSnapshot']),
+            new Middleware('permission:Report Index', only: ['index', 'show']),
+            new Middleware('permission:Report Snapshot Index', only: ['listSnapshots']),
+            new Middleware('permission:Report Snapshot Create', only: ['generateSnapshots']),
+            new Middleware('permission:Report Snapshot Delete', only: ['deleteSnapshot']),
             new Middleware('permission:Report Agent Performance', only: ['agentPerformance']),
             new Middleware('permission:Report Hierarchy Performance', only: ['hierarchyPerformance']),
             new Middleware('permission:Report Hierarchy Detailed', only: ['hierarchyDetailedReport']),
