@@ -88,4 +88,9 @@ class Customer extends Model
     {
         return $this->hasMany(ExpiredInvestment::class);
     }
+
+    public function investments()
+    {
+        return $this->hasMany(Investment::class);
+    }
 }

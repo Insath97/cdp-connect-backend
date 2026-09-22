@@ -9,6 +9,8 @@ use App\Models\User;
 use App\Models\Target;
 use App\Models\Investment;
 use App\Models\Commission;
+use App\Models\Customer;
+use App\Traits\InvestmentCalculationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
@@ -16,7 +18,7 @@ use Illuminate\Support\Facades\Log;
 
 class ExternalApiController extends Controller
 {
-    use ActivityLogTrait;
+    use ActivityLogTrait, InvestmentCalculationTrait;
 
     /**
      * Get employee metrics summary for a specific period/date range.
@@ -151,6 +153,212 @@ class ExternalApiController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to retrieve employees summary',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Verify customer by ID and retrieve basic details, investments, products,
+     * reservation dates, expiry dates, and total amount invested.
+     */
+    public function customerInvestments(Request $request): JsonResponse
+    {
+        try {
+            $idNumber = trim((string) ($request->get('id_number') ?? $request->input('id_number')));
+            $idType = $request->get('id_type') ?? $request->input('id_type');
+            $status = $request->get('status') ?? $request->input('status');
+
+            if (empty($idNumber)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'The id_number field is required.'
+                ], 422);
+            }
+
+            $cleanIdNumber = str_replace(' ', '', strtolower($idNumber));
+
+            // Query Customer matching id_number and optional id_type
+            $customerQuery = Customer::query();
+
+            if (!empty($idType)) {
+                $customerQuery->where('id_type', strtolower(trim($idType)));
+            }
+
+            $customer = $customerQuery->where(function ($q) use ($idNumber, $cleanIdNumber) {
+                $q->whereRaw('LOWER(TRIM(id_number)) = ?', [strtolower($idNumber)])
+                  ->orWhereRaw("REPLACE(LOWER(id_number), ' ', '') = ?", [$cleanIdNumber]);
+            })->first();
+
+            if (!$customer) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Customer not found matching the provided identification details.'
+                ], 404);
+            }
+
+            // Load investments with products, annual rates, branch, beneficiary
+            $investmentsQuery = Investment::with([
+                'investmentProduct.annualRates',
+                'branch:id,name,code',
+                'beneficiary:id,full_name,relationship',
+            ])->where('customer_id', $customer->id);
+
+            if (!empty($status) && $status !== 'all') {
+                $investmentsQuery->where('status', $status);
+            }
+
+            $investments = $investmentsQuery->orderBy('reservation_date', 'desc')->get();
+
+            // Transform investments and compute calculations
+            $transformedInvestments = [];
+            $totalInvestedAll = 0.0;
+            $totalInvestedApproved = 0.0;
+            $approvedCount = 0;
+            $expiredCount = 0;
+
+            foreach ($investments as $inv) {
+                $invAmount = (float) $inv->investment_amount;
+                $totalInvestedAll += $invAmount;
+
+                if (in_array($inv->status, ['approved', 'expired'])) {
+                    $totalInvestedApproved += $invAmount;
+                }
+                if ($inv->status === 'approved') {
+                    $approvedCount++;
+                } elseif ($inv->status === 'expired') {
+                    $expiredCount++;
+                }
+
+                $product = $inv->investmentProduct;
+                $durationMonths = $product ? (int) $product->duration_months : 0;
+
+                // Reservation Date
+                $reservationDate = $inv->reservation_date ? Carbon::parse($inv->reservation_date) : null;
+                $reservationDateFormatted = $reservationDate ? $reservationDate->format('Y-m-d') : null;
+
+                // Expiry / Maturity Date
+                $expiryDateFormatted = null;
+                $isExpired = ($inv->status === 'expired');
+
+                if ($reservationDate && $durationMonths > 0) {
+                    $calculatedExpiry = $reservationDate->copy()->addMonths($durationMonths);
+                    $expiryDateFormatted = $calculatedExpiry->format('Y-m-d');
+                    if (!$isExpired && Carbon::now()->startOfDay()->gt($calculatedExpiry)) {
+                        $isExpired = true;
+                    }
+                }
+
+                // ROI Calculations
+                $roiCalculations = [];
+                $monthlyReturn = 0.0;
+                $maturityAmount = $invAmount;
+                if ($product) {
+                    $roiCalculations = $this->calculateInvestmentROI($invAmount, $product);
+                    $monthlyReturn = (float) ($roiCalculations['monthly_return'] ?? 0);
+                    $maturityAmount = (float) ($roiCalculations['maturity_amount'] ?? $invAmount);
+                }
+
+                if ($monthlyReturn == 0 && (float) $inv->monthly_payment_amount > 0) {
+                    $monthlyReturn = (float) $inv->monthly_payment_amount;
+                }
+
+                $transformedInvestments[] = [
+                    'id' => $inv->id,
+                    'policy_number' => $inv->policy_number,
+                    'application_number' => $inv->application_number,
+                    'sales_code' => $inv->sales_code,
+                    'status' => $inv->status,
+                    'status_badge' => ucfirst($inv->status),
+                    'investment_amount' => $invAmount,
+                    'reservation_date' => $reservationDateFormatted,
+                    'expiry_date' => $expiryDateFormatted,
+                    'maturity_date' => $expiryDateFormatted,
+                    'is_expired' => $isExpired,
+                    'initial_payment' => (float) $inv->initial_payment,
+                    'payment_type' => $inv->payment_type,
+                    'product' => $product ? [
+                        'id' => $product->id,
+                        'name' => $product->name,
+                        'code' => $product->code,
+                        'duration_months' => $product->duration_months,
+                        'plan_type' => $product->plan_type,
+                        'roi_percentage' => (float) $product->roi_percentage,
+                        'is_variable_roi' => (bool) $product->is_variable_roi,
+                    ] : null,
+                    'branch' => $inv->branch ? [
+                        'id' => $inv->branch->id,
+                        'name' => $inv->branch->name,
+                        'code' => $inv->branch->code,
+                    ] : null,
+                    'beneficiary' => $inv->beneficiary ? [
+                        'id' => $inv->beneficiary->id,
+                        'full_name' => $inv->beneficiary->full_name,
+                        'relationship' => $inv->beneficiary->relationship,
+                    ] : null,
+                    'maturity_details' => [
+                        'monthly_return' => round($monthlyReturn, 2),
+                        'annual_return' => round((float)($roiCalculations['annual_return'] ?? 0), 2),
+                        'total_interest' => round((float)($roiCalculations['total_interest'] ?? 0), 2),
+                        'maturity_amount' => round($maturityAmount, 2),
+                    ],
+                    'created_at' => $inv->created_at?->toDateTimeString(),
+                    'approved_at' => $inv->approved_at ? Carbon::parse($inv->approved_at)->toDateTimeString() : null,
+                ];
+            }
+
+            $this->logActivity('External Customer Search', 'External API', "Retrieved details for Customer ID {$customer->id} ({$customer->id_number})", [
+                'customer_id' => $customer->id,
+                'id_type' => $customer->id_type,
+                'id_number' => $customer->id_number,
+                'investments_count' => count($transformedInvestments)
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Customer investment details retrieved successfully',
+                'data' => [
+                    'customer' => [
+                        'id' => $customer->id,
+                        'customer_code' => $customer->customer_code,
+                        'full_name' => $customer->full_name,
+                        'name_with_initials' => $customer->name_with_initials,
+                        'id_type' => $customer->id_type,
+                        'id_number' => $customer->id_number,
+                        'date_of_birth' => $customer->date_of_birth ? Carbon::parse($customer->date_of_birth)->format('Y-m-d') : null,
+                        'email' => $customer->email,
+                        'phone_primary' => $customer->phone_primary,
+                        'phone_secondary' => $customer->phone_secondary,
+                        'address' => trim(($customer->address_line_1 ?? '') . ' ' . ($customer->address_line_2 ?? '')),
+                        'city' => $customer->city,
+                        'state' => $customer->state,
+                        'country' => $customer->country,
+                        'postal_code' => $customer->postal_code,
+                        'preferred_language' => $customer->preferred_language,
+                        'is_active' => (bool) $customer->is_active,
+                        'created_at' => $customer->created_at?->toDateTimeString(),
+                    ],
+                    'summary' => [
+                        'total_invested_amount' => round($totalInvestedAll, 2),
+                        'active_invested_amount' => round($totalInvestedApproved, 2),
+                        'total_investments_count' => count($transformedInvestments),
+                        'approved_investments_count' => $approvedCount,
+                        'expired_investments_count' => $expiredCount,
+                    ],
+                    'investments' => $transformedInvestments
+                ]
+            ], 200);
+
+        } catch (\Throwable $th) {
+            $this->logActivity('Error', 'ExternalApi', 'External customer investments search failed', [
+                'error' => $th->getMessage(),
+                'trace' => $th->getTraceAsString(),
+                'request' => $request->all()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve customer investment details',
                 'error' => $th->getMessage()
             ], 500);
         }

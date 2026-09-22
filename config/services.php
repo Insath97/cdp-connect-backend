@@ -49,5 +49,9 @@ return [
         'key' => env('PORTAL_API_KEY', 'cdp_portal_secure_key_2024'),
     ],
 
+    'credix_api' => [
+        'key' => env('CREDIX_API_KEY'),
+    ],
+
 
 ];
