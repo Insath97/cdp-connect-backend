@@ -167,7 +167,11 @@ Route::middleware(['auth:api'])->prefix('v1')->group(function () {
     Route::get('reports/customer-investments-maturity', [ReportController::class, 'customerInvestmentsMaturityReport']);
     Route::get('reports/welcome-call', [ReportController::class, 'welcomeCallReport']);
     Route::get('reports/hierarchy/{id}', [ReportController::class, 'show']);
-    Route::get('reports/aa',[ReportController::class, 'buildPlanWiseHierarchyNode']);
+
+    // Report Snapshots Management (The "Common Button" endpoints)
+    Route::get('reports/snapshots', [ReportController::class, 'listSnapshots']);
+    Route::post('reports/snapshots/generate', [ReportController::class, 'generateSnapshots']);
+    Route::delete('reports/snapshots/{id}', [ReportController::class, 'deleteSnapshot']);
 
     Route::get('imports/tables/list', [ImportController::class, 'listTables']);
     Route::get('imports', [ImportController::class, 'index']);

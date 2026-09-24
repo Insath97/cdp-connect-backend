@@ -19,6 +19,8 @@ use Illuminate\Routing\Controllers\Middleware;
 
 use App\Traits\InvestmentCalculationTrait;
 use Illuminate\Http\JsonResponse;
+use App\Services\ReportSnapshotService;
+use App\Models\ReportSnapshot;
 
 class ReportController extends Controller implements HasMiddleware
 {
@@ -26,10 +28,20 @@ class ReportController extends Controller implements HasMiddleware
 
     use InvestmentCalculationTrait;
 
+    protected ReportSnapshotService $snapshotService;
+
+    public function __construct(ReportSnapshotService $snapshotService)
+    {
+        $this->snapshotService = $snapshotService;
+    }
+
     public static function middleware(): array
     {
         return [
             new Middleware('permission:Report Index', only: ['index', 'show']),
+            new Middleware('permission:Report Snapshot Index', only: ['listSnapshots']),
+            new Middleware('permission:Report Snapshot Create', only: ['generateSnapshots']),
+            new Middleware('permission:Report Snapshot Delete', only: ['deleteSnapshot']),
             new Middleware('permission:Report Agent Performance', only: ['agentPerformance']),
             new Middleware('permission:Report Hierarchy Performance', only: ['hierarchyPerformance']),
             new Middleware('permission:Report Hierarchy Detailed', only: ['hierarchyDetailedReport']),
@@ -50,9 +62,60 @@ class ReportController extends Controller implements HasMiddleware
         try {
             $user = Auth::guard('api')->user();
             $periodKey = $request->get('period_key', Carbon::now()->format('Y-m'));
-            $perPage = $request->get('per_page', 15);
+            $perPage = (int)$request->get('per_page', 15);
+            $page = (int)$request->get('page', 1);
+            $search = $request->get('search');
 
-            // 1. Determine accessible user IDs
+            // 1. Check if snapshot exists for this period
+            $snapshot = $this->snapshotService->getSnapshot('hierarchy', $periodKey, 'global');
+            if ($snapshot) {
+                $allUsers = $snapshot->snapshot_data ?? [];
+
+                $isAdmin = $user->hasRole('Super Admin') || ($user->user_type === 'admin');
+                $isBranchCoordinator = $user->hasRole('Branch Coordinator');
+
+                if ($isBranchCoordinator) {
+                    $assignedBranchIds = $user->assignedBranches()->pluck('branches.id')->toArray();
+                    $allUsers = array_filter($allUsers, fn($u) => in_array($u['branch_id'] ?? null, $assignedBranchIds));
+                } elseif (!$isAdmin) {
+                    $descendantIds = $this->getDescendantIdsFromSnapshot((int)$user->id, $allUsers);
+                    $accessibleIds = array_merge([(int)$user->id], $descendantIds);
+                    $allUsers = array_filter($allUsers, fn($u) => in_array((int)($u['id'] ?? 0), $accessibleIds));
+                }
+
+                if ($search) {
+                    $cleanSearch = str_replace(' ', '', strtolower($search));
+                    $allUsers = array_filter($allUsers, function ($u) use ($search, $cleanSearch) {
+                        $name = strtolower($u['name'] ?? '');
+                        $uname = strtolower($u['username'] ?? '');
+                        $idNum = strtolower($u['id_number'] ?? '');
+                        $cleanId = str_replace(' ', '', $idNum);
+                        return str_contains($name, strtolower($search))
+                            || str_contains($uname, strtolower($search))
+                            || str_contains($idNum, strtolower($search))
+                            || str_contains($cleanId, $cleanSearch);
+                    });
+                }
+
+                $paginated = $this->snapshotService->paginateArray(array_values($allUsers), $perPage, $page, [
+                    'path' => $request->url(),
+                    'query' => $request->query(),
+                ]);
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Hierarchy report retrieved successfully',
+                    'data' => $paginated,
+                    'meta' => [
+                        'period_key' => $periodKey,
+                        'is_snapshot' => true,
+                        'snapshot_id' => $snapshot->id,
+                        'snapshotted_at' => $snapshot->created_at?->toDateTimeString(),
+                    ]
+                ], 200);
+            }
+
+            // 2. Determine accessible user IDs (Live fallback)
             $isAdmin = $user->hasRole('Super Admin') || ($user->user_type === 'admin');
             $isBranchCoordinator = $user->hasRole('Branch Coordinator');
 
@@ -140,7 +203,40 @@ class ReportController extends Controller implements HasMiddleware
             $currentUser = Auth::guard('api')->user();
             $periodKey = $request->get('period_key', Carbon::now()->format('Y-m'));
 
-            // 1. Accessibility Check
+            // 1. Check if snapshot exists for this period
+            $snapshot = $this->snapshotService->getSnapshot('hierarchy', $periodKey, 'global');
+            if ($snapshot) {
+                $allUsers = $snapshot->snapshot_data ?? [];
+                $userReport = collect($allUsers)->firstWhere('id', (int)$id);
+
+                if ($userReport) {
+                    $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
+                    if (!$isAdmin) {
+                        $descendantIds = $this->getDescendantIdsFromSnapshot((int)$currentUser->id, $allUsers);
+                        $accessibleIds = array_merge([(int)$currentUser->id], $descendantIds);
+                        if (!in_array((int)$id, $accessibleIds)) {
+                            return response()->json([
+                                'status' => 'error',
+                                'message' => 'Unauthorized. This user is not in your hierarchy.'
+                            ], 403);
+                        }
+                    }
+
+                    return response()->json([
+                        'status' => 'success',
+                        'message' => 'User report retrieved successfully',
+                        'data' => $userReport,
+                        'meta' => [
+                            'period_key' => $periodKey,
+                            'is_snapshot' => true,
+                            'snapshot_id' => $snapshot->id,
+                            'snapshotted_at' => $snapshot->created_at?->toDateTimeString(),
+                        ]
+                    ], 200);
+                }
+            }
+
+            // 2. Accessibility Check (Live fallback)
             $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
             if (!$isAdmin) {
                 $descendantIds = $currentUser->getAllDescendantIds();
@@ -737,6 +833,24 @@ class ReportController extends Controller implements HasMiddleware
             $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
             $isBranchCoordinator = $currentUser->hasRole('Branch Coordinator');
 
+            // Snapshot Check (For default full tree when admin views closed/snapshotted period)
+            if (!$search && !$fromDate && !$toDate && $isAdmin) {
+                $snapshot = $this->snapshotService->getSnapshot('hierarchy_date_wise', $periodKey, 'global');
+                if ($snapshot) {
+                    return response()->json([
+                        'status' => 'success',
+                        'message' => 'Hierarchy date-wise report retrieved successfully',
+                        'data' => $snapshot->snapshot_data,
+                        'meta' => [
+                            'period_key' => $periodKey,
+                            'is_snapshot' => true,
+                            'snapshot_id' => $snapshot->id,
+                            'snapshotted_at' => $snapshot->created_at?->toDateTimeString(),
+                        ]
+                    ], 200);
+                }
+            }
+
             // 3. Determine Root Users for the Tree
             $rootUsers = [];
             if ($search) {
@@ -1055,6 +1169,24 @@ class ReportController extends Controller implements HasMiddleware
             $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
             $isBranchCoordinator = $currentUser->hasRole('Branch Coordinator');
 
+            // Snapshot Check (For default full tree when admin views closed/snapshotted period)
+            if (!$search && !$fromDate && !$toDate && $isAdmin) {
+                $snapshot = $this->snapshotService->getSnapshot('plan_wise_hierarchy', $periodKey, 'global');
+                if ($snapshot) {
+                    return response()->json([
+                        'status' => 'success',
+                        'message' => 'Plan-wise hierarchy report retrieved successfully',
+                        'data' => $snapshot->snapshot_data,
+                        'meta' => [
+                            'period_key' => $periodKey,
+                            'is_snapshot' => true,
+                            'snapshot_id' => $snapshot->id,
+                            'snapshotted_at' => $snapshot->created_at?->toDateTimeString(),
+                        ]
+                    ], 200);
+                }
+            }
+
             // 3. Determine Root Users for the Tree
             $rootUsers = [];
             if ($search) {
@@ -1349,6 +1481,24 @@ class ReportController extends Controller implements HasMiddleware
             // 2. Accessibility & Roles
             $isAdmin = $currentUser->hasRole('Super Admin') || ($currentUser->user_type === 'admin');
             $isBranchCoordinator = $currentUser->hasRole('Branch Coordinator');
+
+            // Snapshot Check (For default full tree when admin views closed/snapshotted period)
+            if (!$search && !$fromDate && !$toDate && $isAdmin) {
+                $snapshot = $this->snapshotService->getSnapshot('plan_wise_admin', $periodKey, 'global');
+                if ($snapshot) {
+                    return response()->json([
+                        'status' => 'success',
+                        'message' => 'Plan-wise admin report retrieved successfully',
+                        'data' => $snapshot->snapshot_data,
+                        'meta' => [
+                            'period_key' => $periodKey,
+                            'is_snapshot' => true,
+                            'snapshot_id' => $snapshot->id,
+                            'snapshotted_at' => $snapshot->created_at?->toDateTimeString(),
+                        ]
+                    ], 200);
+                }
+            }
 
             // 3. Determine Root Users for the Tree (Admin Users)
             $rootUsers = [];
@@ -2119,6 +2269,334 @@ class ReportController extends Controller implements HasMiddleware
             }
             $visited[] = $user->parent_user_id;
             $currentId = $user->parent_user_id;
+        }
+    }
+
+    /**
+     * Recursively find descendant IDs from snapshotted user rows.
+     */
+    private function getDescendantIdsFromSnapshot(int $parentId, array $users): array
+    {
+        $descendants = [];
+        foreach ($users as $u) {
+            if (isset($u['parent_user_id']) && (int)$u['parent_user_id'] === $parentId) {
+                $childId = (int)$u['id'];
+                $descendants[] = $childId;
+                $descendants = array_merge($descendants, $this->getDescendantIdsFromSnapshot($childId, $users));
+            }
+        }
+        return array_values(array_unique($descendants));
+    }
+
+    /**
+     * Generate snapshots for a given period (The "Common Button" handler).
+     */
+    public function generateSnapshots(Request $request): JsonResponse
+    {
+        try {
+            $user = Auth::guard('api')->user();
+            if (!$user->hasRole('Super Admin') && $user->user_type !== 'admin') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized. Only Administrators can generate report snapshots.'
+                ], 403);
+            }
+
+            $request->validate([
+                'period_key' => 'required|string|regex:/^\d{4}-\d{2}$/',
+                'report_type' => 'nullable|string|in:all,hierarchy,hierarchy_date_wise,plan_wise_hierarchy,plan_wise_admin',
+                'force' => 'nullable|boolean'
+            ]);
+
+            $periodKey = $request->period_key;
+            $reportType = $request->get('report_type', 'all');
+            $generatedReports = [];
+
+            // 1. Hierarchy Index Snapshot
+            if ($reportType === 'all' || $reportType === 'hierarchy') {
+                $commissionsSub = Commission::select('user_id', DB::raw('SUM(commission_amount) as total_commission'))
+                    ->where('period_key', '=', $periodKey)
+                    ->groupBy('user_id');
+
+                $users = User::with(['level:id,level_name', 'branch:id,name'])
+                    ->select(
+                        'users.id', 'users.name', 'users.username', 'users.employee_code',
+                        'users.level_id', 'users.branch_id', 'users.parent_user_id',
+                        'users.user_type', 'users.id_type', 'users.id_number', 'users.is_active'
+                    )
+                    ->where('users.user_type', '=', 'hierarchy')
+                    ->leftJoinSub(Target::where('period_key', '=', $periodKey), 't', 'users.id', '=', 't.user_id')
+                    ->leftJoinSub($commissionsSub, 'c', 'users.id', '=', 'c.user_id')
+                    ->addSelect([
+                        't.target_amount',
+                        't.achieved_amount',
+                        't.achievement_percentage',
+                        DB::raw('COALESCE(c.total_commission, 0) as total_commission')
+                    ])
+                    ->get()
+                    ->map(function ($u) {
+                        return [
+                            'id' => $u->id,
+                            'name' => $u->name,
+                            'username' => $u->username,
+                            'employee_code' => $u->employee_code,
+                            'level_id' => $u->level_id,
+                            'level_name' => $u->level->level_name ?? 'N/A',
+                            'level' => $u->level,
+                            'branch_id' => $u->branch_id,
+                            'branch_name' => $u->branch->name ?? 'N/A',
+                            'branch' => $u->branch,
+                            'parent_user_id' => $u->parent_user_id,
+                            'user_type' => $u->user_type,
+                            'id_type' => $u->id_type,
+                            'id_number' => $u->id_number,
+                            'is_active' => (bool)$u->is_active,
+                            'target_amount' => (float)($u->target_amount ?? 0),
+                            'achieved_amount' => (float)($u->achieved_amount ?? 0),
+                            'achievement_percentage' => (float)($u->achievement_percentage ?? 0),
+                            'total_commission' => (float)($u->total_commission ?? 0),
+                        ];
+                    })
+                    ->toArray();
+
+                $this->snapshotService->storeSnapshot('hierarchy', $periodKey, $users, $user->id, 'global');
+                $generatedReports[] = 'hierarchy';
+            }
+
+            // 2. Hierarchy Date-Wise Tree Snapshot
+            if ($reportType === 'all' || $reportType === 'hierarchy_date_wise') {
+                $from = Carbon::parse($periodKey . '-01')->startOfMonth();
+                $to = Carbon::parse($periodKey . '-01')->endOfMonth();
+
+                $rootUsers = User::with(['level', 'branch'])
+                    ->where('user_type', '=', 'hierarchy')
+                    ->whereNull('parent_user_id')
+                    ->get();
+
+                $tree = [];
+                foreach ($rootUsers as $root) {
+                    $tree[] = $this->buildDateWiseHierarchyNode($root, $from, $to, $periodKey);
+                }
+
+                $allHierarchyIds = User::where('user_type', '=', 'hierarchy')->pluck('id')->toArray();
+                $totalInvestments = Investment::whereIn('unit_head_id', $allHierarchyIds)
+                    ->whereBetween('reservation_date', [$from, $to])
+                    ->whereIn('status', ['approved', 'expired'])
+                    ->get();
+
+                $totalTargets = Target::whereIn('user_id', $allHierarchyIds)
+                    ->where('period_key', '=', $periodKey)
+                    ->sum('target_amount');
+
+                $payload = [
+                    'hierarchy_tree' => $tree,
+                    'overall_summary' => [
+                        'total_target_amount' => (float)$totalTargets,
+                        'total_business_amount' => (float)$totalInvestments->sum('investment_amount'),
+                        'total_business_count' => $totalInvestments->count(),
+                        'period' => [
+                            'from' => $from->toDateString(),
+                            'to' => $to->toDateString(),
+                            'period_key' => $periodKey
+                        ]
+                    ]
+                ];
+
+                $this->snapshotService->storeSnapshot('hierarchy_date_wise', $periodKey, $payload, $user->id, 'global');
+                $generatedReports[] = 'hierarchy_date_wise';
+            }
+
+            // 3. Plan-Wise Hierarchy Tree Snapshot
+            if ($reportType === 'all' || $reportType === 'plan_wise_hierarchy') {
+                $from = Carbon::parse($periodKey . '-01')->startOfMonth();
+                $to = Carbon::parse($periodKey . '-01')->endOfMonth();
+
+                $rootUsers = User::with(['level', 'branch'])
+                    ->where('user_type', '=', 'hierarchy')
+                    ->whereNull('parent_user_id')
+                    ->get();
+
+                $tree = [];
+                foreach ($rootUsers as $root) {
+                    $tree[] = $this->buildPlanWiseHierarchyNode($root, $from, $to, $periodKey);
+                }
+
+                $allHierarchyIds = User::where('user_type', '=', 'hierarchy')->pluck('id')->toArray();
+                $totalInvestments = Investment::whereIn('unit_head_id', $allHierarchyIds)
+                    ->whereBetween('reservation_date', [$from, $to])
+                    ->whereIn('status', ['approved', 'expired'])
+                    ->get();
+
+                $totalCancelled = Investment::whereIn('unit_head_id', $allHierarchyIds)
+                    ->whereBetween('reservation_date', [$from, $to])
+                    ->where('status', '=', 'cancelled')
+                    ->get();
+
+                $totalRecovery = Commission::whereIn('user_id', $allHierarchyIds)
+                    ->whereHas('investment', function ($q) use ($from, $to) {
+                        $q->whereBetween('reservation_date', [$from, $to])
+                            ->where('status', 'cancelled');
+                    })->sum('recover_amount');
+
+                $payload = [
+                    'hierarchy_tree' => $tree,
+                    'overall_summary' => [
+                        'total_business' => (float)$totalInvestments->sum('investment_amount'),
+                        'total_business_count' => $totalInvestments->count(),
+                        'total_cancelled_business' => (float)$totalCancelled->sum('investment_amount'),
+                        'total_cancelled_count' => $totalCancelled->count(),
+                        'total_recovery_amount' => (float)$totalRecovery,
+                        'period' => [
+                            'from' => $from->toDateString(),
+                            'to' => $to->toDateString()
+                        ]
+                    ]
+                ];
+
+                $this->snapshotService->storeSnapshot('plan_wise_hierarchy', $periodKey, $payload, $user->id, 'global');
+                $generatedReports[] = 'plan_wise_hierarchy';
+            }
+
+            // 4. Plan-Wise Admin Snapshot
+            if ($reportType === 'all' || $reportType === 'plan_wise_admin') {
+                $from = Carbon::parse($periodKey . '-01')->startOfMonth();
+                $to = Carbon::parse($periodKey . '-01')->endOfMonth();
+
+                $rootUsers = User::with(['branch'])
+                    ->where('user_type', '=', 'admin')
+                    ->where('is_head_office_user', '=', true)
+                    ->whereNull('parent_user_id')
+                    ->get();
+
+                $tree = [];
+                foreach ($rootUsers as $root) {
+                    $tree[] = $this->buildAdminBranchPlanNode($root, $from, $to, $periodKey);
+                }
+
+                $totalInvestments = Investment::whereBetween('reservation_date', [$from, $to])
+                    ->whereIn('status', ['approved', 'expired'])
+                    ->get();
+
+                $totalCancelled = Investment::whereBetween('reservation_date', [$from, $to])
+                    ->where('status', '=', 'cancelled')
+                    ->get();
+
+                $payload = [
+                    'admin_tree' => $tree,
+                    'overall_summary' => [
+                        'total_business' => (float)$totalInvestments->sum('investment_amount'),
+                        'total_business_count' => $totalInvestments->count(),
+                        'total_cancelled_business' => (float)$totalCancelled->sum('investment_amount'),
+                        'total_cancelled_count' => $totalCancelled->count(),
+                        'period' => [
+                            'from' => $from->toDateString(),
+                            'to' => $to->toDateString()
+                        ]
+                    ]
+                ];
+
+                $this->snapshotService->storeSnapshot('plan_wise_admin', $periodKey, $payload, $user->id, 'global');
+                $generatedReports[] = 'plan_wise_admin';
+            }
+
+            $this->logActivity('Info', 'Report', "Generated report snapshots for {$periodKey}", [
+                'period_key' => $periodKey,
+                'reports' => $generatedReports,
+                'generated_by' => $user->id
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "Report snapshots generated successfully for period {$periodKey}",
+                'data' => [
+                    'period_key' => $periodKey,
+                    'generated_reports' => $generatedReports,
+                    'generated_by' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                    ],
+                    'generated_at' => Carbon::now()->toDateTimeString()
+                ]
+            ], 200);
+
+        } catch (\Throwable $th) {
+            $this->logActivity('Error', 'Report', 'Failed to generate report snapshots', [
+                'error' => $th->getMessage(),
+                'trace' => $th->getTraceAsString(),
+                'user_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to generate report snapshots',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * List existing report snapshots.
+     */
+    public function listSnapshots(Request $request): JsonResponse
+    {
+        try {
+            $periodKey = $request->get('period_key');
+            $reportType = $request->get('report_type');
+            $perPage = (int) $request->get('per_page', 20);
+
+            $snapshots = $this->snapshotService->listSnapshots($periodKey, $reportType, $perPage);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Report snapshots retrieved successfully',
+                'data' => $snapshots
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve report snapshots',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete an existing snapshot.
+     */
+    public function deleteSnapshot(Request $request, $id): JsonResponse
+    {
+        try {
+            $user = Auth::guard('api')->user();
+            if (!$user->hasRole('Super Admin') && $user->user_type !== 'admin') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized. Only Administrators can delete report snapshots.'
+                ], 403);
+            }
+
+            $deleted = $this->snapshotService->deleteSnapshot((int)$id);
+            if (!$deleted) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Report snapshot not found'
+                ], 404);
+            }
+
+            $this->logActivity('Info', 'Report', "Deleted report snapshot ID {$id}", [
+                'snapshot_id' => $id,
+                'deleted_by' => $user->id
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Report snapshot deleted successfully'
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to delete report snapshot',
+                'error' => $th->getMessage()
+            ], 500);
         }
     }
 }

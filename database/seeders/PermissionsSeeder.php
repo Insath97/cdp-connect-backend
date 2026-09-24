@@ -160,6 +160,9 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Report Plan Wise Admin', 'group_name' => 'Report Management Permissions'],
             ['name' => 'Report Customer Investments Maturity', 'group_name' => 'Report Management Permissions'],
             ['name' => 'Report Welcome Call', 'group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Snapshot Index', 'group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Snapshot Create', 'group_name' => 'Report Management Permissions'],
+            ['name' => 'Report Snapshot Delete', 'group_name' => 'Report Management Permissions'],
 
             /* Dashboard Management */
             ['name' => 'Dashboard View', 'group_name' => 'Dashboard Management Permissions'],
