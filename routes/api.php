@@ -18,4 +18,7 @@ require __DIR__ . '/external.php';
 /* portal routes */
 require __DIR__ . '/portal.php';
 
+/* investor routes */
+require __DIR__ . '/investor.php';
+
 

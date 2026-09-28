@@ -93,4 +93,9 @@ class Customer extends Model
     {
         return $this->hasMany(Investment::class);
     }
+
+    public function otps()
+    {
+        return $this->hasMany(CustomerOtp::class);
+    }
 }

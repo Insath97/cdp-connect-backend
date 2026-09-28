@@ -12,6 +12,7 @@ use Spatie\Permission\Middleware\RoleMiddleware;
 use App\Http\Middleware\VerifyExternalApiKey;
 use App\Http\Middleware\VerifyPortalApiKey;
 use App\Http\Middleware\VerifyCredixApiKey;
+use App\Http\Middleware\CustomerMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -30,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'external.key' => VerifyExternalApiKey::class,
             'credix.key' => VerifyCredixApiKey::class,
             'portal.key' => VerifyPortalApiKey::class,
+            'customer' => CustomerMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
