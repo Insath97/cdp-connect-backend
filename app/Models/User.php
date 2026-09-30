@@ -141,6 +141,11 @@ class User extends Authenticatable implements JWTSubject, MustVerifyEmail
         return $this->belongsToMany(Branch::class, 'branch_user', 'user_id', 'branch_id')->withTimestamps();
     }
 
+    public function customer()
+    {
+        return $this->hasOne(Customer::class, 'customer_id');
+    }
+
     /* Helper Methods */
 
     /**

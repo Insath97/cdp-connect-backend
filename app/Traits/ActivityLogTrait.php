@@ -20,9 +20,11 @@ trait ActivityLogTrait
     public function logActivity(string $action, string $module, string $description, ?array $data = null)
     {
         try {
+            $userId = Auth::guard('api')->id() ?? ($data['user_id'] ?? null);
+
             // DB logging
             ActivityLog::create([
-                'user_id' => Auth::guard('api')->id(),
+                'user_id' => $userId,
                 'action' => $action,
                 'module' => $module,
                 'description' => $description,
@@ -32,7 +34,7 @@ trait ActivityLogTrait
             ]);
 
             // Laravel file logging
-            Log::info("[{$module}] {$action}: {$description} | User ID: " . (Auth::guard('api')->id() ?? 'Guest') . " | IP: " . request()->ip());
+            Log::info("[{$module}] {$action}: {$description} | User ID: " . ($userId ?? 'Guest') . " | IP: " . request()->ip());
 
         } catch (\Throwable $th) {
             // Silently fail DB logging but log the failure to Laravel logs
