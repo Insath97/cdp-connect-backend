@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\V1\Investor\HomeController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\V1\Investor\AuthController;
 
@@ -14,4 +15,7 @@ Route::prefix('v1/investor')->group(function () {
 Route::middleware(['auth:api', 'customer'])->prefix('v1/investor')->group(function () {
     Route::post('logout', [AuthController::class, 'logout']);
     Route::get('me', [AuthController::class, 'me']);
+    
+    // Home Dashboard Data
+    Route::get('home', [HomeController::class, 'index']);
 });
