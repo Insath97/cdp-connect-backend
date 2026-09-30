@@ -14,8 +14,5 @@ Schedule::command('targets:bulk-setup')->monthlyOn(1, '00:00');
 // Daily 08:00 AM 7-Day Renewal Pre-Reminder SMS Notification (Disabled as per requirement)
 // Schedule::command('app:send-renewal-expiry-sms')->dailyAt('08:00');
 
-// Daily 16:00 Same-Day Expiration & SMS Notification
-Schedule::command('app:send-same-day-expiry-sms')->dailyAt('16:00');
-
-
-
+// Daily 09:00 Same-Day Expiration & SMS Notification
+Schedule::command('app:send-same-day-expiry-sms')->dailyAt('09:00');
