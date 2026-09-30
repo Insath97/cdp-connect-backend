@@ -50,35 +50,49 @@ class SendSameDayExpirySmsJob implements ShouldQueue
         try {
             $investment = Investment::with(['customer', 'investmentProduct'])->find($this->investmentId);
 
-            if (!$investment || $investment->status !== 'approved') {
-                $this->logActivity('Warning', 'SameDayExpirySms', "SendSameDayExpirySmsJob: Investment #{$this->investmentId} not found or not approved.", [
+            if (!$investment || !in_array($investment->status, ['approved', 'expired'])) {
+                $this->logActivity('Warning', 'SameDayExpirySms', "SendSameDayExpirySmsJob: Investment #{$this->investmentId} not found or status not eligible ({$investment?->status}).", [
                     'investment_id' => $this->investmentId
                 ]);
                 return;
             }
 
+            // 1. GUARANTEED: Ensure investment status is updated to expired
+            if ($investment->status !== 'expired') {
+                $investment->update([
+                    'status' => 'expired'
+                ]);
+            }
+
+            // 2. GUARANTEED: Ensure ExpiredInvestment settlement record exists
+            ExpiredInvestment::firstOrCreate(
+                ['investment_id' => $investment->id],
+                [
+                    'customer_id' => $investment->customer_id,
+                    'branch_id' => $investment->branch_id,
+                    'investment_amount' => $investment->investment_amount,
+                    'status' => 'unpaid',
+                ]
+            );
+
+            // 3. SMS NOTIFICATION (Decoupled from status update)
             $customer = $investment->customer;
             $recipientPhone = $customer->phone_primary ?? null;
 
             if (!$recipientPhone) {
-                $investment->update([
-                    'status' => 'expired'
-                ]);
-
-                ExpiredInvestment::firstOrCreate(
-                    ['investment_id' => $investment->id],
-                    [
-                        'customer_id' => $investment->customer_id,
-                        'branch_id' => $investment->branch_id,
-                        'investment_amount' => $investment->investment_amount,
-                        'status' => 'unpaid',
-                    ]
-                );
-
                 $this->logActivity('Warning', 'SameDayExpirySms', "SendSameDayExpirySmsJob: Customer for investment #{$investment->id} has no primary phone number. Status updated to expired without SMS.", [
                     'investment_id' => $investment->id,
                     'customer_id' => $customer->id ?? null,
                     'new_status' => 'expired'
+                ]);
+                return;
+            }
+
+            // Prevent duplicate SMS on the same day if already sent
+            if ($investment->same_day_expiry_sms_sent_at && Carbon::parse($investment->same_day_expiry_sms_sent_at)->isToday()) {
+                $this->logActivity('Info', 'SameDayExpirySms', "SendSameDayExpirySmsJob: SMS already sent today for Investment #{$investment->id}.", [
+                    'investment_id' => $investment->id,
+                    'same_day_expiry_sms_sent_at' => $investment->same_day_expiry_sms_sent_at
                 ]);
                 return;
             }
@@ -103,18 +117,7 @@ class SendSameDayExpirySmsJob implements ShouldQueue
             if ($sent) {
                 $investment->update([
                     'same_day_expiry_sms_sent_at' => now(),
-                    'status' => 'expired'
                 ]);
-
-                ExpiredInvestment::firstOrCreate(
-                    ['investment_id' => $investment->id],
-                    [
-                        'customer_id' => $investment->customer_id,
-                        'branch_id' => $investment->branch_id,
-                        'investment_amount' => $investment->investment_amount,
-                        'status' => 'unpaid',
-                    ]
-                );
 
                 $this->logActivity('Success', 'SameDayExpirySms', "Same-day maturity SMS sent successfully to {$recipientPhone} for Policy #{$investment->policy_number}. Status updated to expired.", [
                     'investment_id' => $investment->id,
@@ -125,13 +128,11 @@ class SendSameDayExpirySmsJob implements ShouldQueue
                     'new_status' => 'expired'
                 ]);
             } else {
-                $this->logActivity('Error', 'SameDayExpirySms', "Failed to send same-day maturity SMS to {$recipientPhone} for Policy #{$investment->policy_number}", [
+                $this->logActivity('Error', 'SameDayExpirySms', "Dialog SMS Gateway returned failure response for {$recipientPhone} (Policy #{$investment->policy_number}). Investment status remains expired.", [
                     'investment_id' => $investment->id,
                     'policy_number' => $investment->policy_number,
                     'recipient_phone' => $recipientPhone
                 ]);
-
-                throw new \Exception("Dialog SMS Gateway returned failure response.");
             }
 
         } catch (\Throwable $th) {
@@ -139,8 +140,6 @@ class SendSameDayExpirySmsJob implements ShouldQueue
                 'investment_id' => $this->investmentId,
                 'error' => $th->getMessage()
             ]);
-
-            throw $th; // Re-throw to trigger job retries
         }
     }
 }
