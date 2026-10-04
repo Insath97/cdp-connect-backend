@@ -243,6 +243,181 @@ All protected endpoints require a valid JWT token via the `Authorization: Bearer
 - Permissions, Roles, Levels
 - Activity Logs, Bulk Import, SMS, Database Export/Import
 
+#### Investor (Mobile App)
+Base: `/api/v1/investor` — requires `Authorization: Bearer {token}` (JWT) and an active linked customer profile.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/investor/request-otp` | Request OTP to registered mobile |
+| `POST` | `/api/v1/investor/resend-otp` | Resend OTP |
+| `POST` | `/api/v1/investor/verify-otp` | Verify OTP |
+| `POST` | `/api/v1/investor/set-password` | Set account password |
+| `POST` | `/api/v1/investor/login` | Login (JWT) |
+| `POST` | `/api/v1/investor/logout` | Logout |
+| `GET` | `/api/v1/investor/me` | Current profile |
+| `GET` | `/api/v1/investor/home` | Home dashboard stats |
+| `GET` | `/api/v1/investor/payouts` | Monthly payouts (list + filters) |
+| `GET` | `/api/v1/investor/payouts/analysis` | Monthly payout analysis |
+
+##### GET `/api/v1/investor/payouts`
+
+Returns the logged-in customer's own monthly payouts across all their investments, ordered by `scheduled_date` ascending.
+
+Query parameters (all optional):
+
+| Param | Type | Values | Notes |
+|---|---|---|---|
+| `status` | string | `paid`, `unpaid`, `hold`, `cancelled`, `all` | Omit or `all` for no status filter |
+| `month` | int | `1`–`12` | Filters `scheduled_date` month |
+| `year` | int | `2000`–`2100` | Filters `scheduled_date` year |
+| `investment_id` | int | — | Narrow to one investment |
+| `per_page` | int | `1`–`100` | Default `15` |
+
+Request:
+
+```
+GET /api/v1/investor/payouts?status=unpaid&month=9&year=2026&per_page=15
+Authorization: Bearer {token}
+```
+
+Success `200`:
+
+```json
+{
+  "status": "success",
+  "message": "Payouts retrieved successfully",
+  "data": {
+    "current_page": 1,
+    "per_page": 15,
+    "total": 48,
+    "last_page": 4,
+    "from": 1,
+    "to": 15,
+    "data": [
+      {
+        "id": 101,
+        "investment_id": 7,
+        "scheduled_date": "2026-09-05",
+        "amount": "25000.00",
+        "status": "unpaid",
+        "paid_at": null,
+        "reference_number": null,
+        "remarks": null,
+        "created_at": "2026-08-01T10:15:00.000000Z",
+        "updated_at": "2026-08-01T10:15:00.000000Z",
+        "investment": {
+          "id": 7,
+          "policy_number": "POL-2026-0042",
+          "investment_amount": "1000000.00",
+          "status": "approved",
+          "investment_product": {
+            "id": 2,
+            "name": "12 Month Plan",
+            "code": "12M",
+            "duration_months": 12,
+            "roi_percentage": "36.00"
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+Validation error `422`:
+
+```json
+{
+  "message": "Validation failed",
+  "errors": {
+    "status": ["The selected status is invalid."]
+  }
+}
+```
+
+Unauthenticated `401`:
+
+```json
+{
+  "message": "Unauthenticated.",
+  "error": "Token not provided or invalid"
+}
+```
+
+##### GET `/api/v1/investor/payouts/analysis`
+
+Returns summary, month-wise and per-investment payout breakdown for the logged-in customer.
+
+Query parameters (all optional):
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| `year` | int | current year | `2000`–`2100` |
+| `investment_id` | int | — | Narrow to one investment |
+
+Request:
+
+```
+GET /api/v1/investor/payouts/analysis?year=2026
+Authorization: Bearer {token}
+```
+
+Success `200`:
+
+```json
+{
+  "status": "success",
+  "message": "Payout analysis fetched successfully",
+  "data": {
+    "year": 2026,
+    "summary": {
+      "total":     { "count": 48, "total_amount": 1200000.00 },
+      "paid":      { "count": 30, "total_amount": 750000.00 },
+      "unpaid":    { "count": 16, "total_amount": 400000.00 },
+      "hold":      { "count": 1,  "total_amount": 25000.00 },
+      "cancelled": { "count": 1,  "total_amount": 25000.00 }
+    },
+    "month_wise": {
+      "2026-01": {
+        "paid":      { "count": 2, "total_amount": 50000.00 },
+        "unpaid":    { "count": 0, "total_amount": 0 },
+        "hold":      { "count": 0, "total_amount": 0 },
+        "cancelled": { "count": 0, "total_amount": 0 }
+      },
+      "2026-09": {
+        "paid":      { "count": 1, "total_amount": 25000.00 },
+        "unpaid":    { "count": 1, "total_amount": 25000.00 },
+        "hold":      { "count": 0, "total_amount": 0 },
+        "cancelled": { "count": 0, "total_amount": 0 }
+      },
+      "2026-12": {
+        "paid":      { "count": 0, "total_amount": 0 },
+        "unpaid":    { "count": 0, "total_amount": 0 },
+        "hold":      { "count": 0, "total_amount": 0 },
+        "cancelled": { "count": 0, "total_amount": 0 }
+      }
+    },
+    "per_investment": [
+      {
+        "investment_id": 7,
+        "policy_number": "POL-2026-0042",
+        "product_name": "12 Month Plan",
+        "total":     { "count": 12, "total_amount": 300000.00 },
+        "paid":      { "count": 8,  "total_amount": 200000.00 },
+        "unpaid":    { "count": 4,  "total_amount": 100000.00 },
+        "hold":      { "count": 0,  "total_amount": 0 },
+        "cancelled": { "count": 0,  "total_amount": 0 }
+      }
+    ]
+  }
+}
+```
+
+Notes:
+- `month_wise` always contains all 12 keys (`YYYY-01` … `YYYY-12`) with zeroed buckets, so the mobile chart can render without null checks.
+- Payout `status` values in the DB: `unpaid`, `paid`, `hold`, `cancelled`.
+- Both endpoints write an activity log entry (`Investor Portal` module) on success and on error.
+
 ---
 
 ## Key Features
