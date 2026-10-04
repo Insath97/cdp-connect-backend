@@ -488,7 +488,7 @@ class InvestmentController extends Controller implements HasMiddleware
             $yymm = date('ym');
             $prefix = 'CDP-' . $branch->code . '-';
 
-            $lastPolicy = Investment::where('policy_number', 'like', $prefix . '%', 'and')
+            $lastPolicy = Investment::withTrashed()->where('policy_number', 'like', $prefix . '%', 'and')
                 ->orderBy('policy_number', 'desc')
                 ->first();
 
