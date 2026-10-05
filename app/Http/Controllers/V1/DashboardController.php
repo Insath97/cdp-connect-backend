@@ -77,7 +77,7 @@ class DashboardController extends Controller implements HasMiddleware
             if ($isBranchCoordinator) {
                 $targetQuery->whereHas('user', function ($uq) use ($assignedBranchIds) {
                     $uq->whereIn('branch_id', $assignedBranchIds)
-                        ->where('level_id', '=', 11, 'and'); // Target focus: Branch Managers
+                        ->where('level_id', '=', 21, 'and'); // Target focus: Branch Managers
                 });
             } elseif ($isAdminView) {
                 $targetQuery->whereHas('user', function ($uq) {
@@ -101,7 +101,7 @@ class DashboardController extends Controller implements HasMiddleware
                 $revQuery = Investment::query()
                     ->where('status', '=', 'approved', 'and')
                     ->where('target_period_key', '=', $periodKey, 'and');
-                
+
                 if ($isBranchCoordinator) {
                     $revQuery->whereIn('branch_id', $assignedBranchIds, 'and', false);
                 }
@@ -130,7 +130,7 @@ class DashboardController extends Controller implements HasMiddleware
                 if ($isBranchCoordinator) {
                     $monthTargetQuery->whereHas('user', function ($uq) use ($assignedBranchIds) {
                         $uq->whereIn('branch_id', $assignedBranchIds)
-                            ->where('level_id', '=', 11, 'and');
+                            ->where('level_id', '=', 21, 'and');
                     });
                 } elseif ($isAdminView) {
                     $monthTargetQuery->whereHas('user', function ($uq) {
