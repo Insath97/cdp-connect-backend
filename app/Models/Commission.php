@@ -40,8 +40,8 @@ class Commission extends Model
 
         $amount = (float) $investment->investment_amount;
 
-        // Eligible Level IDs: 14=SGL, 15=GL, 16=SC, 17=C
-        $eligibleLevels = [14, 15, 16, 17]; // Added new levels based on LevelSeeder
+        // Eligible Level IDs: 23=TL, 24=GL, 25=SC, 26=C
+        $eligibleLevels = [23, 24, 25, 26]; // Added new levels based on LevelSeeder
 
         // 2. Unit Head Commission
         if ($investment->unit_head_id) {
@@ -53,7 +53,7 @@ class Commission extends Model
                 if ($unitHead->user_type === 'admin') {
                     $isEligibleUnitHead = true;
                 } elseif ($investment->investment_type === 'direct') {
-                    $isEligibleUnitHead = $unitHead->level_id >= 2 && $unitHead->level_id <= 17;
+                    $isEligibleUnitHead = $unitHead->level_id >= 1 && $unitHead->level_id <= 26;
                 } else {
                     $isEligibleUnitHead = in_array($unitHead->level_id, $eligibleLevels);
                 }
@@ -84,7 +84,7 @@ class Commission extends Model
                         $isEligibleParent = false;
                         if ($investment->investment_type === 'direct') {
                             // Override commission is calculated ONLY when unit head level is 17 (Consultant)
-                            $isEligibleParent = ($unitHead->level_id == 17) && ($parent->level_id >= 2 && $parent->level_id <= 17);
+                            $isEligibleParent = ($unitHead->level_id == 26) && ($parent->level_id >= 1 && $parent->level_id <= 26);
                         } else {
                             $isEligibleParent = in_array($parent->level_id, $eligibleLevels);
                         }

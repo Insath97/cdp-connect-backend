@@ -655,7 +655,7 @@ class UserController extends Controller implements HasMiddleware
             $perPage = $request->input('per_page', 15);
             $currentUser = Auth::guard('api')->user();
             // Level IDs from LevelSeeder: 8=SGL, 9=GL, 10=SC, 11=C
-            $hierarchyLevels = [15, 16, 17];
+            $hierarchyLevels = [24, 25, 26];
 
             $query = User::where('is_active', true)
                 ->whereIn('level_id', $hierarchyLevels);
