@@ -1,0 +1,930 @@
+{
+  "info": {
+    "name": "CDP CORE Customer Mobile APP API",
+    "description": "Postman collection for Investor Customer Mobile App API including Auth, Home Dashboard, Investments Module, Payouts, and Quotations.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Request OTP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "description": "Request OTP using customer NIC or phone number.",
+        "url": {
+          "raw": "{{base_url}}/investor/request-otp",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "request-otp"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id_number\": \"972511056V\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Resend OTP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "description": "Resend OTP if expired or not received.",
+        "url": {
+          "raw": "{{base_url}}/investor/resend-otp",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "resend-otp"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id_number\": \"972511056V\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Verify OTP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "description": "Verify received 6-digit OTP code.",
+        "url": {
+          "raw": "{{base_url}}/investor/verify-otp",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "verify-otp"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"otp\": \"176506\",\n  \"id_number\": \"972511056V\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Set Password",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "description": "Set a new password after successful OTP verification.",
+        "url": {
+          "raw": "{{base_url}}/investor/set-password",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "set-password"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id_number\": \"972511056V\",\n  \"reset_token\": \"4a5147807047c8d1fef74da5d684e799335ca71ab0af1582504165256b2d5d7f\",\n  \"password\": \"SecurePassword123!\",\n  \"password_confirmation\": \"SecurePassword123!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "description": "Authenticate investor using username/ID/phone and password.",
+        "url": {
+          "raw": "{{base_url}}/investor/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "login"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"login\": \"972511056V\",\n  \"password\": \"SecurePassword123!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Investment Products (Plans Catalog)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "description": "Browse active investment plans, durations, and ROI rates.",
+        "url": {
+          "raw": "{{base_url}}/investor/investment-products",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "investment-products"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Branches (Select Box Catalog)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "description": "Fetch active branches (id, name, code, city, is_head_office) for mobile dropdown select box with Head Office prioritized.",
+        "url": {
+          "raw": "{{base_url}}/investor/branches?search=",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "branches"
+          ],
+          "query": [
+            {
+              "key": "search",
+              "value": "",
+              "description": "Search by branch name, code, or city",
+              "disabled": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Me",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "Get logged-in investor customer profile.",
+        "url": {
+          "raw": "{{base_url}}/investor/me",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "me"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "Revoke authentication token.",
+        "url": {
+          "raw": "{{base_url}}/investor/logout",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "logout"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Home Dashboard",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "Fetch investor mobile home dashboard metrics.",
+        "url": {
+          "raw": "{{base_url}}/investor/home?include_my_stats=true&include_global_total=true&include_status_stats=true&include_upcoming_payout=true",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "home"
+          ],
+          "query": [
+            {
+              "key": "include_my_stats",
+              "value": "true",
+              "description": "Returns invest count & total investment amount for this customer"
+            },
+            {
+              "key": "include_global_total",
+              "value": "true",
+              "description": "Returns total investment amount across the entire platform"
+            },
+            {
+              "key": "include_status_stats",
+              "value": "true",
+              "description": "Returns investment counts grouped by status (pending, active, expired, cancelled)"
+            },
+            {
+              "key": "include_upcoming_payout",
+              "value": "true",
+              "description": "Returns the most recent UNPAID payout for this customer"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Investments Summary",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "Get portfolio-level metrics: total invested, active count, projected returns, paid returns, and next upcoming payout.",
+        "url": {
+          "raw": "{{base_url}}/investor/investments/summary",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "investments",
+            "summary"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Investments List",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "List all investments belonging to the authenticated customer with filtering, search, and pagination.",
+        "url": {
+          "raw": "{{base_url}}/investor/investments?status=all&search=&branch=true&agent=true&per_page=15",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "investments"
+          ],
+          "query": [
+            {
+              "key": "status",
+              "value": "all",
+              "description": "approved | pending | active | expired | cancelled | all"
+            },
+            {
+              "key": "search",
+              "value": "",
+              "description": "Search by policy number, application number, sales code or plan name"
+            },
+            {
+              "key": "branch",
+              "value": "true",
+              "description": "Include branch details (name, code)"
+            },
+            {
+              "key": "agent",
+              "value": "true",
+              "description": "Include servicing agent details (name, employee code)"
+            },
+            {
+              "key": "from_date",
+              "value": "",
+              "description": "YYYY-MM-DD (filters reservation_date >= from_date)",
+              "disabled": true
+            },
+            {
+              "key": "to_date",
+              "value": "",
+              "description": "YYYY-MM-DD (filters reservation_date <= to_date)",
+              "disabled": true
+            },
+            {
+              "key": "per_page",
+              "value": "15",
+              "description": "1-100, default 15"
+            },
+            {
+              "key": "all",
+              "value": "false",
+              "description": "Set to true to return all records unpaginated",
+              "disabled": true
+            },
+            {
+              "key": "order_by",
+              "value": "reservation_date",
+              "description": "reservation_date | investment_amount | policy_number | id",
+              "disabled": true
+            },
+            {
+              "key": "order_direction",
+              "value": "desc",
+              "description": "desc | asc",
+              "disabled": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Investment Details",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "View single investment details including product terms, bank details, beneficiary, and optional payout schedule.",
+        "url": {
+          "raw": "{{base_url}}/investor/investments/:id?branch=true&agent=true&include_payouts=true",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "investments",
+            ":id"
+          ],
+          "query": [
+            {
+              "key": "branch",
+              "value": "true",
+              "description": "Include branch details"
+            },
+            {
+              "key": "agent",
+              "value": "true",
+              "description": "Include servicing agent details"
+            },
+            {
+              "key": "include_payouts",
+              "value": "true",
+              "description": "Include embedded payout schedule"
+            }
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "1",
+              "description": "Investment record ID"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Investment Specific Payouts",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "Get full monthly payout schedule and payment status specifically for a single investment policy.",
+        "url": {
+          "raw": "{{base_url}}/investor/investments/:id/payouts?status=all",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "investments",
+            ":id",
+            "payouts"
+          ],
+          "query": [
+            {
+              "key": "status",
+              "value": "all",
+              "description": "paid | unpaid | hold | cancelled | all"
+            }
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "1",
+              "description": "Investment record ID"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Payouts",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "List monthly payouts across all investments for the customer with filters.",
+        "url": {
+          "raw": "{{base_url}}/investor/payouts?status=unpaid&year=2026&per_page=15",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "payouts"
+          ],
+          "query": [
+            {
+              "key": "status",
+              "value": "unpaid",
+              "description": "paid | unpaid | hold | cancelled | all"
+            },
+            {
+              "key": "month",
+              "value": "",
+              "description": "1-12, filters scheduled_date month",
+              "disabled": true
+            },
+            {
+              "key": "year",
+              "value": "2026",
+              "description": "YYYY, filters scheduled_date year"
+            },
+            {
+              "key": "investment_id",
+              "value": "",
+              "description": "Narrow results to a single investment",
+              "disabled": true
+            },
+            {
+              "key": "per_page",
+              "value": "15",
+              "description": "1-100, default 15"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Payout Analysis",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "Monthly payout analytics, 12-month calendar breakdown, and summary cards.",
+        "url": {
+          "raw": "{{base_url}}/investor/payouts/analysis?year=2026",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "payouts",
+            "analysis"
+          ],
+          "query": [
+            {
+              "key": "year",
+              "value": "2026",
+              "description": "YYYY, defaults to current year"
+            },
+            {
+              "key": "investment_id",
+              "value": "",
+              "description": "Narrow analysis to a single investment",
+              "disabled": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Calculate Quotation (ROI Preview)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "Simulate and preview investment returns and yearly schedule breakdown in real time without saving to database.",
+        "url": {
+          "raw": "{{base_url}}/investor/quotations/calculate",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "quotations",
+            "calculate"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"investment_product_id\": 1,\n  \"investment_amount\": 500000.00\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Create Quotation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "Create a new quotation initiated by the investor (creator_type: investor). Automatically snapshots customer profile and calculates full returns.",
+        "url": {
+          "raw": "{{base_url}}/investor/quotations",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "quotations"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"investment_product_id\": 1,\n  \"investment_amount\": 500000.00,\n  \"branch_id\": 1,\n  \"notes\": \"Plan quotation created from mobile app\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Quotations List",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "List all quotations belonging to the authenticated investor with status, creator type, date filters, and pagination.",
+        "url": {
+          "raw": "{{base_url}}/investor/quotations?status=all&creator_type=investor&search=&per_page=15",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "quotations"
+          ],
+          "query": [
+            {
+              "key": "status",
+              "value": "all",
+              "description": "draft | sent | accepted | rejected | all"
+            },
+            {
+              "key": "creator_type",
+              "value": "investor",
+              "description": "investor | consultant"
+            },
+            {
+              "key": "search",
+              "value": "",
+              "description": "Search by quotation number or investment plan name"
+            },
+            {
+              "key": "from_date",
+              "value": "",
+              "description": "YYYY-MM-DD (filters created_at >= from_date)",
+              "disabled": true
+            },
+            {
+              "key": "to_date",
+              "value": "",
+              "description": "YYYY-MM-DD (filters created_at <= to_date)",
+              "disabled": true
+            },
+            {
+              "key": "per_page",
+              "value": "15",
+              "description": "1-100, default 15"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Quotation Details",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "View single quotation details with complete multi-year breakdown schedules.",
+        "url": {
+          "raw": "{{base_url}}/investor/quotations/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "quotations",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "1",
+              "description": "Quotation record ID"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Update Quotation",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "Update an existing draft quotation created by the investor. Automatically recalculates returns. Consultant-created quotations and non-draft quotations are protected.",
+        "url": {
+          "raw": "{{base_url}}/investor/quotations/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "quotations",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "1",
+              "description": "Quotation record ID"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"investment_product_id\": 1,\n  \"investment_amount\": 750000.00,\n  \"notes\": \"Updated investment amount from mobile app\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1",
+      "type": "default"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "default"
+    }
+  ]
+}
