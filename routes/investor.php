@@ -24,6 +24,7 @@ Route::prefix('v1/investor')->group(function () {
 Route::middleware(['auth:api', 'customer'])->prefix('v1/investor')->group(function () {
     Route::post('logout', [AuthController::class, 'logout']);
     Route::get('me', [AuthController::class, 'me']);
+    Route::match(['post', 'patch'], 'change-password', [AuthController::class, 'changePassword']);
 
     // Home Dashboard Data
     Route::get('home', [HomeController::class, 'index']);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\V1\Investor;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ChangePasswordRequest;
 use App\Http\Requests\InvestorLoginRequest;
 use App\Http\Requests\RequestOtpRequest;
 use App\Http\Requests\ResendOtpRequest;
@@ -970,4 +971,71 @@ class AuthController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Change authenticated investor's password.
+     *
+     * @param ChangePasswordRequest $request
+     * @return JsonResponse
+     */
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        try {
+            $user = auth('api')->user();
+
+            if (! $user) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+
+            $currentPassword = (string) $request->input('current_password');
+            $newPassword = (string) $request->input('new_password');
+
+            // Verify current password against stored hash
+            if (! Hash::check($currentPassword, $user->password)) {
+                $this->logActivity('Warning', 'Investor Portal', "Password change failed (incorrect current password): {$user->name} (ID: {$user->id_number})", [
+                    'user_id' => $user->id,
+                ]);
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'The provided current password does not match our records.',
+                    'errors' => [
+                        [
+                            'field' => 'current_password',
+                            'messages' => ['The current password is incorrect.']
+                        ]
+                    ]
+                ], 422);
+            }
+
+            // Update user password
+            $user->password = Hash::make($newPassword);
+            $user->save();
+
+            $this->logActivity('Password Changed', 'Investor Portal', "Password changed successfully for investor: {$user->name} (ID: {$user->id_number})", [
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Password changed successfully.',
+            ], 200);
+
+        } catch (\Throwable $th) {
+            $this->logActivity('Error', 'Investor Portal', 'Change password error: '.$th->getMessage(), [
+                'exception' => $th->getMessage(),
+                'user_id' => auth('api')->id(),
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'An error occurred while changing your password. Please try again later.',
+                'error' => config('app.debug') ? $th->getMessage() : null,
+            ], 500);
+        }
+    }
 }
+

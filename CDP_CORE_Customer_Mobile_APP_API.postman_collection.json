@@ -310,6 +310,49 @@
       }
     },
     {
+      "name": "Change Password",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "description": "Change password for logged-in investor. Requires current password, new password, and confirmation.",
+        "url": {
+          "raw": "{{base_url}}/investor/change-password",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "investor",
+            "change-password"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"current_password\": \"OldPassword123!\",\n  \"new_password\": \"NewPassword456!\",\n  \"new_password_confirmation\": \"NewPassword456!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
       "name": "Home Dashboard",
       "request": {
         "method": "GET",
