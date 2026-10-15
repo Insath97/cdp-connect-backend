@@ -100,8 +100,8 @@ class InvestmentController extends Controller
                 'all'             => 'nullable',
                 'branch'          => 'nullable',
                 'include_branch'  => 'nullable',
-                'agent'           => 'nullable',
-                'include_agent'   => 'nullable',
+                'creator'           => 'nullable',
+                'include_creator'   => 'nullable',
                 'order_by'        => 'nullable|string|in:reservation_date,investment_amount,policy_number,id',
                 'order_direction' => 'nullable|string|in:asc,desc',
             ]);
@@ -123,8 +123,8 @@ class InvestmentController extends Controller
                 $query->with('branch');
             }
 
-            // Eager load agent if requested
-            if ($request->boolean('agent') || $request->boolean('include_agent')) {
+            // Eager load creator if requested
+            if ($request->boolean('creator') || $request->boolean('include_creator')) {
                 $query->with('creator');
             }
 
