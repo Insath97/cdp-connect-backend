@@ -478,7 +478,7 @@
             {
               "key": "agent",
               "value": "true",
-              "description": "Include servicing agent details (name, employee code)"
+              "description": "Include sales agent (unit head) details (name, employee code)"
             },
             {
               "key": "from_date",
@@ -555,7 +555,7 @@
             {
               "key": "agent",
               "value": "true",
-              "description": "Include servicing agent details"
+              "description": "Include sales agent (unit head) details"
             },
             {
               "key": "include_payouts",

@@ -64,12 +64,12 @@ class InvestmentController extends Controller
             ] : null;
         }
 
-        // Conditional Agent
+        // Conditional Agent (sales agent = unit head)
         if ($request->boolean('agent') || $request->boolean('include_agent')) {
-            $data['agent'] = $inv->creator ? [
-                'id'            => $inv->creator->id,
-                'name'          => $inv->creator->name,
-                'employee_code' => $inv->creator->employee_code,
+            $data['agent'] = $inv->unitHead ? [
+                'id'            => $inv->unitHead->id,
+                'name'          => $inv->unitHead->name,
+                'employee_code' => $inv->unitHead->employee_code,
             ] : null;
         }
 
@@ -100,8 +100,8 @@ class InvestmentController extends Controller
                 'all'             => 'nullable',
                 'branch'          => 'nullable',
                 'include_branch'  => 'nullable',
-                'creator'           => 'nullable',
-                'include_creator'   => 'nullable',
+                'agent'           => 'nullable',
+                'include_agent'   => 'nullable',
                 'order_by'        => 'nullable|string|in:reservation_date,investment_amount,policy_number,id',
                 'order_direction' => 'nullable|string|in:asc,desc',
             ]);
@@ -123,9 +123,9 @@ class InvestmentController extends Controller
                 $query->with('branch');
             }
 
-            // Eager load creator if requested
-            if ($request->boolean('creator') || $request->boolean('include_creator')) {
-                $query->with('creator');
+            // Eager load unit head (sales agent) if requested
+            if ($request->boolean('agent') || $request->boolean('include_agent')) {
+                $query->with('unitHead');
             }
 
             // Filter by status if provided
@@ -225,7 +225,7 @@ class InvestmentController extends Controller
             }
 
             if ($request->boolean('agent') || $request->boolean('include_agent')) {
-                $query->with('creator');
+                $query->with('unitHead');
             }
 
             if ($request->boolean('include_payouts')) {

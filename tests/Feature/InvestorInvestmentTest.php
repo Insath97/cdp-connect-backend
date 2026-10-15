@@ -21,6 +21,7 @@ class InvestorInvestmentTest extends TestCase
 
     protected User $user;
     protected User $agent;
+    protected User $creator;
     protected Customer $customer;
     protected Branch $branch;
     protected InvestmentProduct $product;
@@ -43,12 +44,24 @@ class InvestorInvestmentTest extends TestCase
             'can_login' => true,
         ]);
 
-        // Agent user
+        // Agent user (unit head / sales agent)
         $this->agent = User::create([
             'name'          => 'Agent Kamal',
             'username'      => 'agent_kamal',
             'email'         => 'agent@test.com',
             'employee_code' => 'EMP-007',
+            'password'      => bcrypt('password123'),
+            'user_type'     => 'hierarchy',
+            'is_active'     => true,
+            'can_login'     => true,
+        ]);
+
+        // Creator user (data entry — must NOT be returned as the sales agent)
+        $this->creator = User::create([
+            'name'          => 'Data Entry Ops',
+            'username'      => 'data_entry',
+            'email'         => 'dataentry@test.com',
+            'employee_code' => 'EMP-999',
             'password'      => bcrypt('password123'),
             'user_type'     => 'hierarchy',
             'is_active'     => true,
@@ -129,7 +142,7 @@ class InvestorInvestmentTest extends TestCase
             'target_period_key'     => '2026-01',
             'customer_id'           => $this->customer->id,
             'branch_id'             => $this->branch->id,
-            'created_by'            => $this->agent->id,
+            'created_by'            => $this->creator->id,
             'unit_head_id'          => $this->agent->id,
             'investment_product_id' => $this->product->id,
             'investment_amount'     => 100000.00,
@@ -200,6 +213,7 @@ class InvestorInvestmentTest extends TestCase
         $this->assertArrayHasKey('agent', $item);
         $this->assertEquals('Agent Kamal', $item['agent']['name']);
         $this->assertEquals('EMP-007', $item['agent']['employee_code']);
+        $this->assertNotEquals('Data Entry Ops', $item['agent']['name']);
     }
 
     public function test_customer_can_view_single_investment_by_id()
@@ -230,6 +244,10 @@ class InvestorInvestmentTest extends TestCase
                     ],
                 ]
             ]);
+
+        // Agent must be the unit head, not the creator
+        $this->assertEquals($this->agent->id, $response->json('data.agent.id'));
+        $this->assertNotEquals($this->creator->id, $response->json('data.agent.id'));
     }
 
     public function test_customer_cannot_view_another_customers_investment()
@@ -254,7 +272,7 @@ class InvestorInvestmentTest extends TestCase
             'target_period_key'     => '2026-02',
             'customer_id'           => $otherCustomer->id,
             'branch_id'             => $this->branch->id,
-            'created_by'            => $this->agent->id,
+            'created_by'            => $this->creator->id,
             'unit_head_id'          => $this->agent->id,
             'investment_product_id' => $this->product->id,
             'investment_amount'     => 200000.00,
