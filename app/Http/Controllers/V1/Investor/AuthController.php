@@ -3,11 +3,12 @@
 namespace App\Http\Controllers\V1\Investor;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ChangePasswordRequest;
+use App\Http\Requests\InvestorLoginRequest;
 use App\Http\Requests\RequestOtpRequest;
 use App\Http\Requests\ResendOtpRequest;
-use App\Http\Requests\VerifyOtpRequest;
 use App\Http\Requests\SetPasswordRequest;
-use App\Http\Requests\InvestorLoginRequest;
+use App\Http\Requests\VerifyOtpRequest;
 use App\Models\Customer;
 use App\Models\CustomerOtp;
 use App\Models\User;
@@ -35,9 +36,6 @@ class AuthController extends Controller
 
     /**
      * Request an OTP for customer login/verification.
-     *
-     * @param RequestOtpRequest $request
-     * @return JsonResponse
      */
     public function requestOtp(RequestOtpRequest $request): JsonResponse
     {
@@ -48,18 +46,18 @@ class AuthController extends Controller
             // 1. Find customer by id_number and optional id_type (case-insensitive)
             $customerQuery = Customer::query();
 
-            if (!empty($idType)) {
+            if (! empty($idType)) {
                 $customerQuery->where('id_type', strtolower(trim((string) $idType)));
             }
 
             $customer = $customerQuery->where(function ($q) use ($idNumber) {
                 $cleanNumber = preg_replace('/[^0-9a-zA-Z]/', '', $idNumber);
                 $q->whereRaw('LOWER(TRIM(id_number)) = ?', [strtolower($idNumber)])
-                  ->orWhere('phone_primary', $idNumber)
-                  ->orWhere('phone_primary', 'like', '%' . $cleanNumber);
+                    ->orWhere('phone_primary', $idNumber)
+                    ->orWhere('phone_primary', 'like', '%'.$cleanNumber);
             })->first();
 
-            if (!$customer) {
+            if (! $customer) {
                 Log::warning("OTP Request Failed: No customer found for ID/phone: {$idNumber}");
                 $this->logActivity('OTP Request Failed', 'Investor Portal', "No customer found for ID: {$idNumber}", [
                     'id_number' => $idNumber,
@@ -73,7 +71,7 @@ class AuthController extends Controller
             }
 
             // 2. Check if customer is active
-            if (!$customer->is_active) {
+            if (! $customer->is_active) {
                 Log::warning("OTP Request Denied: Inactive customer tried to request OTP for ID: {$idNumber}, customer_id: {$customer->id}");
                 $this->logActivity('OTP Request Denied', 'Investor Portal', "Inactive customer tried to request OTP for ID: {$idNumber}", [
                     'customer_id' => $customer->id,
@@ -170,18 +168,18 @@ class AuthController extends Controller
             try {
                 $smsSent = $this->smsService->sendSms($phone, $smsMessage);
             } catch (\Throwable $e) {
-                Log::error("Failed to send OTP SMS to {$phone}: " . $e->getMessage(), [
+                Log::error("Failed to send OTP SMS to {$phone}: ".$e->getMessage(), [
                     'customer_id' => $customer->id,
                     'exception' => $e,
                 ]);
-                $this->logActivity('Error', 'Investor Portal', "Failed to send OTP SMS to {$phone}: " . $e->getMessage(), [
+                $this->logActivity('Error', 'Investor Portal', "Failed to send OTP SMS to {$phone}: ".$e->getMessage(), [
                     'customer_id' => $customer->id,
                     'phone' => $phone,
                 ]);
             }
 
             // 10. Log activity & info
-            Log::info("OTP requested successfully for customer {$customer->id_number} (Customer ID: {$customer->id}, SMS: " . ($smsSent ? 'sent' : 'failed') . ")");
+            Log::info("OTP requested successfully for customer {$customer->id_number} (Customer ID: {$customer->id}, SMS: ".($smsSent ? 'sent' : 'failed').')');
             $this->logActivity('OTP Requested', 'Investor Portal', "OTP requested for customer: {$customer->full_name} (ID: {$customer->id_number})", [
                 'customer_id' => $customer->id,
                 'id_number' => $customer->id_number,
@@ -203,12 +201,12 @@ class AuthController extends Controller
             ], 200);
 
         } catch (\Throwable $th) {
-            Log::error('OTP request error: ' . $th->getMessage(), [
+            Log::error('OTP request error: '.$th->getMessage(), [
                 'exception' => $th,
                 'request' => $request->only('id_number'),
             ]);
 
-            $this->logActivity('Error', 'Investor Portal', 'OTP request error: ' . $th->getMessage(), [
+            $this->logActivity('Error', 'Investor Portal', 'OTP request error: '.$th->getMessage(), [
                 'exception' => $th->getMessage(),
                 'id_number' => $request->input('id_number'),
             ]);
@@ -223,9 +221,6 @@ class AuthController extends Controller
 
     /**
      * Resend an OTP to the customer.
-     *
-     * @param ResendOtpRequest $request
-     * @return JsonResponse
      */
     public function resendOtp(ResendOtpRequest $request): JsonResponse
     {
@@ -236,18 +231,18 @@ class AuthController extends Controller
             // 1. Find customer by id_number and optional id_type
             $customerQuery = Customer::query();
 
-            if (!empty($idType)) {
+            if (! empty($idType)) {
                 $customerQuery->where('id_type', strtolower(trim((string) $idType)));
             }
 
             $customer = $customerQuery->where(function ($q) use ($idNumber) {
                 $cleanNumber = preg_replace('/[^0-9a-zA-Z]/', '', $idNumber);
                 $q->whereRaw('LOWER(TRIM(id_number)) = ?', [strtolower($idNumber)])
-                  ->orWhere('phone_primary', $idNumber)
-                  ->orWhere('phone_primary', 'like', '%' . $cleanNumber);
+                    ->orWhere('phone_primary', $idNumber)
+                    ->orWhere('phone_primary', 'like', '%'.$cleanNumber);
             })->first();
 
-            if (!$customer) {
+            if (! $customer) {
                 Log::warning("OTP Resend Failed: No customer found for ID/phone: {$idNumber}");
                 $this->logActivity('OTP Resend Failed', 'Investor Portal', "No customer found for ID: {$idNumber}", [
                     'id_number' => $idNumber,
@@ -261,7 +256,7 @@ class AuthController extends Controller
             }
 
             // 2. Check customer active status
-            if (!$customer->is_active) {
+            if (! $customer->is_active) {
                 Log::warning("OTP Resend Denied: Inactive customer tried to resend OTP for ID: {$idNumber}, customer_id: {$customer->id}");
                 $this->logActivity('OTP Resend Denied', 'Investor Portal', "Inactive customer tried to resend OTP for ID: {$idNumber}", [
                     'customer_id' => $customer->id,
@@ -357,18 +352,18 @@ class AuthController extends Controller
             try {
                 $smsSent = $this->smsService->sendSms($phone, $smsMessage);
             } catch (\Throwable $e) {
-                Log::error("Failed to resend OTP SMS to {$phone}: " . $e->getMessage(), [
+                Log::error("Failed to resend OTP SMS to {$phone}: ".$e->getMessage(), [
                     'customer_id' => $customer->id,
                     'exception' => $e,
                 ]);
-                $this->logActivity('Error', 'Investor Portal', "Failed to resend OTP SMS to {$phone}: " . $e->getMessage(), [
+                $this->logActivity('Error', 'Investor Portal', "Failed to resend OTP SMS to {$phone}: ".$e->getMessage(), [
                     'customer_id' => $customer->id,
                     'phone' => $phone,
                 ]);
             }
 
             // 11. Log activity & info
-            Log::info("OTP resent successfully for customer {$customer->id_number} (Customer ID: {$customer->id}, SMS: " . ($smsSent ? 'sent' : 'failed') . ")");
+            Log::info("OTP resent successfully for customer {$customer->id_number} (Customer ID: {$customer->id}, SMS: ".($smsSent ? 'sent' : 'failed').')');
             $this->logActivity('OTP Resent', 'Investor Portal', "OTP resent for customer: {$customer->full_name} (ID: {$customer->id_number})", [
                 'customer_id' => $customer->id,
                 'id_number' => $customer->id_number,
@@ -390,12 +385,12 @@ class AuthController extends Controller
             ], 200);
 
         } catch (\Throwable $th) {
-            Log::error('OTP resend error: ' . $th->getMessage(), [
+            Log::error('OTP resend error: '.$th->getMessage(), [
                 'exception' => $th,
                 'request' => $request->only('id_number'),
             ]);
 
-            $this->logActivity('Error', 'Investor Portal', 'OTP resend error: ' . $th->getMessage(), [
+            $this->logActivity('Error', 'Investor Portal', 'OTP resend error: '.$th->getMessage(), [
                 'exception' => $th->getMessage(),
                 'id_number' => $request->input('id_number'),
             ]);
@@ -410,9 +405,6 @@ class AuthController extends Controller
 
     /**
      * Verify OTP code and return customer identity with reset token.
-     *
-     * @param VerifyOtpRequest $request
-     * @return JsonResponse
      */
     public function verifyOtp(VerifyOtpRequest $request): JsonResponse
     {
@@ -425,15 +417,15 @@ class AuthController extends Controller
                 ->active()
                 ->where('otp', $otp);
 
-            if (!empty($idNumber)) {
+            if (! empty($idNumber)) {
                 $otpQuery->where('id_number', $idNumber);
             }
 
             $otpRecord = $otpQuery->latest('created_at')->first();
 
-            if (!$otpRecord) {
+            if (! $otpRecord) {
                 // If id_number was provided, track failed attempt on any pending OTP
-                if (!empty($idNumber)) {
+                if (! empty($idNumber)) {
                     $pendingOtp = CustomerOtp::where('id_number', $idNumber)->active()->latest('created_at')->first();
                     if ($pendingOtp) {
                         $pendingOtp->incrementAttempts();
@@ -472,7 +464,7 @@ class AuthController extends Controller
                 }
 
                 Log::warning("Invalid or expired OTP verification attempt (id_number: '{$idNumber}')");
-                $this->logActivity('Warning', 'Investor Portal', "Invalid or expired OTP verification attempt", [
+                $this->logActivity('Warning', 'Investor Portal', 'Invalid or expired OTP verification attempt', [
                     'id_number' => $idNumber ?: null,
                 ]);
 
@@ -502,11 +494,11 @@ class AuthController extends Controller
 
             // Retrieve customer from database
             $customer = $otpRecord->customer;
-            if (!$customer) {
+            if (! $customer) {
                 $customer = Customer::whereRaw('LOWER(TRIM(id_number)) = ?', [strtolower($otpRecord->id_number)])->first();
             }
 
-            if (!$customer) {
+            if (! $customer) {
                 Log::error("Associated customer record not found for verified OTP ID {$otpRecord->id} (id_number: {$otpRecord->id_number})");
                 $this->logActivity('Error', 'Investor Portal', "Associated customer record not found for verified OTP (ID: {$otpRecord->id_number})", [
                     'otp_id' => $otpRecord->id,
@@ -542,12 +534,12 @@ class AuthController extends Controller
             ], 200);
 
         } catch (\Throwable $th) {
-            Log::error('OTP verification error: ' . $th->getMessage(), [
+            Log::error('OTP verification error: '.$th->getMessage(), [
                 'exception' => $th,
                 'request' => $request->only(['otp', 'id_number']),
             ]);
 
-            $this->logActivity('Error', 'Investor Portal', 'OTP verification error: ' . $th->getMessage(), [
+            $this->logActivity('Error', 'Investor Portal', 'OTP verification error: '.$th->getMessage(), [
                 'exception' => $th->getMessage(),
                 'id_number' => $request->input('id_number'),
             ]);
@@ -562,9 +554,6 @@ class AuthController extends Controller
 
     /**
      * Set password for verified investor.
-     *
-     * @param SetPasswordRequest $request
-     * @return JsonResponse
      */
     public function setPassword(SetPasswordRequest $request): JsonResponse
     {
@@ -574,7 +563,7 @@ class AuthController extends Controller
 
             // 1. Verify reset_token against Cache
             $cachedToken = Cache::get("investor_reset_token_{$idNumber}");
-            if (!$cachedToken || !hash_equals($cachedToken, $resetToken)) {
+            if (! $cachedToken || ! hash_equals($cachedToken, $resetToken)) {
                 Log::warning("Set password failed: Invalid or expired reset token for ID: {$idNumber}");
                 $this->logActivity('Warning', 'Investor Portal', "Set password attempted with invalid or expired reset token for ID: {$idNumber}", [
                     'id_number' => $idNumber,
@@ -588,7 +577,7 @@ class AuthController extends Controller
 
             // 2. Find customer by id_number
             $customer = Customer::whereRaw('LOWER(TRIM(id_number)) = ?', [strtolower($idNumber)])->first();
-            if (!$customer) {
+            if (! $customer) {
                 Log::warning("Set password failed: Customer not found for ID: {$idNumber}");
                 $this->logActivity('Warning', 'Investor Portal', "Set password failed: Customer not found for ID: {$idNumber}", [
                     'id_number' => $idNumber,
@@ -606,10 +595,10 @@ class AuthController extends Controller
                 $user = User::find($customer->customer_id);
             }
 
-            if (!$user) {
+            if (! $user) {
                 $user = User::where('id_number', $customer->id_number)
                     ->orWhere(function ($q) use ($customer) {
-                        if (!empty($customer->email)) {
+                        if (! empty($customer->email)) {
                             $q->where('email', $customer->email);
                         }
                     })->first();
@@ -621,11 +610,11 @@ class AuthController extends Controller
                 $user->can_login = true;
                 $user->save();
             } else {
-                $email = !empty($customer->email) ? $customer->email : ($customer->customer_code . '@customer.cdpempire.com');
-                $username = !empty($customer->customer_code) ? $customer->customer_code : ('cust_' . $customer->id);
+                $email = ! empty($customer->email) ? $customer->email : ($customer->customer_code.'@customer.cdpempire.com');
+                $username = ! empty($customer->customer_code) ? $customer->customer_code : ('cust_'.$customer->id);
 
                 if (User::where('username', $username)->exists()) {
-                    $username = $username . '_' . rand(100, 999);
+                    $username = $username.'_'.rand(100, 999);
                 }
 
                 $user = User::create([
@@ -663,12 +652,12 @@ class AuthController extends Controller
             ], 200);
 
         } catch (\Throwable $th) {
-            Log::error('Set password error: ' . $th->getMessage(), [
+            Log::error('Set password error: '.$th->getMessage(), [
                 'exception' => $th,
                 'request' => $request->only(['id_number']),
             ]);
 
-            $this->logActivity('Error', 'Investor Portal', 'Set password error: ' . $th->getMessage(), [
+            $this->logActivity('Error', 'Investor Portal', 'Set password error: '.$th->getMessage(), [
                 'exception' => $th->getMessage(),
                 'id_number' => $request->input('id_number'),
             ]);
@@ -684,9 +673,6 @@ class AuthController extends Controller
     /**
      * Mask phone number for secure display.
      * E.g. "0771234567" becomes "077****567".
-     *
-     * @param string $phone
-     * @return string
      */
     protected function maskPhoneNumber(string $phone): string
     {
@@ -701,14 +687,11 @@ class AuthController extends Controller
         $visibleEnd = 3;
         $maskedLength = max(3, $len - $visibleStart - $visibleEnd);
 
-        return substr($phone, 0, $visibleStart) . str_repeat('*', $maskedLength) . substr($phone, -$visibleEnd);
+        return substr($phone, 0, $visibleStart).str_repeat('*', $maskedLength).substr($phone, -$visibleEnd);
     }
 
     /**
      * Investor Login.
-     *
-     * @param InvestorLoginRequest $request
-     * @return JsonResponse
      */
     public function login(InvestorLoginRequest $request): JsonResponse
     {
@@ -724,9 +707,9 @@ class AuthController extends Controller
             $cleanNumber = preg_replace('/[^0-9a-zA-Z]/', '', $loginValue);
             $customer = Customer::where(function ($q) use ($loginValue, $cleanNumber) {
                 $q->whereRaw('LOWER(TRIM(id_number)) = ?', [strtolower($loginValue)])
-                  ->orWhereRaw('LOWER(TRIM(email)) = ?', [strtolower($loginValue)])
-                  ->orWhere('phone_primary', $loginValue)
-                  ->orWhere('phone_primary', 'like', '%' . $cleanNumber);
+                    ->orWhereRaw('LOWER(TRIM(email)) = ?', [strtolower($loginValue)])
+                    ->orWhere('phone_primary', $loginValue)
+                    ->orWhere('phone_primary', 'like', '%'.$cleanNumber);
             })->first();
 
             // 2. Resolve User record
@@ -735,15 +718,15 @@ class AuthController extends Controller
                 $user = User::find($customer->customer_id);
             }
 
-            if (!$user) {
+            if (! $user) {
                 $user = User::where(function ($query) use ($loginValue, $customer) {
                     $query->whereRaw('LOWER(TRIM(id_number)) = ?', [strtolower($loginValue)])
-                          ->orWhereRaw('LOWER(TRIM(email)) = ?', [strtolower($loginValue)])
-                          ->orWhere('username', $loginValue);
+                        ->orWhereRaw('LOWER(TRIM(email)) = ?', [strtolower($loginValue)])
+                        ->orWhere('username', $loginValue);
 
                     if ($customer) {
                         $query->orWhereRaw('LOWER(TRIM(id_number)) = ?', [strtolower($customer->id_number)]);
-                        if (!empty($customer->email)) {
+                        if (! empty($customer->email)) {
                             $query->orWhereRaw('LOWER(TRIM(email)) = ?', [strtolower($customer->email)]);
                         }
                     }
@@ -751,11 +734,11 @@ class AuthController extends Controller
             }
 
             // 3. If User was found first, resolve linked Customer if not yet found
-            if (!$customer && $user) {
+            if (! $customer && $user) {
                 $customer = Customer::where('customer_id', $user->id)
                     ->orWhereRaw('LOWER(TRIM(id_number)) = ?', [strtolower($user->id_number)])
                     ->orWhere(function ($q) use ($user) {
-                        if (!empty($user->email)) {
+                        if (! empty($user->email)) {
                             $q->whereRaw('LOWER(TRIM(email)) = ?', [strtolower($user->email)]);
                         }
                     })
@@ -763,14 +746,14 @@ class AuthController extends Controller
             }
 
             // If customer exists and user exists, ensure customer_id is linked
-            if ($customer && $user && !$customer->customer_id) {
+            if ($customer && $user && ! $customer->customer_id) {
                 $customer->update(['customer_id' => $user->id]);
             }
 
             // 4. Validate user exists and is an investor (has linked customer profile or user_type is customer)
             $isInvestor = $user && ($user->user_type === 'customer' || $customer !== null);
 
-            if (!$isInvestor) {
+            if (! $isInvestor) {
                 Log::warning("Investor Login Failed: Invalid credentials or not an investor account for login: {$loginValue}");
                 $this->logActivity('Login Failed', 'Investor Portal', "Invalid login credentials for: {$loginValue}", [
                     'login' => $loginValue,
@@ -788,7 +771,7 @@ class AuthController extends Controller
                 'password' => $request->input('password'),
             ];
 
-            if (!$token = Auth::guard('api')->attempt($credentials)) {
+            if (! $token = Auth::guard('api')->attempt($credentials)) {
                 Log::warning("Investor Login Failed: Invalid password for user ID: {$user->id} ({$user->id_number})");
                 $this->logActivity('Login Failed', 'Investor Portal', "Invalid password for user: {$user->name} (ID: {$user->id_number})", [
                     'user_id' => $user->id,
@@ -804,7 +787,7 @@ class AuthController extends Controller
             $user = auth('api')->user();
 
             // 5. Verify user can login and is active
-            if (!$user->canLogin()) {
+            if (! $user->canLogin()) {
                 Auth::guard('api')->logout();
                 Log::warning("Investor Login Denied: User account deactivated: ID {$user->id}");
                 $this->logActivity('Login Denied', 'Investor Portal', "Account deactivated for user: {$user->name} (ID: {$user->id_number})", [
@@ -818,7 +801,7 @@ class AuthController extends Controller
             }
 
             // 6. Verify linked customer profile active status
-            if ($customer && !$customer->is_active) {
+            if ($customer && ! $customer->is_active) {
                 Auth::guard('api')->logout();
                 Log::warning("Investor Login Denied: Linked customer profile is inactive for customer ID {$customer->id}");
                 $this->logActivity('Login Denied', 'Investor Portal', "Customer profile is inactive for customer: {$customer->full_name} (ID: {$customer->id_number})", [
@@ -854,7 +837,7 @@ class AuthController extends Controller
             }
 
             // 9. Logging & Response
-            Log::info("Investor Login Successful: User ID {$user->id} ({$user->id_number}), Customer ID: " . ($customer->id ?? 'N/A'));
+            Log::info("Investor Login Successful: User ID {$user->id} ({$user->id_number}), Customer ID: ".($customer->id ?? 'N/A'));
             $this->logActivity('Login', 'Investor Portal', "Investor logged in successfully: {$user->name} (ID: {$user->id_number})", [
                 'user_id' => $user->id,
                 'customer_id' => $customer->id ?? null,
@@ -873,12 +856,12 @@ class AuthController extends Controller
             ], 200)->cookie($cookie);
 
         } catch (\Throwable $th) {
-            Log::error('Investor login error: ' . $th->getMessage(), [
+            Log::error('Investor login error: '.$th->getMessage(), [
                 'exception' => $th,
                 'request' => $request->except('password'),
             ]);
 
-            $this->logActivity('Error', 'Investor Portal', 'Login error: ' . $th->getMessage(), [
+            $this->logActivity('Error', 'Investor Portal', 'Login error: '.$th->getMessage(), [
                 'exception' => $th->getMessage(),
             ]);
 
@@ -892,9 +875,6 @@ class AuthController extends Controller
 
     /**
      * Investor Logout.
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function logout(Request $request): JsonResponse
     {
@@ -920,11 +900,11 @@ class AuthController extends Controller
             ], 200)->withCookie($cookie);
 
         } catch (\Throwable $th) {
-            Log::error('Investor logout error: ' . $th->getMessage(), [
+            Log::error('Investor logout error: '.$th->getMessage(), [
                 'exception' => $th,
             ]);
 
-            $this->logActivity('Error', 'Investor Portal', 'Logout error: ' . $th->getMessage(), [
+            $this->logActivity('Error', 'Investor Portal', 'Logout error: '.$th->getMessage(), [
                 'exception' => $th->getMessage(),
             ]);
 
@@ -938,16 +918,13 @@ class AuthController extends Controller
 
     /**
      * Get authenticated investor profile and details.
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function me(Request $request): JsonResponse
     {
         try {
             $user = auth('api')->user();
 
-            if (!$user) {
+            if (! $user) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Unauthenticated.',
@@ -979,11 +956,11 @@ class AuthController extends Controller
             ], 200);
 
         } catch (\Throwable $th) {
-            Log::error('Investor profile fetch error: ' . $th->getMessage(), [
+            Log::error('Investor profile fetch error: '.$th->getMessage(), [
                 'exception' => $th,
             ]);
 
-            $this->logActivity('Error', 'Investor Portal', 'Fetch profile error: ' . $th->getMessage(), [
+            $this->logActivity('Error', 'Investor Portal', 'Fetch profile error: '.$th->getMessage(), [
                 'exception' => $th->getMessage(),
             ]);
 
@@ -994,4 +971,71 @@ class AuthController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Change authenticated investor's password.
+     *
+     * @param ChangePasswordRequest $request
+     * @return JsonResponse
+     */
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        try {
+            $user = auth('api')->user();
+
+            if (! $user) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+
+            $currentPassword = (string) $request->input('current_password');
+            $newPassword = (string) $request->input('new_password');
+
+            // Verify current password against stored hash
+            if (! Hash::check($currentPassword, $user->password)) {
+                $this->logActivity('Warning', 'Investor Portal', "Password change failed (incorrect current password): {$user->name} (ID: {$user->id_number})", [
+                    'user_id' => $user->id,
+                ]);
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'The provided current password does not match our records.',
+                    'errors' => [
+                        [
+                            'field' => 'current_password',
+                            'messages' => ['The current password is incorrect.']
+                        ]
+                    ]
+                ], 422);
+            }
+
+            // Update user password
+            $user->password = Hash::make($newPassword);
+            $user->save();
+
+            $this->logActivity('Password Changed', 'Investor Portal', "Password changed successfully for investor: {$user->name} (ID: {$user->id_number})", [
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Password changed successfully.',
+            ], 200);
+
+        } catch (\Throwable $th) {
+            $this->logActivity('Error', 'Investor Portal', 'Change password error: '.$th->getMessage(), [
+                'exception' => $th->getMessage(),
+                'user_id' => auth('api')->id(),
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'An error occurred while changing your password. Please try again later.',
+                'error' => config('app.debug') ? $th->getMessage() : null,
+            ], 500);
+        }
+    }
 }
+

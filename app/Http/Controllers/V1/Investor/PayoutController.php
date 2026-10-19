@@ -7,28 +7,13 @@ use App\Models\Customer;
 use App\Models\Investment;
 use App\Models\InvestmentPayout;
 use App\Traits\ActivityLogTrait;
+use App\Traits\ResolvesInvestorCustomer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PayoutController extends Controller
 {
-    use ActivityLogTrait;
-
-    /**
-     * Resolve the customer profile linked to the authenticated user.
-     */
-    protected function resolveCustomer()
-    {
-        $user = auth('api')->user();
-
-        if (! $user) {
-            return null;
-        }
-
-        return Customer::where('customer_id', $user->id)
-            ->orWhereRaw('LOWER(TRIM(id_number)) = ?', [strtolower($user->id_number)])
-            ->first();
-    }
+    use ActivityLogTrait, ResolvesInvestorCustomer;
 
     /**
      * Get the investment IDs belonging to the authenticated customer.

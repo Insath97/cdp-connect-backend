@@ -77,6 +77,11 @@ class QuotationController extends Controller implements HasMiddleware
                 $query->where('quotations.branch_id', $request->branch_id);
             }
 
+            // Creator Type Filter (consultant vs investor)
+            if ($request->filled('creator_type')) {
+                $query->where('quotations.creator_type', $request->creator_type);
+            }
+
             // Search by Quotation Number or Customer Name
             if ($request->has('search')) {
                 $search = $request->search;
@@ -208,6 +213,7 @@ class QuotationController extends Controller implements HasMiddleware
                 'branch_id' => $branchId,
                 'quotation_number' => $quotationNumber,
                 'created_by' => $createdBy,
+                'creator_type' => 'consultant',
                 'status' => 'draft',
                 'monthly_return' => $monthlyReturn,
                 'annual_return' => $annualReturn,

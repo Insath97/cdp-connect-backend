@@ -1,10 +1,12 @@
 <?php
 
-namespace App\Http\Controllers\V1;
+namespace App\Http\Controllers\External;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\VerifyInvestmentRequest;
+use App\Http\Requests\CalculatePortalReturnRequest;
 use App\Models\Investment;
+use App\Models\InvestmentProduct;
 use App\Traits\ActivityLogTrait;
 use App\Traits\InvestmentCalculationTrait;
 use App\Utilities\NumberToWords;
@@ -12,7 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 
-class CustomerVerificationController extends Controller
+class PortalController extends Controller
 {
     use ActivityLogTrait, InvestmentCalculationTrait;
 
@@ -166,6 +168,102 @@ class CustomerVerificationController extends Controller
                 'status' => 'error',
                 'message' => 'An error occurred during verification. Please try again later.',
                 'error' => config('app.debug') ? $th->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /**
+     * Get available investment products.
+     *
+     * @return JsonResponse
+     */
+    public function getAvailableInvestmentProducts(): JsonResponse
+    {
+        try {
+            $products = InvestmentProduct::active()
+                ->visibleTo()
+                ->select('id', 'name', 'code', 'duration_months')
+                ->orderBy('id', 'asc')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Investment products retrieved successfully',
+                'data' => $products,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve investment products',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Calculate estimated investment return and maturity amount for portal display.
+     *
+     * @param CalculatePortalReturnRequest $request
+     * @return JsonResponse
+     */
+    public function calculateReturn(CalculatePortalReturnRequest $request): JsonResponse
+    {
+        try {
+            $amount = (float) $request->input('investment_amount');
+            $productId = (int) $request->input('investment_product_id');
+
+            $product = InvestmentProduct::active()
+                ->with('annualRates')
+                ->find($productId);
+
+            if (!$product) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Investment product not found or is currently inactive.',
+                ], 404);
+            }
+
+            $calculations = $this->calculateInvestmentROI($amount, $product);
+
+            $duration = (int) $product->duration_months;
+            $horizonLabel = "{$duration} Mo. Horizon";
+            $netReturn = round((float) ($calculations['total_interest'] ?? 0), 2);
+            $totalAtMaturity = round((float) ($calculations['maturity_amount'] ?? ($amount + $netReturn)), 2);
+
+            $initialCapitalFormatted = 'LKR ' . number_format($amount, ($amount == floor($amount)) ? 0 : 2);
+            $netReturnFormatted = 'LKR ' . number_format($netReturn, ($netReturn == floor($netReturn)) ? 0 : 2);
+            $totalAtMaturityFormatted = 'LKR ' . number_format($totalAtMaturity, ($totalAtMaturity == floor($totalAtMaturity)) ? 0 : 2);
+
+            $description = "Net estimated return ({$horizonLabel}) over initial capital of {$initialCapitalFormatted}";
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Investment return estimated successfully',
+                'data'    => [
+                    'product_id'                     => $product->id,
+                    'product_name'                   => $product->name,
+                    'duration_months'                => $duration,
+                    'horizon_label'                  => $horizonLabel,
+                    'initial_capital'                => $amount,
+                    'initial_capital_formatted'      => $initialCapitalFormatted,
+                    'estimated_net_return'           => $netReturn,
+                    'estimated_net_return_formatted' => $netReturnFormatted,
+                    'total_at_maturity'              => $totalAtMaturity,
+                    'total_at_maturity_formatted'    => $totalAtMaturityFormatted,
+                    'description'                    => $description,
+                ],
+            ], 200);
+
+        } catch (\Throwable $th) {
+            Log::error('Portal return calculation error: ' . $th->getMessage(), [
+                'exception' => $th,
+                'request'   => $request->only(['investment_product_id', 'investment_amount']),
+            ]);
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Failed to calculate investment return',
+                'error'   => config('app.debug') ? $th->getMessage() : null,
             ], 500);
         }
     }

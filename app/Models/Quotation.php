@@ -35,6 +35,7 @@ class Quotation extends Model
         'year_4_breakdown',
         'year_5_breakdown',
         'status',
+        'creator_type',
         'is_active',
         'valid_until',
         'notes',
@@ -80,5 +81,15 @@ class Quotation extends Model
     public function marketingUser()
     {
         return $this->belongsTo(User::class, 'marketing_user_id');
+    }
+
+    public function scopeInvestorCreated($query)
+    {
+        return $query->where('creator_type', 'investor');
+    }
+
+    public function scopeConsultantCreated($query)
+    {
+        return $query->where('creator_type', 'consultant');
     }
 }
