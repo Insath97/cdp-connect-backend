@@ -610,7 +610,7 @@ class AuthController extends Controller
                 $user->can_login = true;
                 $user->save();
             } else {
-                $email = ! empty($customer->email) ? $customer->email : ($customer->customer_code.'@customer.cdpempire.com');
+                $email = ! empty($customer->email) ? $customer->email : ($customer->customer_code.'@cdp.lk');
                 $username = ! empty($customer->customer_code) ? $customer->customer_code : ('cust_'.$customer->id);
 
                 if (User::where('username', $username)->exists()) {
