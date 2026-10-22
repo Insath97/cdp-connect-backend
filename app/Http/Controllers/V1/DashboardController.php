@@ -81,7 +81,7 @@ class DashboardController extends Controller implements HasMiddleware
                 });
             } elseif ($isAdminView) {
                 $targetQuery->whereHas('user', function ($uq) {
-                    $uq->where('level_id', '=', 1, 'and'); // Company view: GM (Level 1)
+                    $uq->where('level_id', '=', 2, 'and'); // Company view: GM (Level 1)
                 });
             } else {
                 // Hierarchy User: Show only their own aggregate target record
